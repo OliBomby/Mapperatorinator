@@ -316,7 +316,7 @@ def load_model(
         model.load_state_dict(model_state)
 
     model.eval()
-    model.to(device)
+    model.to(torch.bfloat16).to(device)
 
     return model, tokenizer
 

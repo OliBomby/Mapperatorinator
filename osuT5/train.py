@@ -46,7 +46,7 @@ def main(args: TrainConfig):
 
     shared = get_shared_training_state()
     tokenizer = get_tokenizer(args)
-    model = get_model(args, tokenizer)
+    model = get_model(args, tokenizer).to(torch.bfloat16)
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args, accelerator)
     train_dataloader, test_dataloader = get_dataloaders(tokenizer, args, shared)

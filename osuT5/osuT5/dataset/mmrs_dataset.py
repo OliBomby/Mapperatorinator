@@ -665,7 +665,7 @@ class BeatmapDatasetIterable:
         Returns:
             The same sequence with padded frames.
         """
-        frames = torch.from_numpy(sequence["frames"]).to(torch.float32)
+        frames = torch.from_numpy(sequence["frames"]).to(torch.bfloat16)
 
         if frames.shape[0] != self.frame_seq_len:
             n = min(self.frame_seq_len, len(frames))

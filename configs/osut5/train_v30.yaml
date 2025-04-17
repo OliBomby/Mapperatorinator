@@ -64,4 +64,21 @@ dataloader:             # Dataloader settings
 optim:                  # Optimizer settings
   base_lr: 1e-2         # Should not be scaled with the number of devices present
   batch_size: 128
-  grad_acc: 128
+  grad_acc: 32
+  grad_clip: 1.0
+  total_steps: 65536
+  warmup_steps: 10000
+
+logging:                # Logging settings
+  log_with: 'wandb'     # Logging service (wandb/tensorboard)
+  every_steps: 10
+  grad_l2: true
+  weights_l2: true
+  mode: 'online'
+
+eval:                   # Evaluation settings
+  every_steps: 2000
+  steps: 500
+
+checkpoint:             # Checkpoint settings
+  every_steps: 2000

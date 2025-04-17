@@ -581,7 +581,7 @@ class Processor(object):
         return MapperatorinatorCache(decoder_cache, encoder_cache, self.cfg_scale)
 
     def prepare_frames(self, frames: torch.Tensor) -> torch.Tensor:
-        frames = frames.to(self.device)
+        frames = frames.to(torch.bfloat16).to(self.device)
 
         if frames.dim() == 1:
             frames = frames.unsqueeze(0)

@@ -29,6 +29,7 @@ def get_backbone_model(name, config):
     elif name.startswith("openai/whisper"):
         if isinstance(config, dict):
             config = WhisperConfig(**config)
+        config._attn_implementation = "sdpa"
         model = WhisperForConditionalGeneration(config)
     else:
         raise NotImplementedError
