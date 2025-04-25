@@ -348,7 +348,7 @@ def load_diff_model(
     return model, tokenizer
 
 
-@hydra.main(config_path="configs", config_name="inference_v29", version_base="1.1")
+@hydra.main(config_path="configs", config_name="inference_v30", version_base="1.1")
 def main(args: InferenceConfig):
     prepare_args(args)
 
