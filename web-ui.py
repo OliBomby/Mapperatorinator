@@ -238,7 +238,70 @@ def start_inference():
             print(f"Error starting subprocess: {e}")
             current_process = None
             return jsonify({"status": "error", "message": f"Failed to start process: {e}"}), 500
+        
+@app.route('/upload_audio', methods=['POST'])
+def upload_audio():
+    """Handles audio file upload."""
+    audio_file = request.files.get('audio_file')
+    if not audio_file:
+        return jsonify({"status": "error", "message": "No audio file provided"}), 400
 
+    # Save the uploaded file to a temporary location
+    temp_dir = os.path.join(script_dir, 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
+    audio_path = os.path.join(temp_dir, audio_file.filename)
+    
+    try:
+        audio_file.save(audio_path)
+        print(f"Audio file saved to: {audio_path}")
+        return jsonify({"status": "success", "message": "Audio file uploaded successfully", "path": audio_path}), 200
+    except Exception as e:
+        print(f"Error saving audio file: {e}")
+        return jsonify({"status": "error", "message": f"Failed to save audio file: {e}"}), 500
+
+@app.route('/upload_beatmap', methods=['POST'])
+def upload_beatmap_file():
+    """Handles beatmap file upload."""
+    beatmap_file = request.files.get('beatmap_file')
+    if not beatmap_file:
+        return jsonify({"status": "error", "message": "No beatmap file provided"}), 400
+
+    # Save the uploaded file to a temporary location
+    temp_dir = os.path.join(script_dir, 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
+    beatmap_path = os.path.join(temp_dir, beatmap_file.filename)
+
+    try:
+        beatmap_file.save(beatmap_path)
+        print(f"Beatmap file saved to: {beatmap_path}")
+        return jsonify({"status": "success", "message": "Beatmap file uploaded successfully", "path": beatmap_path}), 200
+    except Exception as e:
+        print(f"Error saving beatmap file: {e}")
+        return jsonify({"status": "error", "message": f"Failed to save beatmap file: {e}"}), 500
+    
+@app.route('/upload_osu_file_content', methods=['POST'])
+def upload_osu_file_content():
+    # send a defined beatmap
+    """Handles osu file upload."""
+    beatmap_path = request.form.get('beatmap_path')
+    if not beatmap_path:
+        return jsonify({"status": "error", "message": "No beatmap path provided"}), 400
+    
+    # send the file from the beatmap_path
+    if not os.path.isfile(beatmap_path):
+        return jsonify({"status": "error", "message": "Beatmap file does not exist"}), 400
+    try:
+        # send the content of the file
+        with open(beatmap_path, 'rb') as f:
+            content = f.read()
+        # send the content as a response (its a text file)
+        response = Response(content, mimetype='text/plain')
+        response.headers['Content-Disposition'] = f'attachment; filename="{os.path.basename(beatmap_path)}"'
+        print(f"Beatmap file content sent: {beatmap_path}")
+        return response, 200
+    except Exception as e:
+        print(f"Error copying beatmap file: {e}")
+        return jsonify({"status": "error", "message": f"Failed to copy beatmap file: {e}"}), 500
 
 @app.route('/stream_output')
 def stream_output():
@@ -446,22 +509,22 @@ def run_flask(port):
 
     # Use threaded=True for better concurrency within Flask
     # Avoid debug=True as it interferes with threading and pywebview
-    print(f"Starting Flask server on http://127.0.0.1:{port}")
+    print(f"Starting Flask server on http://0.0.0.0:{port}")
     try:
         # Explicitly set debug=False, in addition to FLASK_ENV=production
-        app.run(host='127.0.0.1', port=port, threaded=True, debug=False)
+        app.run(host='0.0.0.0', port=port, threaded=True, debug=False)
     except OSError as e:
         print(f"Flask server could not start on port {port}: {e}")
         # Optionally: try another port or exit
 
 
 # --- Function to Find Available Port ---
-def find_available_port(start_port=5000, max_tries=100):
+def find_available_port(start_port=7050, max_tries=1):
     """Finds an available TCP port."""
     for port in range(start_port, start_port + max_tries):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
-                s.bind(('127.0.0.1', port))
+                s.bind(('0.0.0.0', port))
                 print(f"Found available port: {port}")
                 return port
             except OSError:
@@ -499,7 +562,7 @@ if __name__ == '__main__':
 
     # Create the pywebview window pointing to the Flask server
     window_title = 'Mapperatorinator'
-    flask_url = f'http://127.0.0.1:{flask_port}/'
+    flask_url = f'http://localhost:{flask_port}/'
 
     print(f"Creating pywebview window loading URL: {flask_url}")
 
