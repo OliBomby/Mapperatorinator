@@ -67,10 +67,12 @@ data:                  # Data settings
   timing_random_offset: 0
   add_gd_context: false  # Prefix the decoder with tokens of another beatmap in the mapset
   min_difficulty: 0     # Minimum difficulty to consider including in the dataset
+  max_difficulty: 100   # Maximum difficulty to consider including in the dataset
   sample_weights_path: ''    # Path to sample weights
   rhythm_weight: 1.0    # Weight of rhythm tokens in the loss calculation
   lookback: 0             # Fraction of audio sequence to fill with tokens from previous inference window
   lookahead: 0            # Fraction of audio sequence to skip at the end of the audio window
+  lookback_prob: 0.0  # Probability of using the lookback augmentation for a beatmap in the dataset
   context_types:      # List of context types to include in the dataset
     - "in": []
       "out": ['${context_type:map}']
@@ -88,6 +90,7 @@ data:                  # Data settings
   position_range: [-256, 768, -256, 640]  # Range of hit object coordinates
   dt_augment_prob: 0.0   # Probability of augmenting the dataset with DT
   dt_augment_range: [1.5, 1.5]  # Range of DT augmentation
+  dt_augment_sqrt: false  # Sample DT augmentation from a square root distribution
   types_first: false       # Put the type token at the start of the group before the timeshift token
   add_kiai: false        # Add kiai times to map context
   gamemodes: [0]  # List of gamemodes to include in the dataset
@@ -95,6 +98,7 @@ data:                  # Data settings
   add_sv: false  # Model slider velocity in std and ctb
   add_mania_sv: false  # Add mania scroll velocity in map context
   min_year: null  # Minimum year of the beatmap to include in the dataset
+  frame_offset_augment_prob: 1.0  # Probability of augmenting beatmap sequences with frame offset
 
 
 dataloader:             # Dataloader settings
@@ -103,6 +107,7 @@ dataloader:             # Dataloader settings
 optim:                  # Optimizer settings
   name: adamwscale
   base_lr: 2e-2         # Should be scaled with the number of devices present
+  base_lr_2: 3e-4        # Secondary learning rate for the internal optimizer
   batch_size: 129       # This is the batch size per GPU
   total_steps: 65536
   warmup_steps: 10000

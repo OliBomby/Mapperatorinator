@@ -12,7 +12,6 @@ from accelerate.utils import ProjectConfiguration
 from torch import nn
 from tqdm import tqdm
 
-import routed_pickle
 from osuT5.config import TrainConfig
 from osuT5.dataset.ors_dataset import STEPS_PER_MILLISECOND, LABEL_IGNORE_ID
 from osuT5.model import Mapperatorinator
@@ -43,7 +42,7 @@ def load_model(
         if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
             tokenizer = Tokenizer.from_pretrained(ckpt_path_str)
         else:
-            tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=routed_pickle, weights_only=False)
+            tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", weights_only=False)
             tokenizer = Tokenizer()
             tokenizer.load_state_dict(tokenizer_state)
         return tokenizer

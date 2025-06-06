@@ -146,6 +146,7 @@ def get_optimizer(model: Mapperatorinator, args: TrainConfig) -> Optimizer:
         optimizer = Muon(
             muon_params=muon_params,
             lr=args.optim.base_lr,
+            adamw_lr=args.optim.base_lr_2,
             adamw_params=adamw_params,
             adamw_betas=(0.90, 0.95)
         )
