@@ -455,6 +455,40 @@ def open_log_file():
         return jsonify({"status": "error", "message": f"Could not open log file: {e}"}), 500
 
 
+@app.route('/save_config', methods=['POST'])
+def save_config():
+    try:
+        folder_path = request.form.get('folder_path')
+        filename = request.form.get('filename')
+        config_data = request.form.get('config_data')
+
+        if not folder_path or not filename or not config_data:
+            return jsonify({'success': False, 'error': 'Missing required parameters'})
+
+        # Ensure the folder path exists
+        if not os.path.exists(folder_path):
+            return jsonify({'success': False, 'error': 'Selected folder does not exist'})
+
+        # Create full file path
+        file_path = os.path.join(folder_path, filename)
+
+        # Write the configuration file
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(config_data)
+
+        return jsonify({
+            'success': True,
+            'file_path': file_path,
+            'message': 'Configuration saved successfully'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to save configuration: {str(e)}'
+        })
+
+
 # --- Function to Run Flask in a Thread ---
 def run_flask(port):
     """Runs the Flask app."""
