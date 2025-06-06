@@ -1,15 +1,19 @@
 import os
 import random
+import traceback
+from datetime import timedelta
 from pathlib import Path
+from threading import Thread
 
 import hydra
 import numpy as np
 import torch
 from scipy import linalg
-from slider import Beatmap
+from slider import Beatmap, Circle, Slider, Spinner, HoldNote
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from classifier.classify import iterate_examples
+from classifier.classify import ExampleDataset
 from classifier.libs.model.model import OsuClassifierOutput
 from classifier.libs.utils import load_ckpt
 from config import FidConfig
@@ -101,80 +105,198 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     return diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean
 
 
-def worker(beatmap_paths, args: FidConfig, return_dict, idx):
+def add_to_dict(source_dict, target_dict):
+    for key, value in source_dict.items():
+        if key not in target_dict:
+            target_dict[key] = value
+        else:
+            target_dict[key] += value
+
+
+def calculate_rhythm_stats(real_rhythm, generated_rhythm):
+    # Rhythm is a set of timestamps for each beat
+    # Calculate number of true positives, false positives, and false negatives within a leniency of 10 ms
+    leniency = 10
+    true_positives = 0
+    false_positives = 0
+    false_negatives = 0
+    for real_beat in real_rhythm:
+        if any(abs(real_beat - gen_beat) <= leniency for gen_beat in generated_rhythm):
+            true_positives += 1
+        else:
+            false_negatives += 1
+
+    for gen_beat in generated_rhythm:
+        if not any(abs(gen_beat - real_beat) <= leniency for real_beat in real_rhythm):
+            false_positives += 1
+
+    return {
+        "true_positives": true_positives,
+        "false_positives": false_positives,
+        "false_negatives": false_negatives,
+    }
+
+
+def calculate_precision(rhythm_stats):
+    true_positives = rhythm_stats["true_positives"]
+    false_positives = rhythm_stats["false_positives"]
+    if true_positives + false_positives == 0:
+        return 0.0
+    return true_positives / (true_positives + false_positives)
+
+
+def calculate_recall(rhythm_stats):
+    true_positives = rhythm_stats["true_positives"]
+    false_negatives = rhythm_stats["false_negatives"]
+    if true_positives + false_negatives == 0:
+        return 0.0
+    return true_positives / (true_positives + false_negatives)
+
+
+def calculate_f1(rhythm_stats):
+    precision = calculate_precision(rhythm_stats)
+    recall = calculate_recall(rhythm_stats)
+    if precision + recall == 0:
+        return 0.0
+    return 2 * (precision * recall) / (precision + recall)
+
+
+def get_rhythm(beatmap, passive=False):
+    # Extract the rhythm from the beatmap
+    # Active rhythm includes only circles, slider heads, and hold note heads
+    # Passive rhythm also includes slider tails, slider repeats, and spinners tails
+    rhythm = set()
+    for hit_object in beatmap.hit_objects(stacking=False):
+        if isinstance(hit_object, Circle):
+            rhythm.add(int(hit_object.time.total_seconds() * 1000))
+        elif isinstance(hit_object, Slider):
+            duration: timedelta = (hit_object.end_time - hit_object.time) / hit_object.repeat
+            rhythm.add(int(hit_object.time.total_seconds() * 1000))
+            if passive:
+                for i in range(hit_object.repeat):
+                    rhythm.add(int((hit_object.time + duration * (i + 1)).total_seconds() * 1000))
+        elif isinstance(hit_object, Spinner):
+            if passive:
+                rhythm.add(int(hit_object.end_time.total_seconds() * 1000))
+        elif isinstance(hit_object, HoldNote):
+            rhythm.add(int(hit_object.time.total_seconds() * 1000))
+
+    return rhythm
+
+
+def worker(beatmap_paths, fid_args: FidConfig, return_dict, idx):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    prepare_args(args)
+    prepare_args(fid_args)
+    args = fid_args.inference
 
-    model, tokenizer = load_model(args.model_path, args.osut5, args.device)
-
-    if args.compile:
-        model.transformer.forward = torch.compile(model.transformer.forward, mode="reduce-overhead", fullgraph=True)
-
-    diff_model, diff_tokenizer, refine_model = None, None, None
-    if args.generate_positions:
-        diff_model, diff_tokenizer = load_diff_model(args.diff_ckpt, args.diffusion, args.device)
-
-        if os.path.exists(args.diff_refine_ckpt):
-            refine_model = load_diff_model(args.diff_refine_ckpt, args.diffusion, args.device)[0]
+    model, tokenizer, diff_model, diff_tokenizer, refine_model = None, None, None, None, None
+    if not fid_args.skip_generation:
+        model, tokenizer = load_model(args.model_path, args.osut5, args.device, args.max_batch_size, True)
 
         if args.compile:
-            diff_model.forward = torch.compile(diff_model.forward, mode="reduce-overhead", fullgraph=False)
+            model.transformer.forward = torch.compile(model.transformer.forward, mode="reduce-overhead", fullgraph=True)
 
-    classifier_model, classifier_args, classifier_tokenizer = load_ckpt(args.classifier_ckpt)
+        if args.generate_positions:
+            diff_model, diff_tokenizer = load_diff_model(args.diff_ckpt, args.diffusion, args.device)
 
-    if args.compile:
-        classifier_model.model.transformer.forward = torch.compile(classifier_model.model.transformer.forward, mode="reduce-overhead", fullgraph=False)
+            if os.path.exists(args.diff_refine_ckpt):
+                refine_model = load_diff_model(args.diff_refine_ckpt, args.diffusion, args.device)[0]
+
+            if args.compile:
+                diff_model.forward = torch.compile(diff_model.forward, mode="reduce-overhead", fullgraph=False)
+
+    classifier_model, classifier_args, classifier_tokenizer = None, None, None
+    if fid_args.fid:
+        classifier_model, classifier_args, classifier_tokenizer = load_ckpt(fid_args.classifier_ckpt)
+
+        if args.compile:
+            classifier_model.model.transformer.forward = torch.compile(classifier_model.model.transformer.forward, mode="reduce-overhead", fullgraph=False)
 
     real_features = []
     generated_features = []
+    active_rhythm_stats = {}
+    passive_rhythm_stats = {}
 
     for beatmap_path in tqdm(beatmap_paths, desc=f"Process {idx}"):
-        audio_path = beatmap_path.parents[1] / list(beatmap_path.parents[1].glob('audio.*'))[0]
-        beatmap = Beatmap.from_path(beatmap_path)
+        try:
+            audio_path = beatmap_path.parents[1] / list(beatmap_path.parents[1].glob('audio.*'))[0]
+            beatmap = Beatmap.from_path(beatmap_path)
 
-        if ContextType.GD in args.in_context:
-            other_beatmaps = [k for k in beatmap_path.parent.glob("*.osu") if k != beatmap_path]
-            if len(other_beatmaps) == 0:
-                continue
-            other_beatmap_path = random.choice(other_beatmaps)
-        else:
-            other_beatmap_path = beatmap_path
+            output_path = Path("generated") / beatmap_path.stem
 
-        generation_config = generation_config_from_beatmap(beatmap, tokenizer)
-        beatmap_config = beatmap_config_from_beatmap(beatmap)
+            if fid_args.skip_generation or (output_path.exists() and len(list(output_path.glob("*.osu"))) > 0):
+                if not output_path.exists() or len(list(output_path.glob("*.osu"))) == 0:
+                    raise FileNotFoundError(f"Generated beatmap not found in {output_path}")
+                generated_beatmap = Beatmap.from_path(list(output_path.glob("*.osu"))[0])
+                print(f"Skipping {beatmap_path.stem} as it already exists")
+            else:
+                if ContextType.GD in args.in_context:
+                    other_beatmaps = [k for k in beatmap_path.parent.glob("*.osu") if k != beatmap_path]
+                    if len(other_beatmaps) == 0:
+                        continue
+                    other_beatmap_path = random.choice(other_beatmaps)
+                else:
+                    other_beatmap_path = beatmap_path
 
-        result = generate(
-            args,
-            audio_path=audio_path,
-            beatmap_path=other_beatmap_path,
-            generation_config=generation_config,
-            beatmap_config=beatmap_config,
-            model=model,
-            tokenizer=tokenizer,
-            diff_model=diff_model,
-            diff_tokenizer=diff_tokenizer,
-            refine_model=refine_model,
-            verbose=False,
-        )[0]
-        generated_beatmap = Beatmap.parse(result)
+                generation_config = generation_config_from_beatmap(beatmap, tokenizer)
+                beatmap_config = beatmap_config_from_beatmap(beatmap)
 
-        # Calculate feature vectors for real and generated beatmaps
-        sample_rate = classifier_args.data.sample_rate
-        audio = load_audio_file(audio_path, sample_rate)
+                if args.year is not None:
+                    generation_config.year = args.year
 
-        for example in iterate_examples(beatmap, audio, classifier_args, classifier_tokenizer, device):
-            classifier_result: OsuClassifierOutput = classifier_model(**example)
-            features = classifier_result.feature_vector
-            real_features.append(features.squeeze(0).cpu().numpy())
+                result = generate(
+                    args,
+                    audio_path=audio_path,
+                    beatmap_path=other_beatmap_path,
+                    output_path=output_path,
+                    generation_config=generation_config,
+                    beatmap_config=beatmap_config,
+                    model=model,
+                    tokenizer=tokenizer,
+                    diff_model=diff_model,
+                    diff_tokenizer=diff_tokenizer,
+                    refine_model=refine_model,
+                    verbose=False,
+                )[0]
+                generated_beatmap = Beatmap.parse(result)
+                print(beatmap_path, "Generated %s hit objects" % len(generated_beatmap.hit_objects(stacking=False)))
 
-        for example in iterate_examples(generated_beatmap, audio, classifier_args, classifier_tokenizer, device):
-            classifier_result: OsuClassifierOutput = classifier_model(**example)
-            features = classifier_result.feature_vector
-            generated_features.append(features.squeeze(0).cpu().numpy())
+            if fid_args.fid:
+                # Calculate feature vectors for real and generated beatmaps
+                sample_rate = classifier_args.data.sample_rate
+                audio = load_audio_file(audio_path, sample_rate)
 
-        torch.cuda.empty_cache()  # Clear any cached memory
+                for example in DataLoader(ExampleDataset(beatmap, audio, classifier_args, classifier_tokenizer, device), batch_size=fid_args.classifier_batch_size):
+                    classifier_result: OsuClassifierOutput = classifier_model(**example)
+                    features = classifier_result.feature_vector
+                    real_features.append(features.cpu().numpy())
 
-    return_dict[idx] = (real_features, generated_features)
+                for example in DataLoader(ExampleDataset(generated_beatmap, audio, classifier_args, classifier_tokenizer, device), batch_size=fid_args.classifier_batch_size):
+                    classifier_result: OsuClassifierOutput = classifier_model(**example)
+                    features = classifier_result.feature_vector
+                    generated_features.append(features.cpu().numpy())
+
+            if fid_args.rhythm_stats:
+                # Calculate rhythm stats
+                real_active_rhythm = get_rhythm(beatmap, passive=False)
+                generated_active_rhythm = get_rhythm(generated_beatmap, passive=False)
+                add_to_dict(calculate_rhythm_stats(real_active_rhythm, generated_active_rhythm), active_rhythm_stats)
+
+                real_passive_rhythm = get_rhythm(beatmap, passive=True)
+                generated_passive_rhythm = get_rhythm(generated_beatmap, passive=True)
+                add_to_dict(calculate_rhythm_stats(real_passive_rhythm, generated_passive_rhythm), passive_rhythm_stats)
+        except Exception as e:
+            print(f"Error processing {beatmap_path}: {e}")
+            traceback.print_exc()
+        finally:
+            torch.cuda.empty_cache()  # Clear any cached memory
+
+    return_dict[idx] = dict(
+        real_features=real_features,
+        generated_features=generated_features,
+        active_rhythm_stats=active_rhythm_stats,
+        passive_rhythm_stats=passive_rhythm_stats,
+    )
 
 
 @hydra.main(config_path="configs", config_name="calc_fid", version_base="1.1")
@@ -201,21 +323,41 @@ def main(args: FidConfig):
 
     real_features = []
     generated_features = []
+    active_rhythm_stats = {}
+    passive_rhythm_stats = {}
     for i in range(num_processes):
         if i not in return_dict:
             print(f"Process {i} did not return results!")
             continue
-        real_features.extend(return_dict[i][0])
-        generated_features.extend(return_dict[i][1])
+        real_features.extend(return_dict[i]["real_features"])
+        generated_features.extend(return_dict[i]["generated_features"])
+        add_to_dict(return_dict[i]["active_rhythm_stats"], active_rhythm_stats)
+        add_to_dict(return_dict[i]["passive_rhythm_stats"], passive_rhythm_stats)
 
-    # Calculate FID
-    real_features = np.stack(real_features)
-    generated_features = np.stack(generated_features)
-    m1, s1 = np.mean(real_features, axis=0), np.cov(real_features, rowvar=False)
-    m2, s2 = np.mean(generated_features, axis=0), np.cov(generated_features, rowvar=False)
-    fid = calculate_frechet_distance(m1, s1, m2, s2)
+    if args.fid:
+        # Calculate FID
+        real_features = np.concatenate(real_features, axis=0)
+        generated_features = np.concatenate(generated_features, axis=0)
+        m1, s1 = np.mean(real_features, axis=0), np.cov(real_features, rowvar=False)
+        m2, s2 = np.mean(generated_features, axis=0), np.cov(generated_features, rowvar=False)
+        fid = calculate_frechet_distance(m1, s1, m2, s2)
 
-    print(f"FID: {fid}")
+        print(f"FID: {fid}")
+
+    if args.rhythm_stats:
+        # Calculate rhythm precision, recall, and F1 score
+        active_precision = calculate_precision(active_rhythm_stats)
+        active_recall = calculate_recall(active_rhythm_stats)
+        active_f1 = calculate_f1(active_rhythm_stats)
+        passive_precision = calculate_precision(passive_rhythm_stats)
+        passive_recall = calculate_recall(passive_rhythm_stats)
+        passive_f1 = calculate_f1(passive_rhythm_stats)
+        print(f"Active Rhythm Precision: {active_precision}")
+        print(f"Active Rhythm Recall: {active_recall}")
+        print(f"Active Rhythm F1: {active_f1}")
+        print(f"Passive Rhythm Precision: {passive_precision}")
+        print(f"Passive Rhythm Recall: {passive_recall}")
+        print(f"Passive Rhythm F1: {passive_f1}")
 
 
 if __name__ == "__main__":

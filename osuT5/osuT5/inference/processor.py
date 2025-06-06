@@ -9,13 +9,12 @@ import torch
 import torch.nn.functional as F
 from slider import Beatmap, TimingPoint
 from tqdm import tqdm
-from transformers import LogitsProcessorList, LogitsProcessor, EncoderDecoderCache, StaticCache, \
-    ClassifierFreeGuidanceLogitsProcessor, Cache, TemperatureLogitsWarper
 
 from config import InferenceConfig
+from .server import InferenceClient, model_generate
 from ..dataset import OsuParser
 from ..dataset.data_utils import (update_event_times, remove_events_of_type, get_hold_note_ratio,
-                                  get_scroll_speed_ratio, get_hitsounded_status, TIMED_EVENTS)
+                                  get_scroll_speed_ratio, get_hitsounded_status)
 from ..model import Mapperatorinator
 from ..tokenizer import Event, EventType, Tokenizer, ContextType
 
@@ -31,8 +30,12 @@ class GenerationConfig:
     mapper_id: Optional[int] = None
     year: Optional[int] = None
     hitsounded: bool = True
-    slider_multiplier: float = 1.4
+    hp_drain_rate: Optional[float] = None
     circle_size: Optional[float] = None
+    overall_difficulty: Optional[float] = None
+    approach_rate: Optional[float] = None
+    slider_multiplier: float = 1.4
+    slider_tick_rate: Optional[float] = None
     keycount: int = 4
     hold_note_ratio: Optional[float] = None
     scroll_speed_ratio: Optional[float] = None
@@ -54,8 +57,12 @@ def generation_config_from_beatmap(beatmap: Beatmap, tokenizer: Tokenizer) -> Ge
         beatmap_id=beatmap.beatmap_id,
         difficulty=difficulty,
         mapper_id=tokenizer.beatmap_mapper.get(beatmap.beatmap_id, None),
-        slider_multiplier=beatmap.slider_multiplier,
+        hp_drain_rate=beatmap.hp_drain_rate,
         circle_size=beatmap.circle_size,
+        overall_difficulty=beatmap.overall_difficulty,
+        approach_rate=beatmap.approach_rate,
+        slider_multiplier=beatmap.slider_multiplier,
+        slider_tick_rate=beatmap.slider_tick_rate,
         hitsounded=get_hitsounded_status(beatmap),
         keycount=int(beatmap.circle_size) if gamemode == 3 else 4,
         hold_note_ratio=get_hold_note_ratio(beatmap) if gamemode == 3 else None,
@@ -64,140 +71,8 @@ def generation_config_from_beatmap(beatmap: Beatmap, tokenizer: Tokenizer) -> Ge
     )
 
 
-def get_beat_type_tokens(tokenizer: Tokenizer) -> list[int]:
-    beat_range = [
-        tokenizer.event_start[EventType.BEAT],
-        tokenizer.event_start[EventType.MEASURE],
-    ]
-    if EventType.TIMING_POINT in tokenizer.event_start:
-        beat_range.append(tokenizer.event_start[EventType.TIMING_POINT])
-    return beat_range
-
-
-def get_mania_type_tokens(tokenizer: Tokenizer) -> list[int]:
-    return [
-        tokenizer.event_start[EventType.CIRCLE],
-        tokenizer.event_start[EventType.HOLD_NOTE],
-        tokenizer.event_start[EventType.HOLD_NOTE_END],
-    ] if EventType.HOLD_NOTE_END in tokenizer.event_start else []
-
-
-def get_scroll_speed_tokens(tokenizer: Tokenizer) -> range:
-    return range(tokenizer.event_start[EventType.SCROLL_SPEED], tokenizer.event_end[EventType.SCROLL_SPEED])
-
-
-class TimeshiftBias(LogitsProcessor):
-    def __init__(self, timeshift_bias: float, time_range: range):
-        self.timeshift_bias = timeshift_bias
-        self.time_range = time_range
-
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.Tensor:
-        scores_processed = scores.clone()
-        scores_processed[:, self.time_range] += self.timeshift_bias
-        return scores_processed
-
-
-class ConditionalTemperatureLogitsWarper(LogitsProcessor):
-    def __init__(
-            self,
-            temperature: float,
-            timing_temperature: float,
-            mania_column_temperature: float,
-            taiko_hit_temperature: float,
-            types_first: bool,
-            tokenizer: Tokenizer,
-            gamemode: int,
-    ):
-        self.gamemode = gamemode
-        self.temperature = temperature
-        self.conditionals = []
-
-        if timing_temperature != temperature:
-            self.conditionals.append((timing_temperature, get_beat_type_tokens(tokenizer), 1))
-        if mania_column_temperature != temperature and gamemode == 3:
-            self.conditionals.append((mania_column_temperature, get_mania_type_tokens(tokenizer), 3))
-        if taiko_hit_temperature != temperature and gamemode == 1:
-            self.conditionals.append((taiko_hit_temperature, get_scroll_speed_tokens(tokenizer), 1))
-
-        if not types_first:
-            print("WARNING: Conditional temperature is not supported for types_first=False. Ignoring.")
-            self.conditionals = []
-
-        self.max_offset = max([offset for _, _, offset in self.conditionals], default=0)
-
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.Tensor:
-        if len(self.conditionals) > 0:
-            lookback = input_ids[0, -self.max_offset:].cpu()
-            for temperature, tokens, offset in self.conditionals:
-                if len(lookback) >= offset and lookback[-offset] in tokens:
-                    return scores / temperature
-
-        return scores / self.temperature
-
-
-class LookbackBiasLogitsWarper(LogitsProcessor):
-    """This logit processor adjusts for bias in the frequency of generated events in case there is a lookback window,
-    and it is not full of generated tokens. In this case, the lookback window will be considered multiple times for
-    generating the next token, so we nill the scores of the lookback tokens and increase the chance of eos.
-    """
-    def __init__(self, lookback_max_time: float, tokenizer: Tokenizer, types_first: bool, device):
-        self.types_first = types_first  # Lookback bias is only supported for types_first=True
-        self.lookback_start = tokenizer.event_start[EventType.TIME_SHIFT]
-        self.lookback_end = tokenizer.encode(Event(EventType.TIME_SHIFT, int(lookback_max_time / MILISECONDS_PER_STEP)))
-        self.lookback_range = torch.full((tokenizer.vocab_size_out,), False, dtype=torch.bool, device=device)
-        self.lookback_range[self.lookback_start:self.lookback_end] = True
-        self.other_range = ~self.lookback_range
-        self.eos_ids = torch.tensor([tokenizer.eos_id] + [tokenizer.context_eos[context] for context in tokenizer.context_eos], dtype=torch.long, device=device)
-
-        self.last_scores = None
-        self.timed_tokens = []
-        for event_type in TIMED_EVENTS:
-            if event_type in tokenizer.event_start:
-                self.timed_tokens.extend(list(range(tokenizer.event_start[event_type], tokenizer.event_end[event_type])))
-        self.timed_tokens = torch.tensor(self.timed_tokens, dtype=torch.long, device=device)
-
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.Tensor:
-        if not self.types_first:
-            return scores
-
-        scores_processed = scores
-
-        if input_ids.shape[1] != 0 and self.last_scores is not None:
-            last_token = input_ids[:, -1]
-            last_timed = torch.isin(last_token, self.timed_tokens)
-            if last_timed.any():
-                # The scores are for a timeshift event
-                last_probs = F.softmax(self.last_scores, dim=-1)
-                probs = F.softmax(scores, dim=-1)
-                prob_eos = last_probs[:, self.eos_ids].sum(dim=-1)
-                prob_event = 1 - prob_eos
-                s = 1 / (probs[:, self.other_range].sum(dim=-1) * prob_event + prob_eos)
-                probs[:, self.lookback_range] = 0
-                probs[:, self.other_range] *= s.unsqueeze(1)
-                # Probability of eos now which should have been at the previous token
-                prob_eos_extra = torch.clip((s - 1) * prob_eos / prob_event, 0, 1)  # Clip to avoid numerical instability
-                probs[:, self.lookback_start] = prob_eos_extra  # This will be treated as eos if trim lookback is true
-
-                scores_processed = torch.where(last_timed.unsqueeze(1), torch.log(probs), scores)
-
-        self.last_scores = scores
-        return scores_processed
-
-
-class MapperatorinatorCache(EncoderDecoderCache):
-    def __init__(self, self_attention_cache: Cache, cross_attention_cache: Cache, cfg_scale: float):
-        super().__init__(self_attention_cache, cross_attention_cache)
-        self.cfg_scale = cfg_scale
-
-    def reorder_cache(self, beam_idx: torch.LongTensor):
-        """Reorders the cache for beam search, given the selected beam indices."""
-        beam_idx = beam_idx.repeat(2) if self.cfg_scale > 1 else beam_idx
-        self.self_attention_cache.reorder_cache(beam_idx)
-        self.cross_attention_cache.reorder_cache(beam_idx)
-
-
 class Processor(object):
-    def __init__(self, args: InferenceConfig, model: Mapperatorinator, tokenizer: Tokenizer, cfg_scale: float = None):
+    def __init__(self, args: InferenceConfig, model: Mapperatorinator | InferenceClient, tokenizer: Tokenizer, cfg_scale: float = None):
         """Model inference stage that processes sequences."""
         self.device = args.device
         self.args = args
@@ -209,12 +84,15 @@ class Processor(object):
         self.sample_rate = args.osut5.model.spectrogram.sample_rate
         self.samples_per_sequence = self.frame_seq_len * self.frame_size
         self.miliseconds_per_sequence = self.samples_per_sequence * MILISECONDS_PER_SECOND / self.sample_rate
-        self.lookback_max_time = args.lookback * self.miliseconds_per_sequence
-        self.lookback_time_range = range(tokenizer.event_start[EventType.TIME_SHIFT], tokenizer.encode(Event(EventType.TIME_SHIFT, int(self.lookback_max_time / MILISECONDS_PER_STEP))))
+        self.lookback_time = args.lookback * self.miliseconds_per_sequence
+        self.lookback_time_range = range(tokenizer.event_start[EventType.TIME_SHIFT], tokenizer.encode(Event(EventType.TIME_SHIFT, int(self.lookback_time / MILISECONDS_PER_STEP))))
         self.lookahead_max_time = (1 - args.lookahead) * self.miliseconds_per_sequence
+        self.lookahead_time = args.lookahead * self.miliseconds_per_sequence
         self.lookahead_time_range = range(tokenizer.encode(Event(EventType.TIME_SHIFT, int(self.lookahead_max_time / MILISECONDS_PER_STEP))), tokenizer.event_end[EventType.TIME_SHIFT])
         self.eos_time = (1 - args.osut5.data.lookahead) * self.miliseconds_per_sequence
         self.center_pad_decoder = args.osut5.data.center_pad_decoder
+        # All Special Prefix Tokens
+        self.add_out_context_types = args.osut5.data.add_out_context_types
         self.add_gamemode_token = args.osut5.data.add_gamemode_token
         self.add_style_token = args.osut5.data.add_style_token
         self.add_diff_token = args.osut5.data.add_diff_token
@@ -222,9 +100,16 @@ class Processor(object):
         self.add_year_token = args.osut5.data.add_year_token
         self.add_hitsounded_token = args.osut5.data.add_hitsounded_token
         self.add_song_length_token = args.osut5.data.add_song_length_token
-        self.add_song_position_token = args.osut5.data.add_song_position_token
+        self.add_global_sv_token = args.osut5.data.add_global_sv_token
         self.add_cs_token = args.osut5.data.add_cs_token
+        self.add_keycount_token = args.osut5.data.add_keycount_token
+        self.add_hold_note_ratio_token = args.osut5.data.add_hold_note_ratio_token
+        self.add_scroll_speed_ratio_token = args.osut5.data.add_scroll_speed_ratio_token
         self.add_descriptors = args.osut5.data.add_descriptors
+        self.add_sv_special_token = args.osut5.data.add_sv_special_token
+        self.add_kiai_special_token = args.osut5.data.add_kiai_special_token
+        self.add_song_position_token = args.osut5.data.add_song_position_token
+        # ---
         self.add_kiai = args.osut5.data.add_kiai
         self.max_pre_token_len = args.osut5.data.max_pre_token_len
         self.add_pre_tokens = args.osut5.data.add_pre_tokens
@@ -236,12 +121,10 @@ class Processor(object):
         self.do_mapper_embed = args.osut5.model.do_mapper_embed
         self.do_song_position_embed = args.osut5.model.do_song_position_embed
         self.add_positions = args.osut5.data.add_positions
-        self.add_sv_special_token = args.osut5.data.add_sv_special_token
         self.add_sv = args.osut5.data.add_sv
         self.add_mania_sv = args.osut5.data.add_mania_sv
         self.context_types: list[dict[str, list[ContextType]]] = \
             [{k: [ContextType(t) for t in v] for k, v in ct.items()} for ct in args.osut5.data.context_types]
-        self.add_out_context_types = args.osut5.data.add_out_context_types
         self.add_to_beatmap = args.add_to_beatmap
         self.start_time = args.start_time
         self.end_time = args.end_time
@@ -268,29 +151,28 @@ class Processor(object):
         self.max_batch_size = args.max_batch_size
 
         self.timeshift_bias = args.timeshift_bias
-        self.time_range = range(tokenizer.event_start[EventType.TIME_SHIFT], tokenizer.event_end[EventType.TIME_SHIFT])
-        self.beat_type_tokens = get_beat_type_tokens(tokenizer)
         self.types_first = args.osut5.data.types_first
 
-        self.base_logit_processor = LogitsProcessorList()
-        if self.cfg_scale > 1:
-            self.base_logit_processor.append(ClassifierFreeGuidanceLogitsProcessor(self.cfg_scale))
-        if self.timeshift_bias != 0:
-            self.base_logit_processor.append(TimeshiftBias(self.timeshift_bias, self.time_range))
-
-        self.lookback_bias_logit_processor = LookbackBiasLogitsWarper(self.lookback_max_time, tokenizer, self.types_first, self.device)
-
-    def model_generate(self, inputs, **kwargs: Any) -> Any:
-        return self.model.generate(
-            inputs,
-            top_p=self.top_p,
-            top_k=self.top_k,
+    def model_generate(self, model_kwargs, **generate_kwargs: Any) -> Any:
+        generate_kwargs2 = generate_kwargs | dict(
             do_sample=self.do_sample,
             num_beams=self.num_beams,
-            use_cache=True,
+            top_p=self.top_p,
+            top_k=self.top_k,
             max_length=self.tgt_seq_len,
-            **kwargs,
+            cfg_scale=self.cfg_scale,
+            timeshift_bias=self.timeshift_bias,
+            types_first=self.types_first,
+            temperature=self.temperature,
+            timing_temperature=self.timing_temperature,
+            mania_column_temperature=self.mania_column_temperature,
+            taiko_hit_temperature=self.taiko_hit_temperature,
         )
+
+        if isinstance(self.model, InferenceClient):
+            return self.model.generate(model_kwargs, generate_kwargs2)
+        else:
+            return model_generate(self.model, self.tokenizer, model_kwargs, generate_kwargs2)
 
     def generate(
             self,
@@ -367,30 +249,26 @@ class Processor(object):
             verbose=verbose,
         )
 
-        # Prepare logit processors
-        logit_processor = self.get_logits_processor(generation_config)
-
         # Prepare special conditioning input for model kwargs
         model_kwargs = {}
         if self.do_style_embed:
             if generation_config.beatmap_id is not None:
                 model_kwargs["beatmap_idx"] = torch.tensor(
-                    [self.tokenizer.beatmap_idx[generation_config.beatmap_id]], dtype=torch.long, device=self.device)
+                    [self.tokenizer.beatmap_idx[generation_config.beatmap_id]], dtype=torch.long)
             else:
-                model_kwargs["beatmap_idx"] = torch.tensor([self.tokenizer.num_classes], dtype=torch.long,
-                                                           device=self.device)
+                model_kwargs["beatmap_idx"] = torch.tensor([self.tokenizer.num_classes], dtype=torch.long)
         if self.do_difficulty_embed:
             if generation_config.difficulty is not None:
-                model_kwargs["difficulty"] = torch.tensor([generation_config.difficulty], dtype=torch.float32, device=self.device)
+                model_kwargs["difficulty"] = torch.tensor([generation_config.difficulty], dtype=torch.float32)
             else:
                 print("WARNING: Difficulty not provided. Selecting 5.0 for difficulty.")
-                model_kwargs["difficulty"] = torch.tensor([5.0], dtype=torch.float32, device=self.device)
+                model_kwargs["difficulty"] = torch.tensor([5.0], dtype=torch.float32)
         if self.do_mapper_embed:
             if generation_config.mapper_id is not None:
-                model_kwargs["mapper_idx"] = torch.tensor([self.tokenizer.get_mapper_idx(generation_config.mapper_id)], dtype=torch.long, device=self.device)
+                model_kwargs["mapper_idx"] = torch.tensor([self.tokenizer.get_mapper_idx(generation_config.mapper_id)], dtype=torch.long)
             else:
                 print("WARNING: Mapper ID not provided. Selecting default mapper.")
-                model_kwargs["mapper_idx"] = torch.tensor([-1], dtype=torch.long, device=self.device)
+                model_kwargs["mapper_idx"] = torch.tensor([-1], dtype=torch.long)
 
         # Start generation
         inputs = dict(
@@ -398,15 +276,16 @@ class Processor(object):
             in_context=in_context_data,
             out_context=out_context_data,
             model_kwargs=model_kwargs,
-            logit_processor=logit_processor,
             req_special_tokens=req_special_tokens,
             verbose=verbose,
         )
 
-        if self.parallel:
-            self.generate_parallel(**inputs)
+        generate_func = self.generate_parallel if self.parallel else self.generate_sequential
+        if isinstance(self.model, InferenceClient):
+            with self.model:
+                generate_func(**inputs)
         else:
-            self.generate_sequential(**inputs)
+            generate_func(**inputs)
 
         # Post-process events
         for context in out_context_data:
@@ -465,7 +344,6 @@ class Processor(object):
             in_context: list[dict[str, Any]],
             out_context: list[dict[str, Any]],
             model_kwargs: dict[str, Any],
-            logit_processor: LogitsProcessorList,
             req_special_tokens: list[str],
             verbose: bool = True,
     ):
@@ -479,10 +357,8 @@ class Processor(object):
                 print(f"Generating {context['context_type'].value}")
             iterator = tqdm(list(zip(*sequences[:2]))) if verbose else zip(*sequences[:2])
             for sequence_index, (frames, frame_time) in enumerate(iterator):
-                trim_lookback = sequence_index != 0 and self.types_first and self.lookback_max_time > 0
+                trim_lookback = sequence_index != 0 and self.types_first and self.lookback_time > 0
                 trim_lookahead = sequence_index != len(sequences[0]) - 1
-
-                logit_processor2 = LogitsProcessorList(logit_processor + [self.lookback_bias_logit_processor]) if trim_lookback else logit_processor
 
                 # noinspection PyUnresolvedReferences
                 frames = self.prepare_frames(frames)
@@ -495,24 +371,23 @@ class Processor(object):
                 )
 
                 [prompt, uncond_prompt], max_len = self.pad_prompts([cond_prompt, uncond_prompt])
-                cache = self.get_cache(prompt.size(0))
 
                 # Prepare additional model kwargs
                 if self.do_song_position_embed:
                     global_pos_start = frame_time / song_length
                     global_pos_end = (frame_time + self.miliseconds_per_sequence) / song_length
-                    model_kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32, device=self.device).unsqueeze(0)
+                    model_kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32).unsqueeze(0)
 
                 result = self.model_generate(
-                    frames,
-                    **model_kwargs,
-                    decoder_input_ids=prompt,
-                    decoder_attention_mask=prompt.ne(self.tokenizer.pad_id),
-                    logits_processor=logit_processor2,
-                    negative_prompt=uncond_prompt,
-                    negative_prompt_attention_mask=uncond_prompt.ne(self.tokenizer.pad_id) if uncond_prompt is not None else None,
-                    past_key_values=cache,
-                    eos_token_id=self.get_eos_token_id(trim_lookback, trim_lookahead, context["context_type"]),
+                    model_kwargs | dict(
+                        inputs=frames,
+                        decoder_input_ids=prompt,
+                        decoder_attention_mask=prompt.ne(self.tokenizer.pad_id),
+                        negative_prompt=uncond_prompt,
+                        negative_prompt_attention_mask=uncond_prompt.ne(self.tokenizer.pad_id) if uncond_prompt is not None else None,
+                    ),
+                    lookback_time=self.lookback_time if trim_lookback else 0,
+                    lookahead_time=self.lookahead_time if trim_lookahead else 0,
                 )
 
                 # Only support batch size 1
@@ -526,7 +401,6 @@ class Processor(object):
             in_context: list[dict[str, Any]],
             out_context: list[dict[str, Any]],
             model_kwargs: dict[str, Any],
-            logit_processor: LogitsProcessorList,
             req_special_tokens: list[str],
             verbose: bool = True,
     ):
@@ -552,7 +426,7 @@ class Processor(object):
             if self.do_song_position_embed:
                 global_pos_start = frame_time / song_length
                 global_pos_end = (frame_time + self.miliseconds_per_sequence) / song_length
-                kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32, device=self.device).unsqueeze(0)
+                kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32).unsqueeze(0)
             model_kwargses.append(kwargs)
 
         prompt, uncond_prompt, max_len = self.stack_prompts(cond_prompts, uncond_prompts)
@@ -564,24 +438,23 @@ class Processor(object):
         results = []
 
         # Process each batch
-        for i in range(0, num_samples, max_batch_size):
+        iterator = tqdm(list(range(0, num_samples, max_batch_size))) if verbose else range(0, num_samples, max_batch_size)
+        for i in iterator:
             frames_batch = frames[i:i + max_batch_size]
             prompt_batch = prompt[i:i + max_batch_size]
             uncond_prompt_batch = uncond_prompt[i:i + max_batch_size] if uncond_prompt is not None else None
             kwargses_batch = model_kwargses[i:i + max_batch_size]
             model_kwargs_batch = {k: torch.cat([kwargs[k] for kwargs in kwargses_batch], dim=0) for k in model_kwarg_keys}
 
-            cache = self.get_cache(prompt_batch.size(0))
-
             # Start generation
             results.append(self.model_generate(
-                frames_batch,
-                **model_kwargs_batch,
-                decoder_input_ids=prompt_batch,
-                logits_processor=logit_processor,
-                negative_prompt=uncond_prompt_batch,
-                past_key_values=cache,
-                eos_token_id=self.get_eos_token_id(context_type=out_context[-1]["context_type"]),
+                model_kwargs_batch | dict(
+                    inputs=frames_batch,
+                    decoder_input_ids=prompt_batch,
+                    decoder_attention_mask=prompt_batch.ne(self.tokenizer.pad_id),
+                    negative_prompt=uncond_prompt_batch,
+                    negative_prompt_attention_mask=uncond_prompt_batch.ne(self.tokenizer.pad_id) if uncond_prompt_batch is not None else None,
+                ),
             ))
 
         # Concatenate all batch results to form the final result
@@ -609,23 +482,7 @@ class Processor(object):
             return [None] * batch_size
         return [tensor[i:i + max_batch_size] for i in range(0, tensor.size(0), max_batch_size)]
 
-    def get_cache(self, batch_size: int):
-        cache_kwargs = {
-            "config": self.model.config,
-            "max_batch_size": batch_size * self.num_beams * 2 if self.cfg_scale > 1 else batch_size * self.num_beams,
-            "max_cache_len": self.model.config.max_target_positions,
-            "device": self.device,
-            "dtype": self.model.dtype,
-        }
-        decoder_cache = StaticCache(**cache_kwargs)
-        encoder_kwargs = cache_kwargs.copy()
-        encoder_kwargs["max_cache_len"] = self.model.config.max_source_positions
-        encoder_cache = StaticCache(**encoder_kwargs)
-        return MapperatorinatorCache(decoder_cache, encoder_cache, self.cfg_scale)
-
     def prepare_frames(self, frames: torch.Tensor) -> torch.Tensor:
-        frames = frames.to(self.device)
-
         if frames.dim() == 1:
             frames = frames.unsqueeze(0)
 
@@ -784,9 +641,13 @@ class Processor(object):
                     difficulty=generation_config.difficulty,
                     mapper_id=generation_config.mapper_id if (generation_config.descriptors and len(generation_config.descriptors) > 0) or (generation_config.negative_descriptors and len(generation_config.negative_descriptors) > 0) else None,
                     year=generation_config.year,
+                    hp_drain_rate=generation_config.hp_drain_rate,
                     circle_size=generation_config.circle_size,
-                    hitsounded=generation_config.hitsounded,
+                    overall_difficulty=generation_config.overall_difficulty,
+                    approach_rate=generation_config.approach_rate,
                     slider_multiplier=generation_config.slider_multiplier,
+                    slider_tick_rate=generation_config.slider_tick_rate,
+                    hitsounded=generation_config.hitsounded,
                     keycount=generation_config.keycount,
                     hold_note_ratio=generation_config.hold_note_ratio,
                     scroll_speed_ratio=generation_config.scroll_speed_ratio,
@@ -830,18 +691,20 @@ class Processor(object):
         if self.add_song_length_token:
             song_length_token = self.tokenizer.encode_song_length(song_length)
             cond_tokens.append(song_length_token)
-        if self.add_sv and config.gamemode in [0, 2]:
+        if self.add_global_sv_token and self.add_sv and config.gamemode in [0, 2]:
             global_sv_token = self.tokenizer.encode_global_sv(config.slider_multiplier)
             cond_tokens.append(global_sv_token)
         if self.add_cs_token and config.gamemode in [0, 2]:
             cs_token = self.tokenizer.encode_cs(config.circle_size) if config.circle_size is not None else self.tokenizer.cs_unk
             cond_tokens.append(cs_token)
         if config.gamemode == 3:
-            keycount_token = self.tokenizer.encode(Event(EventType.MANIA_KEYCOUNT, config.keycount))
-            cond_tokens.append(keycount_token)
-            hold_note_ratio_token = self.tokenizer.encode_hold_note_ratio(config.hold_note_ratio) if config.hold_note_ratio is not None else self.tokenizer.hold_note_ratio_unk
-            cond_tokens.append(hold_note_ratio_token)
-        if config.gamemode in [1, 3]:
+            if self.add_keycount_token:
+                keycount_token = self.tokenizer.encode(Event(EventType.MANIA_KEYCOUNT, config.keycount))
+                cond_tokens.append(keycount_token)
+            if self.add_hold_note_ratio_token:
+                hold_note_ratio_token = self.tokenizer.encode_hold_note_ratio(config.hold_note_ratio) if config.hold_note_ratio is not None else self.tokenizer.hold_note_ratio_unk
+                cond_tokens.append(hold_note_ratio_token)
+        if self.add_scroll_speed_ratio_token and config.gamemode in [1, 3]:
             scroll_speed_ratio_token = self.tokenizer.encode_scroll_speed_ratio(config.scroll_speed_ratio) if config.scroll_speed_ratio is not None else self.tokenizer.scroll_speed_ratio_unk
             cond_tokens.append(scroll_speed_ratio_token)
 
@@ -868,30 +731,9 @@ class Processor(object):
             if descriptors is None or descriptors_added == 0:
                 cond_tokens.append(self.tokenizer.descriptor_unk)
 
-        cond_tokens = torch.tensor(cond_tokens, dtype=torch.long, device=self.device).unsqueeze(0)
+        cond_tokens = torch.tensor(cond_tokens, dtype=torch.long).unsqueeze(0)
 
         return cond_tokens
-
-    def get_logits_processor(self, generation_config: GenerationConfig) -> LogitsProcessorList:
-        processors = LogitsProcessorList(self.base_logit_processor)
-
-        if self.do_sample:
-            if self.types_first:
-                processors.append(ConditionalTemperatureLogitsWarper(
-                    self.temperature,
-                    self.timing_temperature,
-                    self.mania_column_temperature,
-                    self.taiko_hit_temperature,
-                    self.types_first,
-                    self.tokenizer,
-                    generation_config.gamemode,
-                ))
-            else:
-                processors.append(TemperatureLogitsWarper(
-                    self.temperature,
-                ))
-
-        return processors
 
     def add_predicted_tokens_to_context(
             self,
@@ -924,16 +766,6 @@ class Processor(object):
         if trim_lookahead:
             lookahead_time = frame_time + self.lookahead_max_time
             self._trim_events_after_time(context["events"], context["event_times"], lookahead_time)
-
-    def get_eos_token_id(self, trim_lookback: bool = False, trim_lookahead: bool = False, context_type: ContextType = None):
-        eos_token_id = [self.tokenizer.eos_id]
-        if trim_lookback:
-            eos_token_id += self.lookback_time_range
-        if trim_lookahead:
-            eos_token_id += self.lookahead_time_range
-        if self.add_out_context_types and context_type is not None:
-            eos_token_id.append(self.tokenizer.context_eos[context_type])
-        return eos_token_id
 
     def get_required_extra_special_tokens(self, all_out_context: list[ContextType]) -> list[str]:
         result = []
@@ -992,11 +824,11 @@ class Processor(object):
 
         # Prepare extra special tokens
         extra_special_events = {}
-        if context["context_type"] == ContextType.KIAI or (self.add_kiai and context["context_type"] in [ContextType.GD, ContextType.MAP]):
+        if self.add_kiai_special_token and (context["context_type"] == ContextType.KIAI or (self.add_kiai and context["context_type"] in [ContextType.GD, ContextType.MAP])):
             extra_special_events["last_kiai"] = self._kiai_before_time(context["events"], context["event_times"], frame_time)
-        if context["context_type"] == ContextType.SV or ((self.add_sv or self.add_mania_sv) and context["context_type"] in [ContextType.GD, ContextType.MAP]):
+        if self.add_sv_special_token and (context["context_type"] == ContextType.SV or ((self.add_sv or self.add_mania_sv) and context["context_type"] in [ContextType.GD, ContextType.MAP])):
             extra_special_events["last_sv"] = self._sv_before_time(context["events"], context["event_times"], frame_time)
-        if "class" in context and self.add_song_position_token:
+        if self.add_song_position_token and "class" in context:
             extra_special_events["song_position"] = self.tokenizer.encode_song_position_event(frame_time, context["song_length"])
 
         result["extra_special_events"] = extra_special_events
@@ -1014,7 +846,7 @@ class Processor(object):
 
         to_concat = []
         if context["add_type"]:
-            to_concat.append(torch.tensor([[self.tokenizer.context_sos[context_type]]], dtype=torch.long, device=self.device))
+            to_concat.append(torch.tensor([[self.tokenizer.context_sos[context_type]]], dtype=torch.long))
 
         if context["add_class"]:
             if "class" in context:
@@ -1025,15 +857,15 @@ class Processor(object):
         to_concat.append(tokens)
 
         if context["add_type"] and add_type_end:
-            to_concat.append(torch.tensor([[self.tokenizer.context_eos[context_type]]], dtype=torch.long, device=self.device))
+            to_concat.append(torch.tensor([[self.tokenizer.context_eos[context_type]]], dtype=torch.long))
 
         return torch.concatenate(to_concat, dim=-1)
 
     def get_prompt(self, in_context, out_context, negative=False, max_token_length=None):
         class_container = out_context[0]
         user_prompt = class_container["negative_class"] if negative else class_container["class"]
-        extra_special_tokens = class_container["extra_special_tokens"] if "extra_special_tokens" in class_container else torch.tensor([[]], dtype=torch.long, device=self.device)
-        pre_tokens = class_container["pre_tokens"] if "pre_tokens" in class_container else torch.tensor([[]], dtype=torch.long, device=self.device)
+        extra_special_tokens = class_container["extra_special_tokens"] if "extra_special_tokens" in class_container else torch.tensor([[]], dtype=torch.long)
+        pre_tokens = class_container["pre_tokens"] if "pre_tokens" in class_container else torch.tensor([[]], dtype=torch.long)
 
         in_tokens = [self.get_context_tokens(context, max_token_length) for context in in_context]
         # We must not add the type end token to the last context because it should be generated by the model
@@ -1048,7 +880,7 @@ class Processor(object):
         if self.center_pad_decoder:
             prefix = F.pad(prefix, (self.tgt_seq_len // 2 - prefix.shape[1], 0), value=self.tokenizer.pad_id)
 
-        sos = torch.tensor([[self.tokenizer.sos_id]], dtype=torch.long, device=self.device)
+        sos = torch.tensor([[self.tokenizer.sos_id]], dtype=torch.long)
         prompt = torch.concatenate([prefix, sos] + out_tokens, dim=-1)
         return prompt
 
@@ -1108,7 +940,7 @@ class Processor(object):
                 value = np.clip(value, timeshift_range.min_value, timeshift_range.max_value)
                 event = Event(type=event.type, value=value)
             tokens[0, i] = self.tokenizer.encode(event)
-        return tokens.to(self.device)
+        return tokens
 
     def _decode(self, tokens: torch.Tensor, frame_time: float) -> list[Event]:
         """Converts a list of tokens into Event objects and converts to absolute time values.
@@ -1155,26 +987,6 @@ class Processor(object):
                 new_event_times.append(event_times[i])
 
         return new_events, new_event_times
-
-    def _get_beat_time_token_from_context(self, context_tokens, generated_tokens):
-        context_tokens = context_tokens.cpu()
-        generated_tokens = generated_tokens.cpu()
-
-        # Search generated tokens in reverse order for the latest time shift token followed by a beat or measure token
-        latest_time = -1000
-        beat_offset = -1 if self.types_first else 1
-        for i in range(len(generated_tokens) - 1, -1, -1):
-            token = generated_tokens[i]
-            if (token in self.time_range and
-                    0 <= i + beat_offset < len(generated_tokens) and generated_tokens[i + beat_offset] in self.beat_type_tokens):
-                latest_time = token
-                break
-
-        # Search context tokens in order for the first time shift token after latest_time which is followed by a beat or measure token
-        for i, token in enumerate(context_tokens):
-            if (token in self.time_range and token > latest_time + 1 and
-                    0 <= i + beat_offset < len(context_tokens) and context_tokens[i + beat_offset] in self.beat_type_tokens):
-                return token
 
     def _kiai_before_time(self, events, event_times, time) -> Event:
         for i in range(len(events) - 1, -1, -1):

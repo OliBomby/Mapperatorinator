@@ -63,8 +63,9 @@
             <label for="model">Model:</label>
             <select id="model" name="model" class="styled-select">
               <option value="v28">Mapperatorinator V28</option>
-              <option value="v29">Mapperatorinator V29</option>
-              <option value="v30" selected>Mapperatorinator V30</option>
+              <option value="v29">Mapperatorinator V29 (Supports gamemodes and descriptors)</option>
+              <option value="v30" selected>Mapperatorinator V30 (Best model)</option>
+              <option value="v31">Mapperatorinator V31 (Slightly more accurate than V29)</option>
             </select>
             <label for="gamemode">Gamemode:</label>
             <select id="gamemode" name="gamemode" class="styled-select">
@@ -73,27 +74,38 @@
               <option value="2">Catch the Beat</option>
               <option value="3">Mania</option>
             </select>
+            <label for="difficulty" title="Difficulty rating (star rating)">Difficulty (star rating):</label>
+            <input type="number" step="0.1" id="difficulty" name="difficulty" min="0" value="5" />
+          </fieldset>
+          <fieldset>
+            <legend>Difficulty Metadata</legend>
+            <label for="hp_drain_rate" title="HP drain rate (HP)">HP Drain Rate (HP):</label>
+            <input type="number" step="0.1" id="hp_drain_rate" name="hp_drain_rate" min="0" max="10" value="5" />
+            <div class="form-group" id="group-circle_size" style="display: none;">
+              <label for="circle_size" title="Circle size (CS)">Circle Size (CS):</label>
+              <input type="number" step="0.1" id="circle_size" name="circle_size" min="0" max="10" value="4" />
+            </div>
+            <div class="form-group" id="group-keycount" style="display: none;">
+              <label for="keycount" title="Number of keys for mania">Key Count:</label>
+              <input type="number" id="keycount" name="keycount" min="0" max="18" value="4" />
+            </div>
+            <label for="overall_difficulty" title="Overall difficulty (OD)">Overall Difficulty (OD):</label>
+            <input type="number" step="0.1" id="overall_difficulty" name="overall_difficulty" min="0" max="10" value="8" />
+            <label for="approach_rate" title="Approach rate (AR)">Approach Rate (AR):</label>
+            <input type="number" step="0.1" id="approach_rate" name="approach_rate" min="0" max="10" value="9" />
+            <label for="slider_multiplier" title="Slider velocity multiplier">Slider Multiplier:</label>
+            <input type="number" step="0.1" id="slider_multiplier" name="slider_multiplier" min="0" max="3.6" value="1.4" />
+            <label for="slider_tick_rate" title="Slider tick rate">Slider Tick Rate:</label>
+            <input type="number" step="0.5" id="slider_tick_rate" name="slider_tick_rate" min="0.5" max="4.0" value="1" />
+          </fieldset>
+          <fieldset>
+            <legend>Advanced Settings</legend>
+            <label for="mapper_id" title="Mapper user ID for style">Mapper ID:</label>
+                <input type="text" id="mapper_id" name="mapper_id" />
             <div class="form-group" id="group-year">
                 <label for="year" title="Year of the song (2007-2023)">Year (2007-2023):</label>
                 <input type="number" id="year" name="year" min="2007" max="2023" value="2023" />
             </div>
-            <label for="difficulty" title="Difficulty rating (star rating)">Difficulty (star rating):</label>
-            <input type="number" step="0.1" id="difficulty" name="difficulty" min="0" value="5" />
-            <label for="slider_multiplier" title="Slider velocity multiplier">Slider Multiplier:<span style="color:var(--accent-color); margin-left: 3px;">*</span></label>
-            <input type="number" step="0.1" id="slider_multiplier" name="slider_multiplier" min="0" value="1.4" required />
-            <div class="form-group" id="group-circle_size" style="display: none;">
-              <label for="circle_size" title="Circle size for standard">Circle Size:<span class="required-indicator cs-required" style="color:var(--accent-color); margin-left: 3px; display: none;">*</span></label>
-              <input type="number" step="0.1" id="circle_size" name="circle_size" min="0" value="4" />
-            </div>
-            <div class="form-group" id="group-keycount" style="display: none;">
-              <label for="keycount" title="Number of keys for mania">Key Count:<span class="required-indicator kc-required" style="color:var(--accent-color); margin-left: 3px; display: none;">*</span></label>
-              <input type="number" id="keycount" name="keycount" min="0" value="4" />
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Optional Settings</legend>
-            <label for="mapper_id" title="Mapper user ID for style">Mapper ID:</label>
-            <input type="text" id="mapper_id" name="mapper_id" />
             <div class="form-group" id="group-hold_note_ratio" style="display: none;">
               <label for="hold_note_ratio" title="Hold note ratio for mania 0-1">Hold Note Ratio:</label>
               <input type="number" step="0.01" id="hold_note_ratio" name="hold_note_ratio" min="0" max="1" />
@@ -105,14 +117,14 @@
             <label for="cfg_scale" title="Scale of the classifier-free guidance">CFG Scale:</label>
             <input type="number" step="0.1" id="cfg_scale" name="cfg_scale" min="0" value="1.0"/>
             <label for="temperature">Temperature:</label>
-            <input type="number" id="temperature" name="temperature" step="0.01" min="0" max="1" value="1.0">
+            <input type="number" id="temperature" name="temperature" step="0.01" min="0" max="1" value="0.9">
             <label for="top_p">Top-p:</label>
-            <input type="number" id="top_p" name="top_p" step="0.01" min="0" max="1" value="0.95">
+            <input type="number" id="top_p" name="top_p" step="0.01" min="0" max="1" value="0.9">
             <label for="seed" title="Random seed for generation">Random Seed:</label>
             <input type="text" id="seed" name="seed" />
           </fieldset>
           <fieldset>
-            <legend>Timing & Segments</legend>
+            <legend>Generation Interval</legend>
             <label for="start_time" title="Generation start time in milliseconds">Start Time (ms):</label>
             <input type="number" id="start_time" name="start_time" min="0" />
             <label for="end_time" title="Generation end time in milliseconds">End Time (ms):</label>
@@ -120,16 +132,20 @@
           </fieldset>
           <fieldset>
             <legend>Options</legend>
+            <div class="option-item" id="export-osz-option">
+              <input type="checkbox" id="export_osz" name="export_osz" value="false" />
+              <label for="export_osz" title="Whether to export a .osz file containing the generated beatmap and audio file">Export .osz</label>
+            </div>
+            <div class="option-item" id="add-to-beatmap-option">
+              <input type="checkbox" id="add_to_beatmap" name="add_to_beatmap" value="false" />
+              <label for="add_to_beatmap" title="Whether to add generated content to the reference beatmap instead of making a new beatmap">Add to Beatmap</label>
+            </div>
             <div class="option-item" id="option-item-hitsounded">
               <input type="checkbox" id="hitsounded" name="hitsounded" value="true" checked />
               <label for="hitsounded">Add Hitsounds</label>
             </div>
-            <div class="option-item" id="add-to-beatmap-option" style="display: none;">
-              <input type="checkbox" id="add_to_beatmap" name="add_to_beatmap" value="true" />
-              <label for="add_to_beatmap" title="Whether to add generated content to the reference beatmap instead of making a new beatmap">Add to Beatmap</label>
-            </div>
             <div class="option-item">
-              <input type="checkbox" id="super_timing" name="super_timing" value="false" checked />
+              <input type="checkbox" id="super_timing" name="super_timing" value="false" />
               <label for="super_timing" title="Whether to use slow accurate variable BPM timing generator">Super Timing</label>
             </div>
           </fieldset>
@@ -394,17 +410,17 @@
 
           if (showCircleSize) {
               if (!$("#group-circle_size").is(':visible')) $("#group-circle_size").slideDown(animationSpeed);
-              $circleSizeInput.prop('required', true); $circleSizeAsterisk.show();
+              $circleSizeAsterisk.show();
           } else {
               if ($("#group-circle_size").is(':visible')) $("#group-circle_size").slideUp(animationSpeed);
-              $circleSizeInput.prop('required', false); $circleSizeAsterisk.hide();
+              $circleSizeAsterisk.hide();
           }
           if (showKeyCount) {
               if (!$("#group-keycount").is(':visible')) $("#group-keycount").slideDown(animationSpeed);
-              $keyCountInput.prop('required', true); $keyCountAsterisk.show();
+              $keyCountAsterisk.show();
           } else {
               if ($("#group-keycount").is(':visible')) $("#group-keycount").slideUp(animationSpeed);
-              $keyCountInput.prop('required', false); $keyCountAsterisk.hide();
+              $keyCountAsterisk.hide();
           }
           if (showHoldNoteRatio && !$("#group-hold_note_ratio").is(':visible')) {
             $("#group-hold_note_ratio").slideDown(animationSpeed);
@@ -572,10 +588,17 @@
         $("#inferenceForm").submit(function(e) {
           const audioPath = $('#audio_path').val().trim();
           const beatmapPath = $('#beatmap_path').val().trim();
+          const outputPath = $('#output_path').val().trim();
           if (!audioPath && !beatmapPath) {
               e.preventDefault();
               $('html, body').animate({ scrollTop: 0 }, 500);
               showFlashMessage("Either 'Beatmap Path' or 'Audio Path' are required for running inference", 'error');
+              return;
+          }
+          if (!outputPath && !beatmapPath) {
+              e.preventDefault();
+              $('html, body').animate({ scrollTop: 0 }, 500);
+              showFlashMessage("Either 'Output Path' or 'Beatmap Path' are required for running inference", 'error');
               return;
           }
           e.preventDefault();

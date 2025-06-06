@@ -16,15 +16,25 @@ data:                  # Data settings
   test_dataset_start: 38689
   test_dataset_end: 39389
   num_classes: 152680
+  # All Special Prefix Tokens
+  add_out_context_types: true  # Add tokens indicating types of the out context
   add_gamemode_token: true
+  add_style_token: false
   add_diff_token: true
   add_mapper_token: true
-  add_cs_token: true
   add_year_token: true
   add_hitsounded_token: true  # Add token for whether the map has hitsounds
   add_song_length_token: true  # Add token for the length of the song
+  add_global_sv_token: true  # Add token for the global slider velocity in std and ctb
+  add_cs_token: true
+  add_keycount_token: true  # Add token for the number of keys in mania
+  add_hold_note_ratio_token: true  # Add token for the ratio of hold notes in mania
+  add_scroll_speed_ratio_token: true  # Add token for the scroll speed ratio in mania
+  add_descriptors: true  # Add beatmap descriptor tokens
+  add_sv_special_token: true  # Add token for last SV value
+  add_kiai_special_token: true  # Add token for last kiai state
   add_song_position_token: true  # Add token for the position of the song in the mapset
-  add_descriptors: true
+  # ---
   timing_random_offset: 2
   src_seq_len: 1024
   tgt_seq_len: 2048
@@ -38,7 +48,6 @@ data:                  # Data settings
       "out": ['${context_type:timing}', '${context_type:kiai}', '${context_type:map}', '${context_type:sv}']
   context_weights: [4, 1, 1]    # List of weights for each context type. Determines how often each context type is sampled
   add_timing: false      # Interweave timing tokens with the beatmap tokens
-  add_out_context_types: true  # Add tokens indicating types of the out context
   add_snapping: true    # Model hit object snapping
   add_timing_points: true  # Model beatmap timing with timing points
   add_hitsounds: true   # Model beatmap hitsounds
@@ -54,7 +63,6 @@ data:                  # Data settings
   add_kiai: false        # Model kiai times
   gamemodes: [0, 1, 2, 3]  # List of gamemodes to include in the dataset
   mania_bpm_normalized_scroll_speed: true  # Normalize mania scroll speed by BPM
-  add_sv_special_token: true  # Add extra special token for current SV
   add_sv: true  # Model slider velocity in std and ctb
   add_mania_sv: false  # Add mania scroll velocity in map context
 

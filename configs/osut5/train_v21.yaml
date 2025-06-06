@@ -9,9 +9,25 @@ precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
 data:                  # Data settings
   train_dataset_path: "/workspace/datasets/ORS16291"
   test_dataset_path: "/workspace/datasets/ORS16291"
+  # All Special Prefix Tokens
+  add_out_context_types: false  # Add tokens indicating types of the out context
+  add_gamemode_token: false
+  add_style_token: false
   add_diff_token: true
   add_mapper_token: true
-  add_descriptors: true
+  add_year_token: false
+  add_hitsounded_token: false  # Add token for whether the map has hitsounds
+  add_song_length_token: false  # Add token for the length of the song
+  add_global_sv_token: false  # Add token for the global slider velocity in std and ctb
+  add_cs_token: false
+  add_keycount_token: false  # Add token for the number of keys in mania
+  add_hold_note_ratio_token: false  # Add token for the ratio of hold notes in mania
+  add_scroll_speed_ratio_token: false  # Add token for the scroll speed ratio in mania
+  add_descriptors: true  # Add beatmap descriptor tokens
+  add_sv_special_token: false  # Add token for last SV value
+  add_kiai_special_token: false  # Add token for last kiai state
+  add_song_position_token: false  # Add token for the position of the song in the mapset
+  # ---
   timing_random_offset: 2
   src_seq_len: 1024
   tgt_seq_len: 1536

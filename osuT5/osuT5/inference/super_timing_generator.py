@@ -66,7 +66,7 @@ class SuperTimingGenerator:
                 sequences=sequences,
                 generation_config=generation_config,
                 in_context=[ContextType.NONE],
-                out_context=[ContextType.TIMING],
+                out_context=[ContextType.MAP] if self.args.osut5.data.add_timing else [ContextType.TIMING],
                 verbose=False,
             )[0]
             groups, _ = get_groups(events, types_first=self.types_first)

@@ -11,8 +11,12 @@ difficulty: null          # Difficulty star rating to map
 mapper_id: null           # Mapper ID to use as style
 year: null                # Year to use as style
 hitsounded: null        # Whether the beatmap has hitsounds
+hp_drain_rate: null     # HP drain rate (HP)
+circle_size: null         # Circle size (CS)
+overall_difficulty: null  # Overall difficulty (OD)
+approach_rate: null      # Approach rate (AR)
 slider_multiplier: null   # Multiplier for slider velocity
-circle_size: null         # Circle size to use for style
+slider_tick_rate: null      # Rate of slider ticks
 keycount: null            # Number of keys to use for mania
 hold_note_ratio: null     # Ratio of how many hold notes to generate in mania
 scroll_speed_ratio: null  # Ratio of how many scroll speed changes to generate in mania and taiko
@@ -47,7 +51,8 @@ timer_num_beams: 2            # Number of beams for beam search
 timer_bpm_threshold: 0.1  # Threshold requirement for BPM change in timer, higher values will result in less BPM changes
 timer_cfg_scale: 1.0     # Scale of classifier-free guidance for timer
 timer_iterations: 20     # Number of iterations for timer
-max_batch_size: 16       # Maximum batch size for inference (only used for parallel sampling or super timing)
+use_server: false        # Use server for optimized multiprocess inference (adds about 8% overhead)
+max_batch_size: 16       # Maximum batch size for inference
 
 # Metadata settings
 bpm: 120                # Beats per minute of input audio

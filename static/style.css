@@ -144,7 +144,6 @@ h1, h2, h3 {
 }
 
 .card:hover {
-  transform: translateY(-3px) scale(1.005);
   box-shadow: 0 6px 12px rgba(0,0,0,0.5);
   border: 1px solid var(--accent-color);
 }
@@ -177,7 +176,8 @@ legend {
 /* Labels */
 label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 2px;
+  margin-top: 5px;
   transition: color var(--transition-speed);
 }
 
@@ -370,7 +370,6 @@ button[type="submit"]:hover {
 }
 
 .descriptor-group:hover {
-  transform: scale(1.02);
   box-shadow: 0 2px 6px rgba(0,0,0,0.5);
 }
 
@@ -440,7 +439,7 @@ button[type="submit"]:hover {
   appearance: none;
   -moz-appearance: none;
   -webkit-appearance: none;
-  background-image: 
+  background-image:
     linear-gradient(45deg, transparent 50%, var(--accent-color) 50%),
     linear-gradient(135deg, var(--accent-color) 50%, transparent 50%);
   background-position: calc(100% - 20px) calc(1em + 2px),
@@ -453,10 +452,9 @@ button[type="submit"]:hover {
 .styled-select::-ms-expand {
   display: none;
 }
-  
+
 /* Additional hover lift for form cards */
 .form-card:hover {
-  transform: translateY(-4px) scale(1.01);
   box-shadow: 0 8px 12px rgba(0,0,0,0.4);
 }
 
@@ -494,7 +492,7 @@ input[type="number"]:hover::-webkit-outer-spin-button {
   -webkit-appearance: none;
   transition: background-color var(--transition-speed), border-color var(--transition-speed);
   /* Custom arrow using CSS gradients */
-  background-image: 
+  background-image:
     linear-gradient(45deg, transparent 50%, var(--accent-color) 50%),
     linear-gradient(135deg, var(--accent-color) 50%, transparent 50%);
   background-position: calc(100% - 20px) calc(1em + 2px),
@@ -528,7 +526,6 @@ input[type="number"]:hover::-webkit-outer-spin-button {
 }
 
 .custom-dropdown-descriptors:hover {
-  transform: translateY(-3px);
 }
 
 .dropdown-header {
@@ -772,7 +769,7 @@ input[type="number"]:hover::-webkit-outer-spin-button {
 
 /* Custom style for Cancellation Success Popup */
 .alert-cancel-success {
-  /* Inherit basic alert padding/margin/radius from .alert if needed, 
+  /* Inherit basic alert padding/margin/radius from .alert if needed,
      but define specific appearance here */
   padding: 10px;
   margin-bottom: 10px; /* Kept for consistency if multiple messages appear */
@@ -781,7 +778,7 @@ input[type="number"]:hover::-webkit-outer-spin-button {
   color: var(--text-color);       /* Standard text color */
   border: 1px solid var(--border-color); /* Optional: subtle border */
   /* Red glow effect */
-  box-shadow: 0 0 8px var(--accent-color); 
+  box-shadow: 0 0 8px var(--accent-color);
 }
 
 /* style.css additions */

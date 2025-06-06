@@ -12,8 +12,10 @@ from accelerate.utils import ProjectConfiguration
 from torch import nn
 from tqdm import tqdm
 
+import routed_pickle
 from osuT5.config import TrainConfig
 from osuT5.dataset.ors_dataset import STEPS_PER_MILLISECOND, LABEL_IGNORE_ID
+from osuT5.model import Mapperatorinator
 from osuT5.tokenizer import ContextType
 from osuT5.utils import calc_loss, get_stats
 from osuT5.tokenizer import EventType, Tokenizer
@@ -25,6 +27,43 @@ from osuT5.utils import (
 )
 
 logger = get_logger(__name__)
+
+
+def load_model(
+        ckpt_path_str: str,
+        t5_args: TrainConfig,
+        device,
+):
+    if ckpt_path_str == "":
+        raise ValueError("Model path is empty.")
+
+    ckpt_path = Path(ckpt_path_str)
+
+    def tokenizer_loader():
+        if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
+            tokenizer = Tokenizer.from_pretrained(ckpt_path_str)
+        else:
+            tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=routed_pickle, weights_only=False)
+            tokenizer = Tokenizer()
+            tokenizer.load_state_dict(tokenizer_state)
+        return tokenizer
+
+    tokenizer = tokenizer_loader()
+
+    def model_loader():
+        if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
+            model = Mapperatorinator.from_pretrained(ckpt_path_str)
+            model.generation_config.disable_compile = True
+        else:
+            model_state = torch.load(ckpt_path / "pytorch_model.bin", map_location=device, weights_only=True)
+            model = get_model(t5_args, tokenizer)
+            model.load_state_dict(model_state)
+
+        model.eval()
+        model.to(device)
+        return model
+
+    return model_loader(), tokenizer
 
 
 def test(args: TrainConfig, accelerator: Accelerator, model, tokenizer, preprefix: str):
@@ -219,7 +258,7 @@ def test(args: TrainConfig, accelerator: Accelerator, model, tokenizer, preprefi
         logger.info(averaged_stats)
 
 
-@hydra.main(config_path="../configs/osut5", config_name="train_v29", version_base="1.1")
+@hydra.main(config_path="../configs/osut5", config_name="train_tiny_dist", version_base="1.1")
 def main(args: TrainConfig):
     accelerator = Accelerator(
         cpu=args.device == "cpu",
@@ -239,15 +278,7 @@ def main(args: TrainConfig):
         }
     )
 
-    ckpt_path = Path(args.checkpoint_path)
-    model_state = torch.load(ckpt_path / "pytorch_model.bin")
-    tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl")
-
-    tokenizer = Tokenizer()
-    tokenizer.load_state_dict(tokenizer_state)
-
-    model = get_model(args, tokenizer)
-    model.load_state_dict(model_state)
+    model, tokenizer = load_model(args.checkpoint_path, args, "cuda")
     model.eval()
 
     # noinspection PyTypeChecker

@@ -147,7 +147,7 @@ def start_inference():
             """Quotes a value for Hydra (single quotes, escapes internal)."""
             value_str = str(value)
             # Escape internal single quotes: ' -> '\''
-            escaped_value = value_str.replace("'", "'\\''")
+            escaped_value = value_str.replace("'", r"\'")
             return f"'{escaped_value}'"
 
         # Set of keys known to be paths needing quoting for Hydra
@@ -179,12 +179,17 @@ def start_inference():
         add_arg("beatmap_path", beatmap_path)
 
         # Basic settings
-        add_arg("gamemode", request.form.get('gamemode'))
+        if 'gamemode' in request.form:
+            add_arg("gamemode", request.form.get('gamemode'))
+        else:
+            # Default to 0 if not provided
+            add_arg("gamemode", 0)
         add_arg("difficulty", request.form.get('difficulty'))
         add_arg("year", request.form.get('year'))
 
         # Numeric settings
-        for param in ['slider_multiplier', 'circle_size', 'keycount', 'hold_note_ratio', 'scroll_speed_ratio',
+        for param in ['hp_drain_rate', 'circle_size', 'overall_difficulty', 'approach_rate', 'slider_multiplier',
+                      'slider_tick_rate', 'keycount', 'hold_note_ratio', 'scroll_speed_ratio',
                       'cfg_scale', 'temperature', 'top_p', 'seed']:
             add_arg(param, request.form.get(param))
         # mapper_id
@@ -195,12 +200,22 @@ def start_inference():
             add_arg(param, request.form.get(param))
 
         # Checkboxes
-        if 'hitsounded' in request.form:
-            cmd.append("hitsounded=true")
+        if 'export_osz' in request.form:
+            cmd.append("export_osz=true")
+        else :
+            cmd.append("export_osz=false")
         if 'add_to_beatmap' in request.form:
             cmd.append("add_to_beatmap=true")
+        else:
+            cmd.append("add_to_beatmap=false")
+        if 'hitsounded' in request.form:
+            cmd.append("hitsounded=true")
+        else:
+            cmd.append("hitsounded=false")
         if 'super_timing' in request.form:
             cmd.append("super_timing=true")
+        else:
+            cmd.append("super_timing=false")
 
         # Descriptors
         descriptors = request.form.getlist('descriptors')

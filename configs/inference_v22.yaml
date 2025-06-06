@@ -6,3 +6,4 @@ defaults:
   - _self_
 
 version: 'Mapperatorinator V22'        # Beatmap version
+diff_ckpt: 'OliBomby/osu-diffusion-v2'

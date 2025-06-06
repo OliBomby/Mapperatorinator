@@ -33,7 +33,7 @@ CircleSize:$circle_size
 OverallDifficulty:$overall_difficulty
 ApproachRate:$approach_rate
 SliderMultiplier:$slider_multiplier
-SliderTickRate:1
+SliderTickRate:$slider_tick_rate
 
 [Events]
 //Background and Video events

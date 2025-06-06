@@ -12,12 +12,13 @@ from transformers.utils import cached_file
 
 import osu_diffusion
 import routed_pickle
-from config import InferenceConfig
+from config import InferenceConfig, FidConfig
 from diffusion_pipeline import DiffisionPipeline
 from osuT5.osuT5.config import TrainConfig
 from osuT5.osuT5.dataset.data_utils import events_of_type, TIMING_TYPES, merge_events
 from osuT5.osuT5.inference import Preprocessor, Processor, Postprocessor, BeatmapConfig, GenerationConfig, \
     generation_config_from_beatmap, beatmap_config_from_beatmap, background_line
+from osuT5.osuT5.inference.server import InferenceClient
 from osuT5.osuT5.inference.super_timing_generator import SuperTimingGenerator
 from osuT5.osuT5.model import Mapperatorinator
 from osuT5.osuT5.tokenizer import Tokenizer, ContextType
@@ -26,7 +27,10 @@ from osu_diffusion import DiT_models
 from osu_diffusion.config import DiffusionTrainConfig
 
 
-def prepare_args(args: InferenceConfig):
+def prepare_args(args: FidConfig | InferenceConfig):
+    if not torch.cuda.is_available() and args.device == "cuda":
+        print("CUDA is not available, using CPU instead.")
+        args.device = "cpu"
     torch.set_grad_enabled(False)
     torch.set_float32_matmul_precision('high')
     if args.seed is None:
@@ -37,6 +41,34 @@ def prepare_args(args: InferenceConfig):
 
 def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
     if args.beatmap_path is None or args.beatmap_path == "":
+        # populate fair defaults for any inherited args that need to be filled
+        if args.gamemode is None:
+            args.gamemode = 0
+            print(f"Using game mode {args.gamemode}")
+        if args.hp_drain_rate is None:
+            args.hp_drain_rate = 5
+            print(f"Using HP drain rate {args.hp_drain_rate}")
+        if args.circle_size is None:
+            args.circle_size = 4
+            print(f"Using circle size {args.circle_size}")
+        if args.overall_difficulty is None:
+            args.overall_difficulty = 8
+            print(f"Using overall difficulty {args.overall_difficulty}")
+        if args.approach_rate is None:
+            args.approach_rate = 9
+            print(f"Using approach rate {args.approach_rate}")
+        if args.slider_multiplier is None:
+            args.slider_multiplier = 1.4
+            print(f"Using slider multiplier {args.slider_multiplier}")
+        if args.slider_tick_rate is None:
+            args.slider_tick_rate = 1
+            print(f"Using slider tick rate {args.slider_tick_rate}")
+        if args.hitsounded is None:
+            args.hitsounded = True
+            print(f"Using hitsounded {args.hitsounded}")
+        if args.keycount is None and args.gamemode == 3:
+            args.keycount = 4
+            print(f"Using keycount {args.keycount}")
         return
 
     beatmap_path = Path(args.beatmap_path)
@@ -69,12 +101,24 @@ def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
     if args.descriptors is None and beatmap.beatmap_id in tokenizer.beatmap_descriptors:
         args.descriptors = generation_config.descriptors
         print(f"Using descriptors {args.descriptors}")
+    if args.hp_drain_rate is None:
+        args.hp_drain_rate = generation_config.hp_drain_rate
+        print(f"Using HP drain rate {args.hp_drain_rate}")
     if args.circle_size is None:
         args.circle_size = generation_config.circle_size
         print(f"Using circle size {args.circle_size}")
+    if args.overall_difficulty is None:
+        args.overall_difficulty = generation_config.overall_difficulty
+        print(f"Using overall difficulty {args.overall_difficulty}")
+    if args.approach_rate is None:
+        args.approach_rate = generation_config.approach_rate
+        print(f"Using approach rate {args.approach_rate}")
     if args.slider_multiplier is None:
         args.slider_multiplier = generation_config.slider_multiplier
         print(f"Using slider multiplier {args.slider_multiplier}")
+    if args.slider_tick_rate is None:
+        args.slider_tick_rate = generation_config.slider_tick_rate
+        print(f"Using slider tick rate {args.slider_tick_rate}")
     if args.hitsounded is None:
         args.hitsounded = generation_config.hitsounded
         print(f"Using hitsounded {args.hitsounded}")
@@ -156,8 +200,12 @@ def get_config(args: InferenceConfig):
         mapper_id=args.mapper_id,
         year=args.year,
         hitsounded=args.hitsounded if args.hitsounded is not None else True,
-        slider_multiplier=args.slider_multiplier or 1.4,
+        hp_drain_rate=args.hp_drain_rate,
         circle_size=args.circle_size,
+        overall_difficulty=args.overall_difficulty,
+        approach_rate=args.approach_rate,
+        slider_multiplier=args.slider_multiplier or 1.4,
+        slider_tick_rate=args.slider_tick_rate or 1,
         keycount=args.keycount if args.keycount is not None else 4,
         hold_note_ratio=args.hold_note_ratio,
         scroll_speed_ratio=args.scroll_speed_ratio,
@@ -169,8 +217,12 @@ def get_config(args: InferenceConfig):
         title_unicode=args.title,
         artist_unicode=args.artist,
         audio_filename=Path(args.audio_path).name,
+        hp_drain_rate=args.hp_drain_rate or 5,
         circle_size=(args.keycount if args.gamemode == 3 else args.circle_size) or 4,
+        overall_difficulty=args.overall_difficulty or 8,
+        approach_rate=args.approach_rate or 9,
         slider_multiplier=args.slider_multiplier or 1.4,
+        slider_tick_rate=args.slider_tick_rate or 1,
         creator=args.creator,
         version=args.version,
         tags=tags,
@@ -187,9 +239,10 @@ def generate(
         *,
         audio_path: str = None,
         beatmap_path: str = None,
+        output_path: str = None,
         generation_config: GenerationConfig,
         beatmap_config: BeatmapConfig,
-        model,
+        model: Mapperatorinator | InferenceClient,
         tokenizer,
         diff_model=None,
         diff_tokenizer=None,
@@ -198,6 +251,13 @@ def generate(
 ):
     audio_path = args.audio_path if audio_path is None else audio_path
     beatmap_path = args.beatmap_path if beatmap_path is None else beatmap_path
+    output_path = args.output_path if output_path is None else output_path
+
+    # Do some validation
+    if not Path(audio_path).exists() or not Path(audio_path).is_file():
+        raise FileNotFoundError(f"Provided audio file path does not exist: {audio_path}")
+    if beatmap_path and (not Path(beatmap_path).exists() or not Path(beatmap_path).is_file()):
+        raise FileNotFoundError(f"Provided beatmap file path does not exist: {beatmap_path}")
 
     preprocessor = Preprocessor(args, parallel=args.parallel)
     processor = Processor(args, model, tokenizer)
@@ -282,13 +342,13 @@ def generate(
         result_path = postprocessor.add_to_beatmap(result, beatmap_path)
         if verbose:
             print(f"Added generated content to {result_path}")
-    elif args.output_path is not None and args.output_path != "":
-        result_path = postprocessor.write_result(result, args.output_path)
+    elif output_path is not None and output_path != "":
+        result_path = postprocessor.write_result(result, output_path)
         if verbose:
             print(f"Generated beatmap saved to {result_path}")
 
     if args.export_osz:
-        osz_path = postprocessor.export_osz(result_path, audio_path, args.output_path)
+        osz_path = postprocessor.export_osz(result_path, audio_path, output_path)
         if verbose:
             print(f"Generated .osz saved to {osz_path}")
 
@@ -296,29 +356,61 @@ def generate(
 
 
 def load_model(
-        ckpt_path: str,
+        ckpt_path_str: str,
         t5_args: TrainConfig,
         device,
+        max_batch_size: int = 8,
+        use_server: bool = False,
 ):
-    if not os.path.exists(ckpt_path) and ckpt_path != "":
-        model = Mapperatorinator.from_pretrained(ckpt_path)
-        model.generation_config.disable_compile = True
-        tokenizer = Tokenizer.from_pretrained(ckpt_path)
+    if ckpt_path_str == "":
+        raise ValueError("Model path is empty.")
+
+    ckpt_path = Path(ckpt_path_str)
+
+    def tokenizer_loader():
+        if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
+            tokenizer = Tokenizer.from_pretrained(ckpt_path_str)
+        else:
+            tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=routed_pickle, weights_only=False)
+            tokenizer = Tokenizer()
+            tokenizer.load_state_dict(tokenizer_state)
+        return tokenizer
+
+    tokenizer = tokenizer_loader()
+
+    def model_loader():
+        if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
+            model = Mapperatorinator.from_pretrained(ckpt_path_str)
+            model.generation_config.disable_compile = True
+        else:
+            model_state = torch.load(ckpt_path / "pytorch_model.bin", map_location=device, weights_only=True)
+            model = get_model(t5_args, tokenizer)
+            model.load_state_dict(model_state)
+
+        model.eval()
+        model.to(device)
+        return model
+
+    return InferenceClient(
+        model_loader,
+        tokenizer_loader,
+        max_batch_size=max_batch_size,
+        socket_path=get_server_address(ckpt_path_str),
+    ) if use_server else model_loader(), tokenizer
+
+
+def get_server_address(ckpt_path_str: str):
+    """
+    Get a valid socket address for the OS and model version.
+    """
+    ckpt_path_str = ckpt_path_str.replace(" ", "_").replace("/", "_").replace("\\", "_").replace(".", "_")
+    # Check if the OS supports Unix sockets
+    if os.name == 'posix':
+        # Use a Unix socket for Linux and macOS
+        return f"/tmp/{ckpt_path_str}.sock"
     else:
-        ckpt_path = Path(ckpt_path)
-        model_state = torch.load(ckpt_path / "pytorch_model.bin", map_location=device, weights_only=True)
-        tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=routed_pickle, weights_only=False)
-
-        tokenizer = Tokenizer()
-        tokenizer.load_state_dict(tokenizer_state)
-
-        model = get_model(t5_args, tokenizer)
-        model.load_state_dict(model_state)
-
-    model.eval()
-    model.to(device)
-
-    return model, tokenizer
+        # Use a Windows named pipe
+        return fr"\\.\pipe\{ckpt_path_str}"
 
 
 def load_diff_model(
@@ -352,7 +444,7 @@ def load_diff_model(
 def main(args: InferenceConfig):
     prepare_args(args)
 
-    model, tokenizer = load_model(args.model_path, args.osut5, args.device)
+    model, tokenizer = load_model(args.model_path, args.osut5, args.device, args.max_batch_size, args.use_server)
 
     diff_model, diff_tokenizer, refine_model = None, None, None
     if args.generate_positions:

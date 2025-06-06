@@ -5,7 +5,7 @@ from typing import Optional, Dict
 import torch
 import torch.nn as nn
 from transformers import T5Config, T5ForConditionalGeneration, WhisperForConditionalGeneration, WhisperConfig, \
-    PreTrainedModel
+    PreTrainedModel, GenerationMixin
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 
 from .configuration_mapperatorinator import MapperatorinatorConfig
@@ -39,7 +39,7 @@ def get_backbone_model(name, config):
     return model
 
 
-class Mapperatorinator(PreTrainedModel):
+class Mapperatorinator(PreTrainedModel, GenerationMixin):
     __slots__ = ["spectrogram", "decoder_embedder", "encoder_embedder", "transformer", "style_embedder", "num_classes"]
     config_class = MapperatorinatorConfig
     base_model_prefix = "model"

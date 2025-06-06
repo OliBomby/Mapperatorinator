@@ -56,10 +56,16 @@ class Preprocessor(object):
         """
         song_length = len(samples) / self.sample_rate * 1000
         samples = np.pad(samples, [begin_pad, end_pad])
-        samples = np.pad(
-            samples,
-            [0, self.sequence_stride - (len(samples) - self.samples_per_sequence) % self.sequence_stride],
-        )
+
+        if len(samples) < self.samples_per_sequence:
+            # If samples is smaller than our window size, pad to window size
+            padding_needed = self.samples_per_sequence - len(samples)
+        else:
+            # Calculate padding needed to make the total length exactly fit the striding pattern
+            remainder = (len(samples) - self.samples_per_sequence) % self.sequence_stride
+            padding_needed = 0 if remainder == 0 else self.sequence_stride - remainder
+
+        samples = np.pad(samples, [0, padding_needed])
         sequences = self.window(samples, self.samples_per_sequence, self.sequence_stride)
         sequences = torch.from_numpy(sequences).to(torch.float32)
         sequence_times = torch.arange(0, len(sequences) * self.miliseconds_per_stride,

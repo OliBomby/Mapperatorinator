@@ -96,7 +96,7 @@ class Tokenizer(PushToHubMixin):
             ]
             self.input_event_ranges: list[EventRange] = []
 
-            if args.data.gamemodes != [0]:
+            if args.data.add_gamemode_token:
                 self.input_event_ranges.append(EventRange(EventType.GAMEMODE, 0, 3))
 
             if args.model.do_style_embed or args.data.add_style_token:
@@ -110,9 +110,10 @@ class Tokenizer(PushToHubMixin):
                 self.max_difficulty = args.data.max_diff
                 self.input_event_ranges.append(EventRange(EventType.DIFFICULTY, 0, self.num_diff_classes))
 
-            if args.data.add_mapper_token:
+            if args.model.do_mapper_embed or args.data.add_mapper_token:
                 self._init_mapper_idx(args)
-                self.input_event_ranges.append(EventRange(EventType.MAPPER, 0, self.num_mapper_classes))
+                if args.data.add_mapper_token:
+                    self.input_event_ranges.append(EventRange(EventType.MAPPER, 0, self.num_mapper_classes))
 
             if args.data.add_cs_token:
                 self.num_cs_classes = args.data.num_cs_classes
@@ -153,16 +154,19 @@ class Tokenizer(PushToHubMixin):
                     self.event_ranges.append(EventRange(EventType.POS, 0, x_count * y_count - 1))
 
             if 3 in args.data.gamemodes:
-                self.input_event_ranges.append(EventRange(EventType.MANIA_KEYCOUNT, 1, 18))
-                self.input_event_ranges.append(EventRange(EventType.HOLD_NOTE_RATIO, -1, 12))
+                if args.data.add_keycount_token:
+                    self.input_event_ranges.append(EventRange(EventType.MANIA_KEYCOUNT, 1, 18))
+                if args.data.add_hold_note_ratio_token:
+                    self.input_event_ranges.append(EventRange(EventType.HOLD_NOTE_RATIO, -1, 12))
                 self.event_ranges.append(EventRange(EventType.MANIA_COLUMN, 0, 17))
 
             if 1 in args.data.gamemodes or 3 in args.data.gamemodes:
-                self.input_event_ranges.append(EventRange(EventType.SCROLL_SPEED_RATIO, -1, 12))
+                if args.data.add_scroll_speed_ratio_token:
+                    self.input_event_ranges.append(EventRange(EventType.SCROLL_SPEED_RATIO, -1, 12))
                 self.event_ranges.append(EventRange(EventType.SCROLL_SPEED, 0, 1000))
 
-            if args.data.add_sv:
-                self.event_ranges.append(EventRange(EventType.GLOBAL_SV, 40, 360))
+            if args.data.add_global_sv_token:
+                self.input_event_ranges.append(EventRange(EventType.GLOBAL_SV, 40, 360))
 
         self.event_ranges: list[EventRange] = self.event_ranges + [
             EventRange(EventType.NEW_COMBO, 0, 0),
@@ -187,7 +191,7 @@ class Tokenizer(PushToHubMixin):
             if args.data.add_timing_points:
                 self.event_ranges.append(EventRange(EventType.TIMING_POINT, 0, 0))
 
-            if args.data.add_kiai or any(ContextType.KIAI in c["out"] for c in args.data.context_types):
+            if args.data.add_kiai_special_token or args.data.add_kiai or any(ContextType.KIAI in c["out"] for c in args.data.context_types):
                 self.event_ranges.append(EventRange(EventType.KIAI, 0, 1))
 
             if 3 in args.data.gamemodes:

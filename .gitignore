@@ -1,6 +1,7 @@
 .venv
 __pycache__
 logs
+logs_fid
 tensorboard_logs
 .idea
 test

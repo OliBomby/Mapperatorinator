@@ -7,3 +7,4 @@ defaults:
 
 version: 'Mapperatorinator V21'        # Beatmap version
 timeshift_bias: -1.5        # Logit bias for sampling timeshift tokens
+diff_ckpt: 'OliBomby/osu-diffusion-v2'

@@ -25,13 +25,19 @@ class InferenceConfig:
     mapper_id: Optional[int] = None  # Mapper ID to use as style
     year: Optional[int] = None  # Year to use as style
     hitsounded: Optional[bool] = None  # Whether the beatmap has hitsounds
-    slider_multiplier: Optional[float] = None  # Multiplier for slider velocity
-    circle_size: Optional[float] = None  # Circle size to use for style
     keycount: Optional[int] = None  # Number of keys to use for mania
     hold_note_ratio: Optional[float] = None  # Ratio of how many hold notes to generate in mania
     scroll_speed_ratio: Optional[float] = None  # Ratio of how many scroll speed changes to generate in mania and taiko
     descriptors: Optional[list[str]] = None  # List of descriptors to use for style
     negative_descriptors: Optional[list[str]] = None  # List of descriptors to avoid when using classifier-free guidance
+
+    # Difficulty settings
+    hp_drain_rate: Optional[float] = None  # HP drain rate (HP)
+    circle_size: Optional[float] = None  # Circle size (CS)
+    overall_difficulty: Optional[float] = None  # Overall difficulty (OD)
+    approach_rate: Optional[float] = None  # Approach rate (AR)
+    slider_multiplier: Optional[float] = None  # Multiplier for slider velocity
+    slider_tick_rate: Optional[float] = None  # Rate of slider ticks
 
     # Inference settings
     seed: Optional[int] = None  # Random seed
@@ -61,6 +67,7 @@ class InferenceConfig:
     timer_bpm_threshold: float = 0.7  # Threshold requirement for BPM change in timer, higher values will result in less BPM changes
     timer_cfg_scale: float = 1.0  # Scale of classifier-free guidance for timer
     timer_iterations: int = 20  # Number of iterations for timer
+    use_server: bool = True  # Use server for optimized multiprocess inference
     max_batch_size: int = 16  # Maximum batch size for inference (only used for parallel sampling or super timing)
 
     # Metadata settings
@@ -94,19 +101,26 @@ class InferenceConfig:
 
 
 @dataclass
-class FidConfig(InferenceConfig):
+class FidConfig:
     compile: bool = True
-    pad_sequence: bool = True
     num_processes: int = 3
+    seed: int = 0
+
+    skip_generation: bool = False
+    fid: bool = True
+    rhythm_stats: bool = True
 
     dataset_path: str = '/workspace/datasets/ORS16291'
     dataset_start: int = 16200
     dataset_end: int = 16291
 
-    model_path: str = 'OliBomby/Mapperatorinator-v29'
-    diff_ckpt: str = 'OliBomby/osu-diffusion-v2'
     classifier_ckpt: str = 'OliBomby/osu-classifier'
+    classifier_batch_size: int = 16
+
+    inference: InferenceConfig = field(default_factory=InferenceConfig)  # Training settings for osuT5 model
+    hydra: Any = MISSING
 
 
 cs = ConfigStore.instance()
 cs.store(name="base_inference", node=InferenceConfig)
+cs.store(name="base_fid", node=FidConfig)

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf, MISSING
@@ -73,16 +73,25 @@ class DataConfig:
     hold_note_ratio_dropout_prob: float = 0.2
     scroll_speed_ratio_dropout_prob: float = 0.2
     descriptor_dropout_prob: float = 0.2
+    # All Special Prefix Tokens
+    add_out_context_types: bool = True  # Add tokens indicating types of the out context
     add_gamemode_token: bool = True
-    add_diff_token: bool = True
     add_style_token: bool = False
+    add_diff_token: bool = True
     add_mapper_token: bool = True
-    add_cs_token: bool = True
     add_year_token: bool = True
     add_hitsounded_token: bool = True  # Add token for whether the map has hitsounds
     add_song_length_token: bool = True  # Add token for the length of the song
+    add_global_sv_token: bool = True  # Add token for the global slider velocity in std and ctb
+    add_cs_token: bool = True
+    add_keycount_token: bool = True  # Add token for the number of keys in mania
+    add_hold_note_ratio_token: bool = True  # Add token for the ratio of hold notes in mania
+    add_scroll_speed_ratio_token: bool = True  # Add token for the scroll speed ratio in mania
+    add_descriptors: bool = True  # Add beatmap descriptor tokens
+    add_sv_special_token: bool = True  # Add token for last SV value
+    add_kiai_special_token: bool = True  # Add token for last kiai state
     add_song_position_token: bool = True  # Add token for the position of the song in the mapset
-    add_descriptors: bool = True
+    # ---
     add_empty_sequences: bool = True
     add_empty_sequences_at_step: int = -1
     add_pre_tokens: bool = False
@@ -104,7 +113,6 @@ class DataConfig:
     descriptors_path: str = ''  # Path to file with all beatmap descriptors
     mappers_path: str = ''  # Path to file with all beatmap mappers
     add_timing: bool = False  # Add beatmap timing to map context
-    add_out_context_types: bool = True  # Add tokens indicating types of the out context
     add_snapping: bool = True  # Model hit object snapping
     add_timing_points: bool = True  # Model beatmap timing with timing points
     add_hitsounds: bool = True  # Model beatmap hitsounds
@@ -119,9 +127,9 @@ class DataConfig:
     add_kiai: bool = True  # Add kiai times to map context
     gamemodes: list[int] = field(default_factory=lambda: [0, 1, 2, 3])  # List of gamemodes to include in the dataset
     mania_bpm_normalized_scroll_speed: bool = True  # Normalize mania scroll speed by BPM
-    add_sv_special_token: bool = True  # Add extra special token for current SV
     add_sv: bool = True  # Model slider velocity in std and ctb
     add_mania_sv: bool = False  # Add mania scroll velocity in map context
+    min_year: Optional[int] = None  # Minimum year of the beatmap to include in the dataset
 
 
 @dataclass

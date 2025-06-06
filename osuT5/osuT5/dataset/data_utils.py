@@ -345,7 +345,7 @@ def get_groups(
     if group.event_type is not None:
         groups.append(group)
         group_indices.append(indices)
-    else:
+    elif len(indices) > 0:
         group_indices[-1].extend(indices)
 
     return groups, group_indices

@@ -102,8 +102,12 @@ class OsuParser:
         """Extract all timing information from a beatmap."""
         events = []
         event_times = []
-        last_ho = beatmap.hit_objects(stacking=False)[-1]
-        last_time = last_ho.end_time if hasattr(last_ho, "end_time") else last_ho.time
+        hit_objects = beatmap.hit_objects(stacking=False)
+        if len(hit_objects) == 0:
+            last_time = timedelta(milliseconds=0)
+        else:
+            last_ho = beatmap.hit_objects(stacking=False)[-1]
+            last_time = last_ho.end_time if hasattr(last_ho, "end_time") else last_ho.time
 
         # Get all timing points with BPM changes
         timing_points = [tp for tp in beatmap.timing_points if tp.bpm]
@@ -168,14 +172,17 @@ class OsuParser:
         if not add_snap or not self.add_snapping:
             return
 
-        tp = self.uninherited_point_at(time, beatmap)
-        beats = (time - tp.offset).total_seconds() * 1000 / tp.ms_per_beat
-        snapping = 0
-        for i in range(1, 17):
-            # If the difference between the time and the snapped time is less than 2 ms, that is the correct snapping
-            if abs(beats - round(beats * i) / i) * tp.ms_per_beat < 2:
-                snapping = i
-                break
+        if len(beatmap.timing_points) > 0:
+            tp = self.uninherited_point_at(time, beatmap)
+            beats = (time - tp.offset).total_seconds() * 1000 / tp.ms_per_beat
+            snapping = 0
+            for i in range(1, 17):
+                # If the difference between the time and the snapped time is less than 2 ms, that is the correct snapping
+                if abs(beats - round(beats * i) / i) * tp.ms_per_beat < 2:
+                    snapping = i
+                    break
+        else:
+            snapping = 0
 
         events.append(Event(EventType.SNAPPING, snapping))
         event_times.append(time_ms)
@@ -185,8 +192,14 @@ class OsuParser:
         if not self.add_hitsounds:
             return
 
-        tp = self.hitsound_point_at(time, beatmap)
-        tp_sample_set = tp.sample_type if tp.sample_type != 0 else 2  # Inherit to soft sample set
+        if len(beatmap.timing_points) > 0:
+            tp = self.hitsound_point_at(time, beatmap)
+            tp_sample_set = tp.sample_type if tp.sample_type != 0 else 2  # Inherit to soft sample set
+            tp_volume = tp.volume
+        else:
+            tp_sample_set = 2
+            tp_volume = 100
+
         addition_split = addition.split(":")
         sample_set = int(addition_split[0]) if addition_split[0] != "0" else tp_sample_set
         addition_set = int(addition_split[1]) if addition_split[1] != "0" else sample_set
@@ -198,7 +211,7 @@ class OsuParser:
         hitsound_idx = hitsound // 2 + 8 * (sample_set - 1) + 24 * (addition_set - 1)
 
         events.append(Event(EventType.HITSOUND, hitsound_idx))
-        events.append(Event(EventType.VOLUME, tp.volume))
+        events.append(Event(EventType.VOLUME, tp_volume))
         event_times.append(group_time)
         event_times.append(group_time)
 

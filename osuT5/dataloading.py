@@ -18,7 +18,39 @@ from osuT5.utils import (
 )
 
 
-@hydra.main(config_path="../configs/osut5", config_name="train_v29", version_base="1.1")
+def play_hs(audio, tokens, sr, tokenizer):
+    import sounddevice as sd
+    import numpy as np
+
+    # Play audio with hitsounds for every time event in labels
+    # Parameters for hitsound
+    hitsound_freq = 2000  # Hz
+    hitsound_duration = 0.03  # seconds
+    hitsound_amp = 0.2
+
+    # Find time events in labels
+    time_indices = []
+    for t in tokens:
+        if tokenizer.event_start[EventType.TIME_SHIFT] <= t < tokenizer.event_end[EventType.TIME_SHIFT]:
+            time_event = tokenizer.decode(t.item())
+            # Convert to sample index
+            x = int(time_event.value / STEPS_PER_MILLISECOND / 1000 * sr)
+            time_indices.append(x)
+
+    # Add hitsounds
+    audio_with_hits = audio.copy()
+    hitsound_samples = int(hitsound_duration * sr)
+    t = np.linspace(0, hitsound_duration, hitsound_samples, endpoint=False)
+    hitsound = hitsound_amp * np.sin(2 * np.pi * hitsound_freq * t)
+
+    for idx in time_indices:
+        end = min(idx + hitsound_samples, len(audio_with_hits))
+        audio_with_hits[idx:end] += hitsound[:end - idx]
+
+    sd.play(audio_with_hits, samplerate=sr)
+
+
+@hydra.main(config_path="../configs/osut5", config_name="train_tiny_dist3", version_base="1.1")
 def main(args: TrainConfig):
     setup_args(args)
 
@@ -47,10 +79,14 @@ def main(args: TrainConfig):
     )
 
     transform = MelSpectrogram(
+        args.model.spectrogram.implementation,
+        args.model.spectrogram.log_scale,
         args.model.spectrogram.sample_rate,
         args.model.spectrogram.n_fft,
         args.model.spectrogram.n_mels,
         args.model.spectrogram.hop_length,
+        f_min=args.model.spectrogram.f_min,
+        f_max=args.model.spectrogram.f_max,
     )
 
     if args.mode == 'benchmark':
@@ -94,8 +130,10 @@ def main(args: TrainConfig):
             mels = transform(b["frames"])
             # [tokenizer.decode(t) if t > 16 else t for t in b['decoder_input_ids'][3].cpu().numpy()]
             # plot the melspectrogram
+            play_hs(audio, labels, args, tokenizer)
             for i in range(len(mels)):
-                plt.imshow(mels[i].numpy().T, aspect="auto", origin="lower", norm="log")
+                fig, ax = plt.subplots(figsize=(12, 6), dpi=200)
+                ax.imshow(mels[i].numpy().T, aspect="auto", origin="lower", norm="log")
 
                 # plot the timing of events as vertical lines
                 timings = b["decoder_input_ids"][i]
@@ -106,18 +144,18 @@ def main(args: TrainConfig):
                     if tokenizer.event_start[EventType.TIME_SHIFT] <= t < tokenizer.event_end[EventType.TIME_SHIFT]:
                         time_event = tokenizer.decode(t.item())
                         x = time_event.value / STEPS_PER_MILLISECOND / 1000 * args.model.spectrogram.sample_rate / args.model.spectrogram.hop_length
-                        plt.vlines(x=x, ymin=0, ymax=mels[i].shape[1], color='g')
+                        ax.vlines(x=x, ymin=0, ymax=mels[i].shape[1], color='g')
                 for t in post:
                     if tokenizer.event_start[EventType.TIME_SHIFT] <= t < tokenizer.event_end[EventType.TIME_SHIFT]:
                         time_event = tokenizer.decode(t.item())
                         x = time_event.value / STEPS_PER_MILLISECOND / 1000 * args.model.spectrogram.sample_rate / args.model.spectrogram.hop_length
-                        plt.vlines(x=x, ymin=0, ymax=mels[i].shape[1] / 2, color='b')
+                        ax.vlines(x=x, ymin=0, ymax=mels[i].shape[1] / 20, color='b')
                 labels = b["labels"][i]
                 for t in labels:
                     if tokenizer.event_start[EventType.TIME_SHIFT] <= t < tokenizer.event_end[EventType.TIME_SHIFT]:
                         time_event = tokenizer.decode(t.item())
                         x = time_event.value / STEPS_PER_MILLISECOND / 1000 * args.model.spectrogram.sample_rate / args.model.spectrogram.hop_length
-                        plt.vlines(x=x, ymin=0, ymax=mels[i].shape[1], color='r')
+                        ax.vlines(x=x, ymin=0, ymax=mels[i].shape[1] / 10, color='r')
 
                 plt.show()
             break

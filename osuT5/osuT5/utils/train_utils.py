@@ -13,7 +13,6 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader
 
 from ..dataset.ors_dataset import LABEL_IGNORE_ID
-from ..model.custom_transformers import NWhisperForConditionalGeneration
 from ..tokenizer import Tokenizer, EventType, ContextType
 from ..model import Mapperatorinator
 from .log_utils import Averager
@@ -31,10 +30,7 @@ def forward(model: Mapperatorinator, batch):
 
 
 def forward_eval(model: Mapperatorinator, batch):
-    if isinstance(model.transformer, NWhisperForConditionalGeneration):
-        outputs = torch.compiler.disable(model.forward)(**batch)
-    else:
-        outputs = model(**batch)
+    outputs = model(**batch)
     return outputs
 
 

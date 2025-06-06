@@ -45,6 +45,7 @@ class BeatmapConfig:
     overall_difficulty: float = 8
     approach_rate: float = 9
     slider_multiplier: float = 1.4
+    slider_tick_rate: float = 1
 
     # Timing
     bpm: float = 120
@@ -65,8 +66,12 @@ def beatmap_config_from_beatmap(beatmap: Beatmap) -> BeatmapConfig:
         title_unicode=beatmap.title,
         artist_unicode=beatmap.artist,
         audio_filename=beatmap.audio_filename,
+        hp_drain_rate=beatmap.hp_drain_rate,
         circle_size=beatmap.circle_size,
+        overall_difficulty=beatmap.overall_difficulty,
+        approach_rate=beatmap.approach_rate,
         slider_multiplier=beatmap.slider_multiplier,
+        slider_tick_rate=beatmap.slider_tick_rate,
         creator=beatmap.creator,
         version=beatmap.version,
         background_line=background_line(beatmap.background),
@@ -169,7 +174,7 @@ class Postprocessor(object):
         self.snap_near_perfect_overlaps(groups)
 
         # Prepare unnormalizing scroll speed changes in mania
-        last_time = max(group.time for group in groups)
+        last_time = max(group.time for group in groups) if len(groups) > 0 else 0
         median_mpb = get_median_mpb(timing, last_time)
 
         # Convert to .osu format
@@ -395,8 +400,9 @@ class Postprocessor(object):
                 timing = self.set_sv(timedelta(milliseconds=group.time), group.scroll_speed, timing)
 
         # Remove any greenlines before the first timingpoint where parent is None
-        first_timing_point = next(tp for tp in timing if tp.parent is None)
-        timing = [tp for tp in timing if tp.offset >= first_timing_point.offset]
+        if len(timing) > 0:
+            first_timing_point = next(tp for tp in timing if tp.parent is None)
+            timing = [tp for tp in timing if tp.offset >= first_timing_point.offset]
 
         # Write .osu file
         with open(OSU_TEMPLATE_PATH, "r") as tf:
@@ -576,6 +582,9 @@ class Postprocessor(object):
             16: [8],
         }
 
+        if len(timing) == 0:
+            return time
+
         before_tp = self.timing_point_at(timedelta(milliseconds=time), timing)
         before_tp = before_tp if before_tp.parent is None else before_tp.parent
         before_time = round(before_tp.offset.total_seconds() * 1000)
@@ -602,6 +611,10 @@ class Postprocessor(object):
         ignore_divisors = ignore_ticks.get(snap_divisor, [1])
         for ignore_divisor in ignore_divisors:
             ticks -= local_ticks(ignore_divisor)
+
+        if len(ticks) == 0:
+            # If we don't have any ticks, just return the original time
+            return time
 
         # Find the closest tick to the original time
         new_time = min(ticks, key=lambda x: abs(x - time))

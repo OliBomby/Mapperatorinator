@@ -6,6 +6,7 @@ import hydra
 import torch
 from omegaconf import DictConfig
 from slider import Beatmap
+from torch.utils.data import IterableDataset
 
 from classifier.libs.dataset import OsuParser
 from classifier.libs.dataset.data_utils import load_audio_file
@@ -27,18 +28,41 @@ def iterate_examples(
     sample_rate = model_args.data.sample_rate
     samples_per_sequence = frame_seq_len * frame_size
 
+    parser = OsuParser(model_args, tokenizer)
+    events, event_times = parser.parse(beatmap)
+
     for sample in range(0, len(audio) - samples_per_sequence, samples_per_sequence):
-        example = create_example(beatmap, audio, sample / sample_rate, model_args, tokenizer, device)
+        example = create_example(events, event_times, audio, sample / sample_rate, model_args, tokenizer, device)
         yield example
 
 
+class ExampleDataset(IterableDataset):
+    def __init__(self, beatmap, audio, classifier_args, classifier_tokenizer, device):
+        self.beatmap = beatmap
+        self.audio = audio
+        self.classifier_args = classifier_args
+        self.classifier_tokenizer = classifier_tokenizer
+        self.device = device
+
+    def __iter__(self):
+        return iterate_examples(
+            self.beatmap,
+            self.audio,
+            self.classifier_args,
+            self.classifier_tokenizer,
+            self.device
+        )
+
+
 def create_example(
-        beatmap: Beatmap,
+        events: list[Event],
+        event_times: list[float],
         audio: npt.NDArray,
         time: float,
         model_args: DictConfig,
         tokenizer: Tokenizer,
-        device: torch.device
+        device: torch.device,
+        unsqueeze: bool = False,
 ):
     frame_seq_len = model_args.data.src_seq_len - 1
     frame_size = model_args.data.hop_length
@@ -49,10 +73,8 @@ def create_example(
     # Get audio frames
     frame_start = int(time * sample_rate)
     frames = audio[frame_start:frame_start + samples_per_sequence]
-    frames = torch.from_numpy(frames).to(torch.float32).unsqueeze(0).to(device)
+    frames = torch.from_numpy(frames).to(torch.float32).to(device)
 
-    parser = OsuParser(model_args, tokenizer)
-    events, event_times = parser.parse(beatmap)
     # Get the events between time and time + sequence_duration
     events = [event for event, event_time in zip(events, event_times) if
               time <= event_time / 1000 < time + sequence_duration]
@@ -65,7 +87,11 @@ def create_example(
     tokens = torch.full((model_args.data.tgt_seq_len,), tokenizer.pad_id, dtype=torch.long)
     for i in range(min(len(events), model_args.data.tgt_seq_len)):
         tokens[i] = tokenizer.encode(events[i])
-    tokens = tokens.unsqueeze(0).to(device)
+    tokens = tokens.to(device)
+
+    if unsqueeze:
+        tokens = tokens.unsqueeze(0)
+        frames = frames.unsqueeze(0)
 
     return {
         "decoder_input_ids": tokens,
@@ -80,7 +106,8 @@ def create_example_from_path(
         time: float,
         model_args: DictConfig,
         tokenizer: Tokenizer,
-        device: torch.device
+        device: torch.device,
+        unsqueeze: bool = False,
 ):
     sample_rate = model_args.data.sample_rate
 
@@ -93,7 +120,10 @@ def create_example_from_path(
 
     audio = load_audio_file(audio_path, sample_rate)
 
-    return create_example(beatmap, audio, time, model_args, tokenizer, device)
+    parser = OsuParser(model_args, tokenizer)
+    events, event_times = parser.parse(beatmap)
+
+    return create_example(events, event_times, audio, time, model_args, tokenizer, device, unsqueeze)
 
 
 def get_mapper_names(path: str):
@@ -123,7 +153,7 @@ def main(args: DictConfig):
     model, model_args, tokenizer = load_ckpt(args.checkpoint_path)
     model.eval().to(device)
 
-    example = create_example_from_path(args.beatmap_path, args.audio_path, args.time, model_args, tokenizer, device)
+    example = create_example_from_path(args.beatmap_path, args.audio_path, args.time, model_args, tokenizer, device, True)
     result: OsuClassifierOutput = model(**example)
     logits = result.logits
 
