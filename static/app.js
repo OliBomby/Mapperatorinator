@@ -67,6 +67,9 @@ $(document).ready(function() {
 
             // Clear placeholders
             $('#audio_path, #output_path').attr('placeholder', '');
+
+            // Hide clear buttons
+            $('.clear-path-button').hide();
         }
     };
 
@@ -185,6 +188,9 @@ $(document).ready(function() {
                     if (path) {
                         $(`#${targetId}`).val(path).trigger('input');
                         console.log(`Selected ${browseType}:`, path);
+
+                        // Update clear button visibility
+                        ClearPathManager.updateClearButtonVisibility(targetId);
                     }
                 } catch (error) {
                     console.error(`Error browsing for ${browseType}:`, error);
@@ -194,7 +200,95 @@ $(document).ready(function() {
         }
     };
 
-    // Path Auto-fill Manager
+    // Clear Path Button Manager
+    const ClearPathManager = {
+        init() {
+            this.attachClearButtonHandlers();
+            this.attachPathInputHandlers();
+        },
+
+        attachClearButtonHandlers() {
+            $('.clear-path-button').click((e) => {
+                const targetId = $(e.target).data('clear-target');
+                this.clearPath(targetId);
+            });
+        },
+
+        attachPathInputHandlers() {
+            // Monitor all path fields for value changes
+            $('#audio_path, #output_path, #beatmap_path').on('input', (e) => {
+                this.updateClearButtonVisibility(e.target.id);
+            });
+        },
+
+        updateClearButtonVisibility(fieldId) {
+            const $field = $(`#${fieldId}`);
+            const $clearButton = $(`.clear-path-button[data-clear-target="${fieldId}"]`);
+            const hasValue = $field.val().trim() !== '';
+
+            if (hasValue) {
+                $clearButton.fadeIn(150);
+            } else {
+                $clearButton.fadeOut(150);
+            }
+        },
+
+        clearPath(fieldId) {
+            const $field = $(`#${fieldId}`);
+            const $clearButton = $(`.clear-path-button[data-clear-target="${fieldId}"]`);
+
+            // Clear the field value
+            $field.val('');
+
+            // Hide the clear button
+            $clearButton.hide();
+
+            // Handle auto-fill updates based on which field was cleared
+            if (fieldId === 'beatmap_path') {
+                this.handleBeatmapPathClear();
+            } else if (fieldId === 'audio_path') {
+                this.handleAudioPathClear();
+            } else if (fieldId === 'output_path') {
+                this.handleOutputPathClear();
+            }
+
+            // Trigger change events for any dependent logic
+            $field.trigger('input');
+        },
+
+        handleBeatmapPathClear() {
+            // Clear auto-fill placeholders for both audio and output paths
+            $('#audio_path').attr('placeholder', '');
+            $('#output_path').attr('placeholder', '');
+
+            // If audio path has a value, update output path placeholder
+            const audioPath = $('#audio_path').val().trim();
+            if (audioPath && $('#output_path').val().trim() === '') {
+                PathAutoFillManager.handleAudioPathChange(audioPath);
+            }
+        },
+
+        handleAudioPathClear() {
+            // Clear output path placeholder if output path is empty
+            if ($('#output_path').val().trim() === '') {
+                $('#output_path').attr('placeholder', '');
+            }
+        },
+
+        handleOutputPathClear() {
+            // Check if we should restore auto-fill placeholder
+            const beatmapPath = $('#beatmap_path').val().trim();
+            const audioPath = $('#audio_path').val().trim();
+
+            if (beatmapPath) {
+                // Restore from beatmap
+                PathAutoFillManager.handleBeatmapPathChange(beatmapPath);
+            } else if (audioPath) {
+                // Restore from audio path
+                PathAutoFillManager.handleAudioPathChange(audioPath);
+            }
+        }
+    };
     const PathAutoFillManager = {
         init() {
             this.attachPathChangeHandlers();
@@ -496,6 +590,11 @@ $(document).ready(function() {
                 if (newBeatmapPath !== currentBeatmapPath) {
                     $("#beatmap_path").trigger('input');
                 }
+
+                // Update clear button visibility for imported paths
+                ClearPathManager.updateClearButtonVisibility('audio_path');
+                ClearPathManager.updateClearButtonVisibility('output_path');
+                ClearPathManager.updateClearButtonVisibility('beatmap_path');
 
                 this.showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
 
@@ -834,6 +933,7 @@ $(document).ready(function() {
         ConfigManager.init();
         InferenceManager.init();
         PathAutoFillManager.init();
+        ClearPathManager.init();
 
         // Attach event handlers
         $("#model").on('change', () => UIManager.updateModelSettings());

@@ -32,16 +32,19 @@
                     <label for="audio_path" title="Path to audio file">Audio Path:</label>
                     <input type="text" id="audio_path" name="audio_path" />
                     <button type="button" class="browse-button" data-browse-type="file" data-target="audio_path">Browse...</button>
+                    <button type="button" class="browse-button clear-path-button" data-clear-target="audio_path" style="display: none;" title="Clear path">✕</button>
                 </div>
                 <div class="path-input-group">
                     <label for="output_path" title="Path to output folder">Output Path:</label>
                     <input type="text" id="output_path" name="output_path" />
                     <button type="button" class="browse-button" data-browse-type="folder" data-target="output_path">Browse...</button>
+                    <button type="button" class="browse-button clear-path-button" data-clear-target="output_path" style="display: none;" title="Clear path">✕</button>
                 </div>
                 <div class="path-input-group">
                     <label for="beatmap_path" title="Path to .osu file to autofill metadata, audio path, and output path, or use as reference">Beatmap Path:</label>
                     <input type="text" id="beatmap_path" name="beatmap_path" />
                     <button type="button" class="browse-button" data-browse-type="file" data-target="beatmap_path">Browse...</button>
+                    <button type="button" class="browse-button clear-path-button" data-clear-target="beatmap_path" style="display: none;" title="Clear path">✕</button>
                 </div>
 
                 <!-- In-Context Options Box -->
