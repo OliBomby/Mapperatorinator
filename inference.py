@@ -27,6 +27,117 @@ from osu_diffusion import DiT_models
 from osu_diffusion.config import DiffusionTrainConfig
 
 
+def get_directory_from_file_path(file_path):
+    """
+    Extract directory path from a file path.
+
+    Args:
+        file_path (str): Path to a file
+
+    Returns:
+        str: Directory path, or empty string if invalid
+    """
+    if not file_path or file_path.strip() == "":
+        return ""
+
+    try:
+        path = Path(file_path)
+        return str(path.parent)
+    except Exception:
+        return ""
+
+
+def validate_audio_file_exists(audio_path):
+    """
+    Check if audio file exists at the given path.
+
+    Args:
+        audio_path (str): Path to audio file
+
+    Returns:
+        dict: {'exists': bool, 'error': str or None}
+    """
+    if not audio_path or audio_path.strip() == "":
+        return {'exists': False, 'error': None}
+
+    try:
+        path = Path(audio_path)
+        if path.exists() and path.is_file():
+            return {'exists': True, 'error': None}
+        else:
+            return {'exists': False, 'error': f"Audio file not found: {audio_path}"}
+    except Exception as e:
+        return {'exists': False, 'error': f"Error checking audio file: {str(e)}"}
+
+
+def get_autofill_paths_from_beatmap(beatmap_path):
+    """
+    Extract auto-fill paths from a beatmap file.
+
+    Args:
+        beatmap_path (str): Path to .osu beatmap file
+
+    Returns:
+        dict: {
+            'audio_path': str,
+            'output_path': str,
+            'audio_filename': str,
+            'audio_exists': bool,
+            'error': str or None
+        }
+    """
+    result = {
+        'audio_path': '',
+        'output_path': '',
+        'audio_filename': '',
+        'audio_exists': False,
+        'error': None
+    }
+
+    if not beatmap_path or beatmap_path.strip() == "":
+        return result
+
+    try:
+        beatmap_path = Path(beatmap_path)
+
+        if not beatmap_path.exists():
+            result['error'] = f"Beatmap file not found: {beatmap_path}"
+            return result
+
+        if not beatmap_path.is_file():
+            result['error'] = f"Beatmap path is not a file: {beatmap_path}"
+            return result
+
+        # Parse beatmap to get audio filename
+        beatmap = Beatmap.from_path(beatmap_path)
+        audio_filename = beatmap.audio_filename
+
+        if not audio_filename:
+            result['error'] = "No audio filename found in beatmap"
+            return result
+
+        # Calculate paths
+        output_path = str(beatmap_path.parent)
+        audio_path = str(beatmap_path.parent / audio_filename)
+
+        # Check if audio file exists
+        audio_validation = validate_audio_file_exists(audio_path)
+
+        result.update({
+            'audio_path': audio_path,
+            'output_path': output_path,
+            'audio_filename': audio_filename,
+            'audio_exists': audio_validation['exists'],
+            'error': audio_validation['error']
+        })
+
+        return result
+
+    except Exception as e:
+        result['error'] = f"Error parsing beatmap: {str(e)}"
+        return result
+
+
 def prepare_args(args: FidConfig | InferenceConfig):
     if not torch.cuda.is_available() and args.device == "cuda":
         print("CUDA is not available, using CPU instead.")
@@ -79,10 +190,22 @@ def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
     beatmap = Beatmap.from_path(beatmap_path)
     print(f"Using metadata from beatmap: {beatmap.display_name}")
 
+    # Use the new utility functions for path auto-fill
     if args.audio_path == '':
-        args.audio_path = beatmap_path.parent / beatmap.audio_filename
+        autofill_info = get_autofill_paths_from_beatmap(args.beatmap_path)
+        if autofill_info['error'] is None:
+            args.audio_path = autofill_info['audio_path']
+            if not autofill_info['audio_exists']:
+                print(f"Warning: {autofill_info['error']}")
+        else:
+            print(f"Warning: Could not auto-fill audio path - {autofill_info['error']}")
+
     if args.output_path == '':
-        args.output_path = beatmap_path.parent
+        autofill_info = get_autofill_paths_from_beatmap(args.beatmap_path)
+        if autofill_info['error'] is None:
+            args.output_path = autofill_info['output_path']
+        else:
+            print(f"Warning: Could not auto-fill output path - {autofill_info['error']}")
 
     generation_config = generation_config_from_beatmap(beatmap, tokenizer)
 

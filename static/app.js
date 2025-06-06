@@ -64,6 +64,9 @@ $(document).ready(function() {
 
             // Clear paths and optional fields
             $('#audio_path, #output_path, #beatmap_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
+
+            // Clear placeholders
+            $('#audio_path, #output_path').attr('placeholder', '');
         }
     };
 
@@ -191,7 +194,91 @@ $(document).ready(function() {
         }
     };
 
-    // Descriptor Manager
+    // Path Auto-fill Manager
+    const PathAutoFillManager = {
+        init() {
+            this.attachPathChangeHandlers();
+        },
+
+        attachPathChangeHandlers() {
+            // Handle beatmap path changes
+            $('#beatmap_path').on('input', (e) => {
+                const beatmapPath = $(e.target).val().trim();
+                if (beatmapPath) {
+                    this.handleBeatmapPathChange(beatmapPath);
+                } else {
+                    this.clearAutoFillPlaceholders();
+                }
+            });
+
+            // Handle audio path changes
+            $('#audio_path').on('input', (e) => {
+                const audioPath = $(e.target).val().trim();
+                if (audioPath && $('#output_path').val().trim() === '') {
+                    this.handleAudioPathChange(audioPath);
+                }
+            });
+        },
+
+        async handleBeatmapPathChange(beatmapPath) {
+            try {
+                const response = await $.get('/get_beatmap_info', { beatmap_path: beatmapPath });
+
+                if (response.success) {
+                    const data = response.data;
+
+                    // Set placeholders for auto-filled paths
+                    if ($('#audio_path').val().trim() === '') {
+                        $('#audio_path').attr('placeholder', data.audio_path);
+                    }
+
+                    if ($('#output_path').val().trim() === '') {
+                        $('#output_path').attr('placeholder', data.output_path);
+                    }
+
+                    // Show warning if audio file doesn't exist
+                    if (!data.audio_exists && data.audio_path) {
+                        Utils.showFlashMessage(
+                            `Warning: Audio file "${data.audio_filename}" not found in beatmap directory`,
+                            'error'
+                        );
+                    }
+                } else if (response.error) {
+                    console.warn('Beatmap auto-fill error:', response.error);
+                    // Silently fail for auto-fill, but log the error
+                }
+            } catch (error) {
+                console.error('Error fetching beatmap info:', error);
+                // Silently fail for auto-fill
+            }
+        },
+
+        async handleAudioPathChange(audioPath) {
+            try {
+                const response = await $.get('/get_directory_from_path', { file_path: audioPath });
+
+                if (response.success && response.data.directory) {
+                    // Set placeholder for output path if it's empty
+                    if ($('#output_path').val().trim() === '') {
+                        $('#output_path').attr('placeholder', response.data.directory);
+                    }
+                }
+            } catch (error) {
+                console.error('Error getting directory from audio path:', error);
+                // Silently fail for auto-fill
+            }
+        },
+
+        clearAutoFillPlaceholders() {
+            // Clear placeholders when beatmap path is cleared
+            if ($('#audio_path').val().trim() === '') {
+                $('#audio_path').attr('placeholder', '');
+            }
+            if ($('#output_path').val().trim() === '') {
+                $('#output_path').attr('placeholder', '');
+            }
+        }
+    };
     const DescriptorManager = {
         init() {
             this.attachDropdownHandler();
@@ -448,13 +535,20 @@ $(document).ready(function() {
             const beatmapPath = $('#beatmap_path').val().trim();
             const outputPath = $('#output_path').val().trim();
 
-            if (!audioPath && !beatmapPath) {
+            // Consider placeholders as valid paths for validation
+            const audioPlaceholder = $('#audio_path').attr('placeholder') || '';
+            const outputPlaceholder = $('#output_path').attr('placeholder') || '';
+
+            const hasAudioPath = audioPath || audioPlaceholder;
+            const hasOutputPath = outputPath || outputPlaceholder;
+
+            if (!hasAudioPath && !beatmapPath) {
                 Utils.smoothScroll(0);
                 Utils.showFlashMessage("Either 'Beatmap Path' or 'Audio Path' are required for running inference", 'error');
                 return false;
             }
 
-            if (!outputPath && !beatmapPath) {
+            if (!hasOutputPath && !beatmapPath) {
                 Utils.smoothScroll(0);
                 Utils.showFlashMessage("Either 'Output Path' or 'Beatmap Path' are required for running inference", 'error');
                 return false;
@@ -739,6 +833,7 @@ $(document).ready(function() {
         DescriptorManager.init();
         ConfigManager.init();
         InferenceManager.init();
+        PathAutoFillManager.init();
 
         // Attach event handlers
         $("#model").on('change', () => UIManager.updateModelSettings());

@@ -13,6 +13,9 @@ import webview
 import werkzeug.serving
 from flask import Flask, render_template, request, Response, jsonify
 
+# Import path auto-fill functions from inference module
+from inference import get_autofill_paths_from_beatmap, get_directory_from_file_path, validate_audio_file_exists
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
 static_folder = os.path.join(script_dir, 'static')
@@ -386,7 +389,7 @@ def open_folder():
     folder_path = request.args.get('folder')
     print(f"Request received to open folder: {folder_path}")
     if not folder_path:
-         return jsonify({"status": "error", "message": "No folder path specified"}), 400
+        return jsonify({"status": "error", "message": "No folder path specified"}), 400
 
     # Resolve to absolute path for checks
     abs_folder_path = os.path.abspath(folder_path)
@@ -486,6 +489,62 @@ def save_config():
         return jsonify({
             'success': False,
             'error': f'Failed to save configuration: {str(e)}'
+        })
+
+
+@app.route('/get_beatmap_info', methods=['GET'])
+def get_beatmap_info():
+    """Get auto-fill information from a beatmap file."""
+    try:
+        beatmap_path = request.args.get('beatmap_path')
+        if not beatmap_path:
+            return jsonify({'success': False, 'error': 'No beatmap path provided'})
+
+        # Use the utility function from inference.py
+        result = get_autofill_paths_from_beatmap(beatmap_path)
+
+        return jsonify({
+            'success': result['error'] is None,
+            'data': {
+                'audio_path': result['audio_path'],
+                'output_path': result['output_path'],
+                'audio_filename': result['audio_filename'],
+                'audio_exists': result['audio_exists']
+            },
+            'error': result['error']
+        })
+
+    except Exception as e:
+        print(f"Error in get_beatmap_info: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to get beatmap info: {str(e)}'
+        })
+
+
+@app.route('/get_directory_from_path', methods=['GET'])
+def get_directory_from_path():
+    """Extract directory from a file path."""
+    try:
+        file_path = request.args.get('file_path')
+        if not file_path:
+            return jsonify({'success': False, 'error': 'No file path provided'})
+
+        # Use the utility function from inference.py
+        directory = get_directory_from_file_path(file_path)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'directory': directory
+            }
+        })
+
+    except Exception as e:
+        print(f"Error in get_directory_from_path: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to extract directory: {str(e)}'
         })
 
 
