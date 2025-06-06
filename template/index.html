@@ -4,60 +4,61 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mapperatorinator Interface (Flask+pywebview)</title>
-    <link
-            href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
-            rel="stylesheet"
-    />
-    <link
-            href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css"
-            rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-<!-- Container for Flash Messages/Popups -->
 <div id="flash-container"></div>
 <div class="container">
     <main>
         <form id="inferenceForm" method="POST" class="card form-card">
+            <!-- Config Section -->
+            <fieldset>
+                <legend>Config</legend>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" id="export-config-btn" class="browse-button">Export</button>
+                    <input type="file" id="import-config-input" accept=".json" style="display: none;" />
+                    <button type="button" id="import-config-btn" class="browse-button">Import</button>
+                    <button type="button" id="reset-config-btn" class="browse-button">Clear</button>
+                </div>
+                <div id="config-status" style="margin-top: 10px; font-size: 14px;"></div>
+            </fieldset>
+
+            <!-- Paths Section -->
             <fieldset>
                 <legend>Paths</legend>
-                <div class="path-input-group"> <label for="audio_path" title="Path to audio file">Audio Path:</label>
+                <div class="path-input-group">
+                    <label for="audio_path" title="Path to audio file">Audio Path:</label>
                     <input type="text" id="audio_path" name="audio_path" />
-                    <button type="button" id="browse-audio" class="browse-button">Browse...</button>
+                    <button type="button" class="browse-button" data-browse-type="file" data-target="audio_path">Browse...</button>
                 </div>
-                <div class="path-input-group"> <label for="output_path" title="Path to output folder">Output Path:</label>
+                <div class="path-input-group">
+                    <label for="output_path" title="Path to output folder">Output Path:</label>
                     <input type="text" id="output_path" name="output_path" />
-                    <button type="button" id="browse-output" class="browse-button">Browse...</button>
+                    <button type="button" class="browse-button" data-browse-type="folder" data-target="output_path">Browse...</button>
                 </div>
-                <div class="path-input-group"> <label for="beatmap_path" title="Path to .osu file to autofill metadata, audio path, and output path, or use as reference">Beatmap Path:</label>
+                <div class="path-input-group">
+                    <label for="beatmap_path" title="Path to .osu file to autofill metadata, audio path, and output path, or use as reference">Beatmap Path:</label>
                     <input type="text" id="beatmap_path" name="beatmap_path" />
-                    <button type="button" id="browse-beatmap" class="browse-button">Browse...</button>
+                    <button type="button" class="browse-button" data-browse-type="file" data-target="beatmap_path">Browse...</button>
                 </div>
-                <!-- Start: In-Context Options Box -->
+
+                <!-- In-Context Options Box -->
                 <div id="in-context-options-box" class="context-options-box" style="display: none;">
-                    <h4 title="List of additional context to provide to the model">In-Context Options</h4> <!-- Title inside the box -->
+                    <h4 title="List of additional context to provide to the model">In-Context Options</h4>
                     <div class="context-options-container">
-                        <div class="context-option-item" data-value="TIMING">
-                            <input type="checkbox" id="context-timing" name="in_context_options" value="TIMING" />
-                            <label for="context-timing">Timing</label>
+                        {% for option in [('TIMING', 'Timing'), ('KIAI', 'Kiai'), ('GD', 'Guest Difficulty'), ('NO_HS', 'No Hitsound')] %}
+                        <div class="context-option-item" data-value="{{ option[0] }}">
+                            <input type="checkbox" id="context-{{ option[0].lower() }}" name="in_context_options" value="{{ option[0] }}" />
+                            <label for="context-{{ option[0].lower() }}">{{ option[1] }}</label>
                         </div>
-                        <div class="context-option-item" data-value="KIAI">
-                            <input type="checkbox" id="context-kiai" name="in_context_options" value="KIAI" />
-                            <label for="context-kiai">Kiai</label>
-                        </div>
-                        <div class="context-option-item" data-value="GD">
-                            <input type="checkbox" id="context-gd" name="in_context_options" value="GD" />
-                            <label for="context-gd">Guest Difficulty</label>
-                        </div>
-                        <div class="context-option-item" data-value="NO_HS">
-                            <input type="checkbox" id="context-no_hs" name="in_context_options" value="NO_HS" />
-                            <label for="context-no_hs">No Hitsound</label>
-                        </div>
+                        {% endfor %}
                     </div>
                 </div>
-                <!-- End: In-Context Options Box -->
             </fieldset>
+
+            <!-- Basic Settings -->
             <fieldset>
                 <legend>Basic Settings</legend>
                 <label for="model">Model:</label>
@@ -67,89 +68,117 @@
                     <option value="v30" selected>Mapperatorinator V30 (Best model)</option>
                     <option value="v31">Mapperatorinator V31 (Slightly more accurate than V29)</option>
                 </select>
+
                 <label for="gamemode">Gamemode:</label>
                 <select id="gamemode" name="gamemode" class="styled-select">
-                    <option value="0">Standard</option>
-                    <option value="1">Taiko</option>
-                    <option value="2">Catch the Beat</option>
-                    <option value="3">Mania</option>
+                    {% for mode in [('0', 'Standard'), ('1', 'Taiko'), ('2', 'Catch the Beat'), ('3', 'Mania')] %}
+                    <option value="{{ mode[0] }}">{{ mode[1] }}</option>
+                    {% endfor %}
                 </select>
+
                 <label for="difficulty" title="Difficulty rating (star rating)">Difficulty (star rating):</label>
                 <input type="number" step="0.1" id="difficulty" name="difficulty" min="0" value="5" />
             </fieldset>
+
+            <!-- Difficulty Metadata -->
             <fieldset>
                 <legend>Difficulty Metadata</legend>
                 <label for="hp_drain_rate" title="HP drain rate (HP)">HP Drain Rate (HP):</label>
                 <input type="number" step="0.1" id="hp_drain_rate" name="hp_drain_rate" min="0" max="10" value="5" />
-                <div class="form-group" id="group-circle_size" style="display: none;">
+
+                <div class="form-group conditional-field" id="group-circle_size" data-show-for-gamemode="0" style="display: none;">
                     <label for="circle_size" title="Circle size (CS)">Circle Size (CS):</label>
                     <input type="number" step="0.1" id="circle_size" name="circle_size" min="0" max="10" value="4" />
                 </div>
-                <div class="form-group" id="group-keycount" style="display: none;">
+
+                <div class="form-group conditional-field" id="group-keycount" data-show-for-gamemode="3" style="display: none;">
                     <label for="keycount" title="Number of keys for mania">Key Count:</label>
                     <input type="number" id="keycount" name="keycount" min="0" max="18" value="4" />
                 </div>
+
                 <label for="overall_difficulty" title="Overall difficulty (OD)">Overall Difficulty (OD):</label>
                 <input type="number" step="0.1" id="overall_difficulty" name="overall_difficulty" min="0" max="10" value="8" />
+
                 <label for="approach_rate" title="Approach rate (AR)">Approach Rate (AR):</label>
                 <input type="number" step="0.1" id="approach_rate" name="approach_rate" min="0" max="10" value="9" />
+
                 <label for="slider_multiplier" title="Slider velocity multiplier">Slider Multiplier:</label>
                 <input type="number" step="0.1" id="slider_multiplier" name="slider_multiplier" min="0" max="3.6" value="1.4" />
+
                 <label for="slider_tick_rate" title="Slider tick rate">Slider Tick Rate:</label>
                 <input type="number" step="0.5" id="slider_tick_rate" name="slider_tick_rate" min="0.5" max="4.0" value="1" />
             </fieldset>
+
+            <!-- Advanced Settings -->
             <fieldset>
                 <legend>Advanced Settings</legend>
                 <label for="mapper_id" title="Mapper user ID for style">Mapper ID:</label>
                 <input type="text" id="mapper_id" name="mapper_id" />
-                <div class="form-group" id="group-year">
+
+                <div class="form-group conditional-field" id="group-year" data-hide-for-model="v30">
                     <label for="year" title="Year of the song (2007-2023)">Year (2007-2023):</label>
                     <input type="number" id="year" name="year" min="2007" max="2023" value="2023" />
                 </div>
-                <div class="form-group" id="group-hold_note_ratio" style="display: none;">
+
+                <div class="form-group conditional-field" id="group-hold_note_ratio" data-show-for-gamemode="3" style="display: none;">
                     <label for="hold_note_ratio" title="Hold note ratio for mania 0-1">Hold Note Ratio:</label>
                     <input type="number" step="0.01" id="hold_note_ratio" name="hold_note_ratio" min="0" max="1" />
                 </div>
-                <div class="form-group" id="group-scroll_speed_ratio" style="display: none;">
+
+                <div class="form-group conditional-field" id="group-scroll_speed_ratio" data-show-for-gamemode="2,3" style="display: none;">
                     <label for="scroll_speed_ratio" title="Scroll speed ratio for mania and ctb 0-1">Scroll Speed Ratio:</label>
                     <input type="number" step="0.01" id="scroll_speed_ratio" name="scroll_speed_ratio" min="0" max="1" />
                 </div>
+
                 <label for="cfg_scale" title="Scale of the classifier-free guidance">CFG Scale:</label>
                 <input type="number" step="0.1" id="cfg_scale" name="cfg_scale" min="0" value="1.0"/>
+
                 <label for="temperature">Temperature:</label>
                 <input type="number" id="temperature" name="temperature" step="0.01" min="0" max="1" value="0.9">
+
                 <label for="top_p">Top-p:</label>
                 <input type="number" id="top_p" name="top_p" step="0.01" min="0" max="1" value="0.9">
+
                 <label for="seed" title="Random seed for generation">Random Seed:</label>
                 <input type="text" id="seed" name="seed" />
             </fieldset>
+
+            <!-- Generation Interval -->
             <fieldset>
                 <legend>Generation Interval</legend>
                 <label for="start_time" title="Generation start time in milliseconds">Start Time (ms):</label>
                 <input type="number" id="start_time" name="start_time" min="0" />
+
                 <label for="end_time" title="Generation end time in milliseconds">End Time (ms):</label>
                 <input type="number" id="end_time" name="end_time" min="0" />
             </fieldset>
+
+            <!-- Options -->
             <fieldset>
                 <legend>Options</legend>
-                <div class="option-item" id="export-osz-option">
+                <div class="option-item">
                     <input type="checkbox" id="export_osz" name="export_osz" value="false" />
                     <label for="export_osz" title="Whether to export a .osz file containing the generated beatmap and audio file">Export .osz</label>
                 </div>
-                <div class="option-item" id="add-to-beatmap-option" style="display: none;">
+
+                <div class="option-item conditional-field" id="add-to-beatmap-option" style="display: none;">
                     <input type="checkbox" id="add_to_beatmap" name="add_to_beatmap" value="false" />
                     <label for="add_to_beatmap" title="Whether to add generated content to the reference beatmap instead of making a new beatmap">Add to Beatmap</label>
                 </div>
-                <div class="option-item" id="option-item-hitsounded">
+
+                <div class="option-item conditional-field" id="option-item-hitsounded" data-hide-for-model="v30">
                     <input type="checkbox" id="hitsounded" name="hitsounded" value="true" checked />
                     <label for="hitsounded">Add Hitsounds</label>
                 </div>
+
                 <div class="option-item">
                     <input type="checkbox" id="super_timing" name="super_timing" value="false" />
                     <label for="super_timing" title="Whether to use slow accurate variable BPM timing generator">Super Timing</label>
                 </div>
             </fieldset>
-            <div class="custom-dropdown-descriptors">
+
+            <!-- Descriptors -->
+            <div class="custom-dropdown-descriptors conditional-field" data-hide-for-model="v30">
                 <div class="dropdown-header">
                     <div>
                         <span class="dropdown-title" title="List of descriptors for style (1 click = include, 2 clicks = exclude)">Descriptors</span>
@@ -264,20 +293,11 @@
                     </div>
                 </div>
             </div>
-            <!-- Import/Export Config Section -->
-            <fieldset>
-                <legend>Config</legend>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button type="button" id="export-config-btn" class="browse-button">Export</button>
-                    <input type="file" id="import-config-input" accept=".json" style="display: none;" />
-                    <button type="button" id="import-config-btn" class="browse-button">Import</button>
-                    <button type="button" id="reset-config-btn" class="browse-button">Reset to Default</button>
-                </div>
-                <div id="config-status" style="margin-top: 10px; font-size: 14px;"></div>
-            </fieldset>
+
             <button type="submit">Run Inference</button>
         </form>
 
+        <!-- Progress Output -->
         <div id="progress_output" class="card" style="margin-top:20px; display:none;">
             <h3>Progress</h3>
             <div id="init_message">Initializing process... This may take a moment.</div>
@@ -285,7 +305,6 @@
             <div id="progressBarContainer">
                 <div id="progressBar"></div>
             </div>
-            <!-- Add Cancel Button (initially hidden) -->
             <div style="margin-top: 10px; text-align: center;">
                 <button type="button" id="cancel-button" class="cancel-button" style="display:none;">Cancel</button>
             </div>
@@ -303,797 +322,758 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
 <script>
     $(document).ready(function() {
-        // Toggle custom dropdown for descriptors on header click
-        $('.custom-dropdown-descriptors .dropdown-header').on('click', function() {
-            var $dropdown = $(this).parent();
-            $dropdown.toggleClass('open');
-            // If the dropdown was just opened, scroll its header to the top
-            if ($dropdown.hasClass('open')) {
-                $('html, body').animate({
-                    scrollTop: $(this).offset().top
-                }, 500); // 500ms smooth scroll duration
+        // Application state and configuration
+        const AppState = {
+            evtSource: null,
+            isCancelled: false,
+            inferenceErrorOccurred: false,
+            accumulatedErrorMessages: [],
+            errorLogFilePath: null,
+            animationSpeed: 300,
+
+            modelCapabilities: {
+                "v28": {},
+                "v29": {},
+                "v30": {
+                    supportedGamemodes: ['0'],
+                    supportsYear: false,
+                    supportedInContextOptions: ['TIMING'],
+                    hideHitsoundsOption: true,
+                    supportsDescriptors: false,
+                },
             }
-        });
-
-        $('.select2').select2({
-            placeholder: "Select options",
-            allowClear: true,
-            dropdownCssClass: "select2-dropdown-dark",
-            containerCssClass: "select2-container-dark"
-        });
-        // Ensure progress title div exists (idempotent)
-        if (!$("#progressTitle").length) {
-            $("#progress_output h3").after("<div id='progressTitle' style='font-weight:bold; padding-bottom:5px;'></div>");
-        }
-        // --- Browse Button Logic ---
-        window.addEventListener('pywebviewready', function() {
-            console.log("pywebview API is ready.");
-            $("#browse-audio").click(async function() {
-                try {
-                    const filePath = await window.pywebview.api.browse_file();
-                    if (filePath) {
-                        $("#audio_path").val(filePath);
-                        console.log("Selected audio file:", filePath);
-                    } else {
-                        console.log("Audio file selection cancelled.");
-                    }
-                } catch (error) {
-                    console.error("Error browsing for audio file:", error);
-                    alert("Could not browse for file. Ensure the backend API is running.");
-                }
-            });
-            $("#browse-output").click(async function() {
-                try {
-                    const folderPath = await window.pywebview.api.browse_folder();
-                    if (folderPath) {
-                        $("#output_path").val(folderPath);
-                        console.log("Selected output folder:", folderPath);
-                    } else {
-                        console.log("Output folder selection cancelled.");
-                    }
-                } catch (error) {
-                    console.error("Error browsing for output folder:", error);
-                    alert("Could not browse for folder. Ensure the backend API is running.");
-                }
-            });
-            $("#browse-beatmap").click(async function() {
-                try {
-                    const filePath = await window.pywebview.api.browse_file();
-                    if (filePath) {
-                        $("#beatmap_path").val(filePath);
-                        console.log("Selected beatmap file:", filePath);
-                        $("#beatmap_path").trigger('input');
-                    } else {
-                        console.log("Beatmap file selection cancelled.");
-                    }
-                } catch (error) {
-                    console.error("Error browsing for beatmap file:", error);
-                    alert("Could not browse for file. Ensure the backend API is running.");
-                }
-            });
-        });
-        // --- End Browse Button Logic ---
-
-        // --- In-Context Dropdown Logic ---
-        const $beatmapPathInput = $('#beatmap_path');
-        const $inContextOptionsBox = $('#in-context-options-box');
-        const $allContextCheckboxes = $inContextOptionsBox.find('input[name="in_context_options"]'); // Renamed to $allContextCheckboxes for clarity
-        const inContextAnimationSpeed = 300; // Used 'animationSpeed' elsewhere, renamed for local consistency
-        const $addToBeatmapOption = $('#add-to-beatmap-option');
-
-        $beatmapPathInput.on('input', function() {
-            if ($(this).val().trim() !== '') {
-                if (!$inContextOptionsBox.is(':visible')) {
-                    $inContextOptionsBox.fadeIn(inContextAnimationSpeed);
-                }
-                if (!$addToBeatmapOption.is(':visible')) {
-                    $addToBeatmapOption.slideDown(inContextAnimationSpeed);
-                }
-            } else {
-                if ($inContextOptionsBox.is(':visible')) {
-                    $inContextOptionsBox.fadeOut(inContextAnimationSpeed);
-                }
-                if ($addToBeatmapOption.is(':visible')) {
-                    $addToBeatmapOption.slideUp(inContextAnimationSpeed);
-                    $('#add_to_beatmap').prop('checked', false);
-                }
-            }
-        });
-
-        // Store if a context option item is allowed by the current model
-        $allContextCheckboxes.each(function() {
-            $(this).closest('.context-option-item').data('model-allowed', true); // Default to true
-        });
-        // --- End In-Context Dropdown Logic ---
-
-        // --- Gamemode Conditional Visibility ---
-        function updateOptionalSettingsVisibility() {
-            var selectedGamemode = $("#gamemode").val();
-            var animationSpeed = 200;
-            var $circleSizeInput = $("#circle_size");
-            var $circleSizeAsterisk = $(".cs-required");
-            var $keyCountInput = $("#keycount");
-            var $keyCountAsterisk = $(".kc-required");
-
-            var showCircleSize = (selectedGamemode === '0');
-            var showKeyCount = (selectedGamemode === '3');
-            var showHoldNoteRatio = (selectedGamemode === '3');
-            var showScrollSpeed = (selectedGamemode === '2' || selectedGamemode === '3');
-
-            if (showCircleSize) {
-                if (!$("#group-circle_size").is(':visible')) $("#group-circle_size").slideDown(animationSpeed);
-                $circleSizeAsterisk.show();
-            } else {
-                if ($("#group-circle_size").is(':visible')) $("#group-circle_size").slideUp(animationSpeed);
-                $circleSizeAsterisk.hide();
-            }
-            if (showKeyCount) {
-                if (!$("#group-keycount").is(':visible')) $("#group-keycount").slideDown(animationSpeed);
-                $keyCountAsterisk.show();
-            } else {
-                if ($("#group-keycount").is(':visible')) $("#group-keycount").slideUp(animationSpeed);
-                $keyCountAsterisk.hide();
-            }
-            if (showHoldNoteRatio && !$("#group-hold_note_ratio").is(':visible')) {
-                $("#group-hold_note_ratio").slideDown(animationSpeed);
-            } else if (!showHoldNoteRatio && $("#group-hold_note_ratio").is(':visible')) {
-                $("#group-hold_note_ratio").slideUp(animationSpeed);
-            }
-            if (showScrollSpeed && !$("#group-scroll_speed_ratio").is(':visible')) {
-                $("#group-scroll_speed_ratio").slideDown(animationSpeed);
-            } else if (!showScrollSpeed && $("#group-scroll_speed_ratio").is(':visible')) {
-                $("#group-scroll_speed_ratio").slideUp(animationSpeed);
-            }
-        }
-        $("#gamemode").on('change', updateOptionalSettingsVisibility);
-        // --- End Gamemode Conditional Visibility ---
-
-        // --- Model Conditional Visibility and Disabling ---
-        const modelFieldAnimationSpeed = 200; // Consistent animation speed
-        const modelCapabilities = { // Simplified, actual capabilities checked directly in func
-            "v28": {},
-            "v29": {},
-            "v30": {
-                supportedGamemodes: ['0'],
-                supportsYear: false,
-                supportedInContextOptions: ['TIMING'],
-                hideHitsoundsOption: true, // Custom flag for specific V30 behavior
-                supportsDescriptors: false,
-            },
         };
 
-        function updateModelSettingsVisibility() {
-            const selectedModel = $("#model").val();
-            const capabilities = modelCapabilities[selectedModel] || {}; // Default to empty if model not in map
+        // Utility functions
+        const Utils = {
+            showFlashMessage(message, type = 'success') {
+                const flashContainer = $('#flash-container');
+                const alertClass = type === 'success' ? 'alert success' :
+                                 type === 'cancel-success' ? 'alert alert-cancel-success' :
+                                 'alert error';
+                const messageDiv = $(`<div class="${alertClass}">${message}</div>`);
+                flashContainer.append(messageDiv);
+                setTimeout(() => messageDiv.remove(), 5000);
+            },
 
-            // Gamemode
-            const $gamemodeSelect = $("#gamemode");
-            const $gamemodeOptions = $gamemodeSelect.find("option");
-            if (selectedModel === "v30") {
-                $gamemodeSelect.val('0').prop('disabled', true); // Force Standard and disable select
-                $gamemodeOptions.each(function() {
-                    $(this).prop('disabled', $(this).val() !== '0');
+            smoothScroll(target, offset = 0) {
+                $('html, body').animate({
+                    scrollTop: $(target).offset().top + offset
+                }, 500);
+            },
+
+            resetFormToDefaults() {
+                $('#inferenceForm')[0].reset();
+
+                // Set specific defaults
+                const defaults = {
+                    model: 'v30', gamemode: '0', difficulty: '5', hp_drain_rate: '5',
+                    circle_size: '4', keycount: '4', overall_difficulty: '8',
+                    approach_rate: '9', slider_multiplier: '1.4', slider_tick_rate: '1',
+                    year: '2023', cfg_scale: '1.0', temperature: '0.9', top_p: '0.9'
+                };
+
+                Object.entries(defaults).forEach(([id, value]) => {
+                    $(`#${id}`).val(value);
                 });
-            } else { // V28, V29
-                $gamemodeSelect.prop('disabled', false);
-                $gamemodeOptions.prop('disabled', false);
+
+                // Reset checkboxes
+                $('#hitsounded').prop('checked', true);
+                $('#export_osz, #add_to_beatmap, #super_timing').prop('checked', false);
+
+                // Clear descriptors and context options
+                $('input[name="descriptors"], input[name="in_context_options"]')
+                    .removeClass('positive-check negative-check').prop('checked', false);
+
+                // Clear paths and optional fields
+                $('#audio_path, #output_path, #beatmap_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
             }
-            $gamemodeSelect.trigger('change'); // Update fields dependent on gamemode
+        };
 
-            // Year
-            const $yearGroup = $("#group-year");
-            const yearSupported = capabilities.supportsYear !== false; // Default to true
-            if (yearSupported) {
-                if (!$yearGroup.is(':visible')) $yearGroup.slideDown(modelFieldAnimationSpeed);
-            } else {
-                if ($yearGroup.is(':visible')) $yearGroup.slideUp(modelFieldAnimationSpeed);
-                $("#year").val('2023'); // Reset to default if hidden
-            }
+        // UI Manager for conditional visibility
+        const UIManager = {
+            updateConditionalFields() {
+                const selectedGamemode = $("#gamemode").val();
+                const selectedModel = $("#model").val();
+                const beatmapPath = $('#beatmap_path').val().trim();
 
-            // In-Context Options
-            const supportedContext = capabilities.supportedInContextOptions || ['NONE', 'TIMING', 'KIAI', 'MAP', 'GD', 'NO_HS']; // Default to all for V28/V29
+                // Handle gamemode-based visibility
+                $('.conditional-field[data-show-for-gamemode]').each(function() {
+                    const $field = $(this);
+                    const supportedModes = $field.data('show-for-gamemode').toString().split(',');
+                    const shouldShow = supportedModes.includes(selectedGamemode);
 
-            $allContextCheckboxes.each(function() {
-                const $checkbox = $(this);
-                const value = $checkbox.val();
-                const $item = $checkbox.closest('.context-option-item');
-                if (supportedContext.includes(value)) {
-                    $item.data('model-allowed', true);
-                    $item.slideDown(modelFieldAnimationSpeed);
-                    $checkbox.prop('disabled', false);
-                } else {
-                    $item.data('model-allowed', false);
-                    $item.slideUp(modelFieldAnimationSpeed);
-                    $checkbox.prop('disabled', true);
-                }
-            });
-
-            // Trigger a change on a context checkbox to re-evaluate display logic if box is visible
-            if ($inContextOptionsBox.is(':visible') && $allContextCheckboxes.filter(':visible').length > 0) {
-                $allContextCheckboxes.filter(':visible').first().trigger('change'); // This can be risky if it causes loops.
-                // Better: call a consolidated update function.
-                // For now, we hope the direct state setting above is enough.
-            }
-
-
-            // Add Hitsounds
-            const $hitsoundedOptionItem = $("#option-item-hitsounded");
-            const $hitsoundedCheckbox = $("#hitsounded");
-            if (capabilities.hideHitsoundsOption === true) { // V30: hide and set to true
-                if ($hitsoundedOptionItem.is(':visible')) $hitsoundedOptionItem.slideUp(modelFieldAnimationSpeed);
-                $hitsoundedCheckbox.prop('checked', true); // Implicitly true for V30
-            } else { // V28, V29: user can choose
-                if (!$hitsoundedOptionItem.is(':visible')) $hitsoundedOptionItem.slideDown(modelFieldAnimationSpeed);
-                $hitsoundedCheckbox.prop('disabled', false);
-                // Do not change checked state, respect user's previous choice or default
-            }
-
-            // Descriptors
-            const $descriptorsDropdown = $(".custom-dropdown-descriptors");
-            const descriptorsSupported = capabilities.supportsDescriptors !== false; // Default to true
-            if (descriptorsSupported) {
-                if (!$descriptorsDropdown.is(':visible')) $descriptorsDropdown.slideDown(modelFieldAnimationSpeed);
-                $descriptorsDropdown.find('input[name="descriptors"]').prop('disabled', false);
-            } else {
-                if ($descriptorsDropdown.is(':visible')) {
-                    $descriptorsDropdown.slideUp(modelFieldAnimationSpeed);
-                    if ($descriptorsDropdown.hasClass('open')) $descriptorsDropdown.removeClass('open');
-                }
-                $descriptorsDropdown.find('input[name="descriptors"]').each(function() {
-                    $(this).removeClass('positive-check negative-check').prop('checked', false).prop('disabled', true);
-                });
-            }
-        }
-        // --- End Model Conditional Visibility ---
-
-        // Initial calls on page load
-        updateOptionalSettingsVisibility(); // For gamemode
-        updateModelSettingsVisibility();    // For model (which also calls updateOptionalSettingsVisibility)
-
-        $("#model").on('change', updateModelSettingsVisibility);
-
-        // --- Descriptor Checkbox 3-State Logic ---
-        function handleDescriptorClick(e) {
-            var $checkbox = $(this);
-            e.preventDefault();
-            if (!$checkbox.prop('disabled')) {
-                if ($checkbox.hasClass('positive-check')) {
-                    $checkbox.removeClass('positive-check').addClass('negative-check');
-                    $checkbox.prop('checked', true);
-                    console.log($checkbox.val() + ' set to negative');
-                } else if ($checkbox.hasClass('negative-check')) {
-                    $checkbox.removeClass('negative-check');
-                    $checkbox.prop('checked', false);
-                    console.log($checkbox.val() + ' set to off');
-                } else {
-                    $checkbox.addClass('positive-check');
-                    $checkbox.prop('checked', true);
-                    console.log($checkbox.val() + ' set to positive');
-                }
-            }
-        }
-        if (!$('.custom-dropdown-descriptors').data('descriptor-click-attached')) {
-            $('.descriptors-container').on('click', 'input[name="descriptors"]', handleDescriptorClick);
-            $('.custom-dropdown-descriptors').data('descriptor-click-attached', true);
-        }
-        // --- End Descriptor Checkbox Logic ---
-
-        // --- Import/Export Configuration Logic ---
-        function exportConfiguration() {
-            const config = {
-                version: "1.0",
-                timestamp: new Date().toISOString(),
-                settings: {}
-            };
-
-            // Export all regular form fields
-            $('#inferenceForm').find('input, select, textarea').each(function() {
-                const $field = $(this);
-                const name = $field.attr('name');
-                const type = $field.attr('type');
-
-                if (name && type !== 'file') {
-                    if (type === 'checkbox') {
-                        config.settings[name] = $field.prop('checked');
-                    } else {
-                        config.settings[name] = $field.val();
+                    if (shouldShow && !$field.is(':visible')) {
+                        $field.slideDown(AppState.animationSpeed);
+                    } else if (!shouldShow && $field.is(':visible')) {
+                        $field.slideUp(AppState.animationSpeed);
                     }
-                }
-            });
+                });
 
-            // Export descriptor states (3-state logic)
-            config.descriptors = {
-                positive: [],
-                negative: []
-            };
+                // Handle model-based visibility
+                $('.conditional-field[data-hide-for-model]').each(function() {
+                    const $field = $(this);
+                    const hiddenModels = $field.data('hide-for-model').toString().split(',');
+                    const shouldHide = hiddenModels.includes(selectedModel);
 
-            $('input[name="descriptors"]').each(function() {
-                const $checkbox = $(this);
-                const value = $checkbox.val();
-                if ($checkbox.hasClass('positive-check')) {
-                    config.descriptors.positive.push(value);
-                } else if ($checkbox.hasClass('negative-check')) {
-                    config.descriptors.negative.push(value);
-                }
-            });
+                    if (shouldHide && $field.is(':visible')) {
+                        $field.slideUp(AppState.animationSpeed);
+                    } else if (!shouldHide && !$field.is(':visible')) {
+                        $field.slideDown(AppState.animationSpeed);
+                    }
+                });
 
-            // Export in-context options
-            config.inContextOptions = [];
-            $('input[name="in_context_options"]:checked').each(function() {
-                config.inContextOptions.push($(this).val());
-            });
-
-            // Use folder browser to let user choose save location
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.browse_folder) {
-                window.pywebview.api.browse_folder()
-                    .then(function(folderPath) {
-                        if (folderPath) {
-                            const configJson = JSON.stringify(config, null, 2);
-                            const filename = `mapperatorinator-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-
-                            // Save config to selected folder via Flask endpoint
-                            $.ajax({
-                                url: "/save_config",
-                                method: "POST",
-                                data: {
-                                    folder_path: folderPath,
-                                    filename: filename,
-                                    config_data: configJson
-                                },
-                                success: function(response) {
-                                    if (response.success) {
-                                        showConfigStatus("Configuration exported successfully to: " + response.file_path, "success");
-                                    } else {
-                                        showConfigStatus("Error saving config: " + response.error, "error");
-                                    }
-                                },
-                                error: function() {
-                                    showConfigStatus("Failed to save config to server. Using browser download instead.", "error");
-                                    fallbackDownload(config);
-                                }
-                            });
-                        } else {
-                            showConfigStatus("Export cancelled by user", "error");
+                // Handle beatmap path dependent fields
+                const shouldShowBeatmapFields = beatmapPath !== '';
+                ['#in-context-options-box', '#add-to-beatmap-option'].forEach(selector => {
+                    const $element = $(selector);
+                    if (shouldShowBeatmapFields && !$element.is(':visible')) {
+                        $element.fadeIn(AppState.animationSpeed);
+                    } else if (!shouldShowBeatmapFields && $element.is(':visible')) {
+                        $element.fadeOut(AppState.animationSpeed);
+                        if (selector === '#add-to-beatmap-option') {
+                            $('#add_to_beatmap').prop('checked', false);
                         }
-                    })
-                    .catch(function(error) {
-                        console.error("Error selecting folder:", error);
-                        fallbackDownload(config);
+                    }
+                });
+            },
+
+            updateModelSettings() {
+                const selectedModel = $("#model").val();
+                const capabilities = AppState.modelCapabilities[selectedModel] || {};
+
+                // Handle gamemode restrictions
+                const $gamemodeSelect = $("#gamemode");
+                if (selectedModel === "v30") {
+                    $gamemodeSelect.val('0').prop('disabled', true);
+                    $gamemodeSelect.find("option").each(function() {
+                        $(this).prop('disabled', $(this).val() !== '0');
                     });
-            } else {
-                // Fallback to browser download if pywebview not available
-                fallbackDownload(config);
+                } else {
+                    $gamemodeSelect.prop('disabled', false);
+                    $gamemodeSelect.find("option").prop('disabled', false);
+                }
+
+                // Handle in-context options
+                const supportedContext = capabilities.supportedInContextOptions ||
+                                       ['NONE', 'TIMING', 'KIAI', 'MAP', 'GD', 'NO_HS'];
+
+                $('input[name="in_context_options"]').each(function() {
+                    const $checkbox = $(this);
+                    const value = $checkbox.val();
+                    const $item = $checkbox.closest('.context-option-item');
+                    const isSupported = supportedContext.includes(value);
+
+                    $item.data('model-allowed', isSupported);
+                    $checkbox.prop('disabled', !isSupported);
+
+                    if (isSupported) {
+                        $item.slideDown(AppState.animationSpeed);
+                    } else {
+                        $item.slideUp(AppState.animationSpeed);
+                    }
+                });
+
+                // Handle hitsounds for V30
+                if (capabilities.hideHitsoundsOption) {
+                    $('#hitsounded').prop('checked', true);
+                }
+
+                this.updateConditionalFields();
             }
-        }
+        };
 
-        function fallbackDownload(config) {
-            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `mapperatorinator-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showConfigStatus("Configuration exported successfully (browser download)", "success");
-        }
+        // File Browser Manager
+        const FileBrowser = {
+            init() {
+                window.addEventListener('pywebviewready', () => {
+                    console.log("pywebview API is ready.");
+                    this.attachBrowseHandlers();
+                });
+            },
 
-        function importConfiguration(file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
+            attachBrowseHandlers() {
+                $('.browse-button[data-browse-type]').click(async function() {
+                    const browseType = $(this).data('browse-type');
+                    const targetId = $(this).data('target');
+
+                    try {
+                        const path = browseType === 'folder' ?
+                                    await window.pywebview.api.browse_folder() :
+                                    await window.pywebview.api.browse_file();
+
+                        if (path) {
+                            $(`#${targetId}`).val(path).trigger('input');
+                            console.log(`Selected ${browseType}:`, path);
+                        }
+                    } catch (error) {
+                        console.error(`Error browsing for ${browseType}:`, error);
+                        alert(`Could not browse for ${browseType}. Ensure the backend API is running.`);
+                    }
+                });
+            }
+        };
+
+        // Descriptor Manager
+        const DescriptorManager = {
+            init() {
+                this.attachDropdownHandler();
+                this.attachDescriptorClickHandlers();
+            },
+
+            attachDropdownHandler() {
+                $('.custom-dropdown-descriptors .dropdown-header').click(function() {
+                    const $dropdown = $(this).parent();
+                    $dropdown.toggleClass('open');
+                    if ($dropdown.hasClass('open')) {
+                        Utils.smoothScroll(this);
+                    }
+                });
+            },
+
+            attachDescriptorClickHandlers() {
+                $('.descriptors-container').on('click', 'input[name="descriptors"]', function(e) {
+                    e.preventDefault();
+                    const $checkbox = $(this);
+
+                    if (!$checkbox.prop('disabled')) {
+                        if ($checkbox.hasClass('positive-check')) {
+                            $checkbox.removeClass('positive-check').addClass('negative-check');
+                        } else if ($checkbox.hasClass('negative-check')) {
+                            $checkbox.removeClass('negative-check');
+                            $checkbox.prop('checked', false);
+                            return;
+                        } else {
+                            $checkbox.addClass('positive-check');
+                        }
+                        $checkbox.prop('checked', true);
+                    }
+                });
+            }
+        };
+
+        // Configuration Manager
+        const ConfigManager = {
+            init() {
+                $('#export-config-btn').click(() => this.exportConfiguration());
+                $('#import-config-btn').click(() => $('#import-config-input').click());
+                $('#reset-config-btn').click(() => this.resetToDefaults());
+                $('#import-config-input').change((e) => this.handleFileImport(e));
+            },
+
+            exportConfiguration() {
+                const config = this.buildConfigObject();
+
+                if (window.pywebview?.api?.browse_folder) {
+                    this.exportToFolder(config);
+                } else {
+                    this.fallbackDownload(config);
+                }
+            },
+
+            buildConfigObject() {
+                const config = {
+                    version: "1.0",
+                    timestamp: new Date().toISOString(),
+                    settings: {},
+                    descriptors: { positive: [], negative: [] },
+                    inContextOptions: []
+                };
+
+                // Export form fields
+                $('#inferenceForm').find('input, select, textarea').each(function() {
+                    const $field = $(this);
+                    const name = $field.attr('name');
+                    const type = $field.attr('type');
+
+                    if (name && type !== 'file') {
+                        config.settings[name] = type === 'checkbox' ? $field.prop('checked') : $field.val();
+                    }
+                });
+
+                // Export descriptors
+                $('input[name="descriptors"]').each(function() {
+                    const $checkbox = $(this);
+                    const value = $checkbox.val();
+                    if ($checkbox.hasClass('positive-check')) {
+                        config.descriptors.positive.push(value);
+                    } else if ($checkbox.hasClass('negative-check')) {
+                        config.descriptors.negative.push(value);
+                    }
+                });
+
+                // Export in-context options
+                $('input[name="in_context_options"]:checked').each(function() {
+                    config.inContextOptions.push($(this).val());
+                });
+
+                return config;
+            },
+
+            async exportToFolder(config) {
                 try {
-                    const config = JSON.parse(e.target.result);
+                    const folderPath = await window.pywebview.api.browse_folder();
+                    if (!folderPath) {
+                        this.showConfigStatus("Export cancelled by user", "error");
+                        return;
+                    }
 
+                    const filename = `mapperatorinator-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+
+                    $.ajax({
+                        url: "/save_config",
+                        method: "POST",
+                        data: {
+                            folder_path: folderPath,
+                            filename: filename,
+                            config_data: JSON.stringify(config, null, 2)
+                        },
+                        success: (response) => {
+                            if (response.success) {
+                                this.showConfigStatus(`Configuration exported successfully to: ${response.file_path}`, "success");
+                            } else {
+                                this.showConfigStatus(`Error saving config: ${response.error}`, "error");
+                            }
+                        },
+                        error: () => {
+                            this.showConfigStatus("Failed to save config to server. Using browser download instead.", "error");
+                            this.fallbackDownload(config);
+                        }
+                    });
+                } catch (error) {
+                    console.error("Error selecting folder:", error);
+                    this.fallbackDownload(config);
+                }
+            },
+
+            fallbackDownload(config) {
+                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `mapperatorinator-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                this.showConfigStatus("Configuration exported successfully (browser download)", "success");
+            },
+
+            resetToDefaults() {
+                if (confirm("Are you sure you want to reset all settings to default values? This cannot be undone.")) {
+                    Utils.resetFormToDefaults();
+                    $("#model, #gamemode, #beatmap_path").trigger('change');
+                    this.showConfigStatus("All settings reset to default values", "success");
+                }
+            },
+
+            handleFileImport(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                    this.showConfigStatus("Please select a valid JSON configuration file.", "error");
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => this.importConfiguration(e.target.result);
+                reader.readAsText(file);
+                $(e.target).val(''); // Reset input
+            },
+
+            importConfiguration(content) {
+                try {
+                    const config = JSON.parse(content);
                     if (!config.version) {
                         throw new Error("Invalid configuration file format");
                     }
 
-                    // Store current UI state before import
+                    // Store current state
                     const currentBeatmapPath = $('#beatmap_path').val().trim();
-                    const addToBeatmapVisible = $('#add-to-beatmap-option').is(':visible');
-                    const inContextVisible = $('#in-context-options-box').is(':visible');
 
-                    // Import regular form fields
+                    // Import settings
                     if (config.settings) {
-                        Object.keys(config.settings).forEach(function(name) {
+                        Object.entries(config.settings).forEach(([name, value]) => {
                             const $field = $(`[name="${name}"]`);
                             if ($field.length) {
-                                const type = $field.attr('type');
-                                if (type === 'checkbox') {
-                                    $field.prop('checked', config.settings[name]);
+                                if ($field.attr('type') === 'checkbox') {
+                                    $field.prop('checked', value);
                                 } else {
-                                    $field.val(config.settings[name]);
+                                    $field.val(value);
                                 }
                             }
                         });
                     }
 
-                    // Clear all descriptor states first
-                    $('input[name="descriptors"]').each(function() {
-                        $(this).removeClass('positive-check negative-check').prop('checked', false);
-                    });
-
-                    // Import descriptor states
+                    // Import descriptors
+                    $('input[name="descriptors"]').removeClass('positive-check negative-check').prop('checked', false);
                     if (config.descriptors) {
-                        if (config.descriptors.positive) {
-                            config.descriptors.positive.forEach(function(value) {
-                                const $checkbox = $(`input[name="descriptors"][value="${value}"]`);
-                                $checkbox.addClass('positive-check').prop('checked', true);
-                            });
-                        }
-                        if (config.descriptors.negative) {
-                            config.descriptors.negative.forEach(function(value) {
-                                const $checkbox = $(`input[name="descriptors"][value="${value}"]`);
-                                $checkbox.addClass('negative-check').prop('checked', true);
-                            });
-                        }
-                    }
-
-                    // Clear in-context options first
-                    $('input[name="in_context_options"]').prop('checked', false);
-
-                    // Import in-context options
-                    if (config.inContextOptions) {
-                        config.inContextOptions.forEach(function(value) {
-                            $(`input[name="in_context_options"][value="${value}"]`).prop('checked', true);
+                        config.descriptors.positive?.forEach(value => {
+                            $(`input[name="descriptors"][value="${value}"]`)
+                                .addClass('positive-check').prop('checked', true);
+                        });
+                        config.descriptors.negative?.forEach(value => {
+                            $(`input[name="descriptors"][value="${value}"]`)
+                                .addClass('negative-check').prop('checked', true);
                         });
                     }
 
-                    // Trigger updates for conditional visibility
-                    $("#model").trigger('change');
-                    $("#gamemode").trigger('change');
+                    // Import in-context options
+                    $('input[name="in_context_options"]').prop('checked', false);
+                    config.inContextOptions?.forEach(value => {
+                        $(`input[name="in_context_options"][value="${value}"]`).prop('checked', true);
+                    });
 
-                    // Only trigger beatmap path input if the path actually changed
+                    // Trigger updates
+                    $("#model, #gamemode").trigger('change');
+
                     const newBeatmapPath = $('#beatmap_path').val().trim();
                     if (newBeatmapPath !== currentBeatmapPath) {
                         $("#beatmap_path").trigger('input');
-                    } else {
-                        // Restore previous UI state if path didn't change
-                        if (addToBeatmapVisible && !$('#add-to-beatmap-option').is(':visible')) {
-                            $('#add-to-beatmap-option').show();
-                        }
-                        if (inContextVisible && !$('#in-context-options-box').is(':visible')) {
-                            $('#in-context-options-box').show();
-                        }
                     }
 
-                    showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
+                    this.showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
 
                 } catch (error) {
                     console.error("Error importing configuration:", error);
-                    showConfigStatus("Error importing configuration: " + error.message, "error");
+                    this.showConfigStatus(`Error importing configuration: ${error.message}`, "error");
                 }
-            };
-            reader.readAsText(file);
-        }
+            },
 
-        function resetToDefaults() {
-            // Reset all form fields to their default values
-            $('#inferenceForm')[0].reset();
-
-            // Reset specific field values that might not be handled by form reset
-            $('#model').val('v30');
-            $('#gamemode').val('0');
-            $('#difficulty').val('5');
-            $('#hp_drain_rate').val('5');
-            $('#circle_size').val('4');
-            $('#keycount').val('4');
-            $('#overall_difficulty').val('8');
-            $('#approach_rate').val('9');
-            $('#slider_multiplier').val('1.4');
-            $('#slider_tick_rate').val('1');
-            $('#year').val('2023');
-            $('#cfg_scale').val('1.0');
-            $('#temperature').val('0.9');
-            $('#top_p').val('0.9');
-
-            // Reset checkboxes to default states
-            $('#hitsounded').prop('checked', true);
-            $('#export_osz').prop('checked', false);
-            $('#add_to_beatmap').prop('checked', false);
-            $('#super_timing').prop('checked', false);
-
-            // Clear all descriptor states
-            $('input[name="descriptors"]').each(function() {
-                $(this).removeClass('positive-check negative-check').prop('checked', false);
-            });
-
-            // Clear in-context options
-            $('input[name="in_context_options"]').prop('checked', false);
-
-            // Clear path fields
-            $('#audio_path').val('');
-            $('#output_path').val('');
-            $('#beatmap_path').val('');
-            $('#mapper_id').val('');
-            $('#seed').val('');
-            $('#start_time').val('');
-            $('#end_time').val('');
-            $('#hold_note_ratio').val('');
-            $('#scroll_speed_ratio').val('');
-
-            // Trigger updates for conditional visibility
-            $("#model").trigger('change');
-            $("#gamemode").trigger('change');
-            $("#beatmap_path").trigger('input');
-
-            showConfigStatus("All settings reset to default values", "success");
-        }
-
-        function showConfigStatus(message, type) {
-            const $status = $("#config-status");
-            $status.text(message)
-                    .css('color', type === 'success' ? '#28a745' : '#dc3545')
-                    .fadeIn();
-
-            setTimeout(function() {
-                $status.fadeOut();
-            }, 5000);
-        }
-
-        // Export button click handler
-        $("#export-config-btn").click(function() {
-            exportConfiguration();
-        });
-
-        // Import button click handler
-        $("#import-config-btn").click(function() {
-            $("#import-config-input").click();
-        });
-
-        // Reset button click handler
-        $("#reset-config-btn").click(function() {
-            if (confirm("Are you sure you want to reset all settings to default values? This cannot be undone.")) {
-                resetToDefaults();
+            showConfigStatus(message, type) {
+                const $status = $("#config-status");
+                $status.text(message)
+                       .css('color', type === 'success' ? '#28a745' : '#dc3545')
+                       .fadeIn();
+                setTimeout(() => $status.fadeOut(), 5000);
             }
-        });
+        };
 
-        // File input change handler
-        $("#import-config-input").change(function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                if (file.type === 'application/json' || file.name.endsWith('.json')) {
-                    importConfiguration(file);
-                } else {
-                    showConfigStatus("Please select a valid JSON configuration file.", "error");
+        // Inference Manager
+        const InferenceManager = {
+            init() {
+                $('#inferenceForm').submit((e) => this.handleSubmit(e));
+                $('#cancel-button').click(() => this.cancelInference());
+            },
+
+            handleSubmit(e) {
+                e.preventDefault();
+
+                if (!this.validateForm()) return;
+
+                this.resetProgress();
+                this.startInference();
+            },
+
+            validateForm() {
+                const audioPath = $('#audio_path').val().trim();
+                const beatmapPath = $('#beatmap_path').val().trim();
+                const outputPath = $('#output_path').val().trim();
+
+                if (!audioPath && !beatmapPath) {
+                    Utils.smoothScroll(0);
+                    Utils.showFlashMessage("Either 'Beatmap Path' or 'Audio Path' are required for running inference", 'error');
+                    return false;
                 }
-            }
-            // Reset the input so the same file can be selected again
-            $(this).val('');
-        });
-        // --- End Import/Export Configuration Logic ---
 
-        // --- Form Submission & Progress Handling ---
-        var evtSource = null;
-        var isCancelled = false;
-        let inferenceErrorOccurred = false;
-        let accumulatedErrorMessages = [];
-        let errorLogFilePath = null;
+                if (!outputPath && !beatmapPath) {
+                    Utils.smoothScroll(0);
+                    Utils.showFlashMessage("Either 'Output Path' or 'Beatmap Path' are required for running inference", 'error');
+                    return false;
+                }
 
-        function showFlashMessage(message, type = 'success') {
-            const flashContainer = $('#flash-container');
-            let alertClass = 'alert ';
-            if (type === 'success') alertClass += 'success';
-            else if (type === 'error') alertClass += 'error';
-            else if (type === 'cancel-success') alertClass += 'alert-cancel-success';
-            else alertClass += 'success';
-            const messageDiv = $('<div class="' + alertClass + '">' + message + '</div>');
-            flashContainer.append(messageDiv);
-            setTimeout(() => { messageDiv.remove(); }, 5000);
-        }
+                return true;
+            },
 
-        $("#inferenceForm").submit(function(e) {
-            const audioPath = $('#audio_path').val().trim();
-            const beatmapPath = $('#beatmap_path').val().trim();
-            const outputPath = $('#output_path').val().trim();
-            if (!audioPath && !beatmapPath) {
-                e.preventDefault();
-                $('html, body').animate({ scrollTop: 0 }, 500);
-                showFlashMessage("Either 'Beatmap Path' or 'Audio Path' are required for running inference", 'error');
-                return;
-            }
-            if (!outputPath && !beatmapPath) {
-                e.preventDefault();
-                $('html, body').animate({ scrollTop: 0 }, 500);
-                showFlashMessage("Either 'Output Path' or 'Beatmap Path' are required for running inference", 'error');
-                return;
-            }
-            e.preventDefault();
-            $('#flash-container').empty();
-            $("#progress_output .cancellation-message").remove();
-            $("#progress_output").show();
-            $('html, body').animate({ scrollTop: $('#progress_output').offset().top }, 500);
-            $("#progressBarContainer").show();
-            $("#progressTitle").show();
-            $("#progressBar").css("width", "0%").removeClass('cancelled error');
-            $("#beatmapLink").hide();
-            $("#errorLogLink").hide();
-            $("#init_message").text("Initializing process... This may take a moment.").show();
-            $("#progressTitle").text("");
-            $("#cancel-button").hide().prop('disabled', false).text('Cancel');
-            var $submitButton = $("button[type='submit']");
-            var $cancelButton = $("#cancel-button");
-            $submitButton.prop("disabled", true);
-            inferenceErrorOccurred = false;
-            accumulatedErrorMessages = [];
-            $("#progressTitle").css('color', '');
-            if (evtSource) { evtSource.close(); evtSource = null; }
+            resetProgress() {
+                $('#flash-container').empty();
+                $("#progress_output").show();
+                Utils.smoothScroll('#progress_output');
 
-            $.ajax({
-                url: "/start_inference",
-                method: "POST",
-                data: function() {
-                    var formData = new FormData($("#inferenceForm")[0]);
-                    formData.delete('descriptors'); // Clear existing
-                    var positiveDescriptors = [];
-                    var negativeDescriptors = [];
-                    $('input[name="descriptors"]').each(function() {
-                        var $cb = $(this);
-                        if ($cb.hasClass('positive-check')) positiveDescriptors.push($cb.val());
-                        else if ($cb.hasClass('negative-check')) negativeDescriptors.push($cb.val());
-                    });
-                    positiveDescriptors.forEach(val => formData.append('descriptors', val));
-                    negativeDescriptors.forEach(val => formData.append('negative_descriptors', val));
-                    // Ensure 'hitsounded' for V30 is true if its checkbox is hidden
-                    if ($("#model").val() === "v30" && !$("#option-item-hitsounded").is(':visible')) {
-                        if (!formData.has('hitsounded')) { // Add if not present (e.g. checkbox was hidden)
-                            formData.append('hitsounded', 'true');
-                        } else { // Ensure it's true if present
-                            formData.set('hitsounded', 'true');
-                        }
+                $("#progressBarContainer, #progressTitle").show();
+                $("#progressBar").css("width", "0%").removeClass('cancelled error');
+                $("#beatmapLink, #errorLogLink").hide();
+                $("#init_message").text("Initializing process... This may take a moment.").show();
+                $("#progressTitle").text("").css('color', '');
+                $("#cancel-button").hide().prop('disabled', false).text('Cancel');
+                $("button[type='submit']").prop("disabled", true);
+
+                AppState.inferenceErrorOccurred = false;
+                AppState.accumulatedErrorMessages = [];
+                AppState.isCancelled = false;
+
+                if (AppState.evtSource) {
+                    AppState.evtSource.close();
+                    AppState.evtSource = null;
+                }
+            },
+
+            buildFormData() {
+                const formData = new FormData($("#inferenceForm")[0]);
+
+                // Handle descriptors
+                formData.delete('descriptors');
+                const positiveDescriptors = [];
+                const negativeDescriptors = [];
+
+                $('input[name="descriptors"]').each(function() {
+                    const $cb = $(this);
+                    if ($cb.hasClass('positive-check')) {
+                        positiveDescriptors.push($cb.val());
+                    } else if ($cb.hasClass('negative-check')) {
+                        negativeDescriptors.push($cb.val());
                     }
-                    return formData;
-                }(),
-                processData: false,
-                contentType: false,
-                success: function() {
-                    $cancelButton.show();
-                    console.log("Inference started. Connecting to SSE stream...");
-                    evtSource = new EventSource("/stream_output");
-                    errorLogFilePath = null;
-                    evtSource.onmessage = function(e) {
-                        if ($("#init_message").is(":visible")) $("#init_message").hide();
-                        if (isCancelled) return;
-                        console.log("SSE Data:", e.data);
-                        const messageData = e.data;
-                        const errorIndicators = ["Traceback (most recent call last):", "Error executing job with overrides:", "FileNotFoundError:", "Exception:", "Set the environment variable HYDRA_FULL_ERROR=1"];
-                        let isErrorMessage = errorIndicators.some(indicator => messageData.includes(indicator));
+                });
 
-                        if (isErrorMessage && !inferenceErrorOccurred) {
-                            console.warn("Error detected in SSE stream.");
-                            inferenceErrorOccurred = true;
-                            accumulatedErrorMessages.push(messageData);
-                            $("#progressTitle").text("Error Detected").css('color', 'var(--accent-color)');
-                            $("#progressBar").addClass('error');
-                        } else if (inferenceErrorOccurred) {
-                            accumulatedErrorMessages.push(messageData);
-                        } else {
-                            const lowerCaseMessage = messageData.toLowerCase();
-                            let newTitle = null;
-                            if (lowerCaseMessage.includes("generating timing")) newTitle = "Generating Timing";
-                            else if (lowerCaseMessage.includes("generating kiai")) newTitle = "Generating Kiai";
-                            else if (lowerCaseMessage.includes("generating map")) newTitle = "Generating Map";
-                            else if (lowerCaseMessage.includes("seq len")) newTitle = "Refining Positions";
-                            if (newTitle) $("#progressTitle").text(newTitle);
+                positiveDescriptors.forEach(val => formData.append('descriptors', val));
+                negativeDescriptors.forEach(val => formData.append('negative_descriptors', val));
 
-                            var progressMatch = messageData.match(/^\s*(\d+)%\|/);
-                            if (progressMatch) {
-                                var currentPercent = parseInt(progressMatch[1].trim(), 10);
-                                if (!isNaN(currentPercent)) $("#progressBar").css("width", currentPercent + "%");
-                            } else if (messageData.includes("Generated beatmap saved to")) {
-                                var beatmapLine = messageData.trim();
-                                var parts = beatmapLine.split("Generated beatmap saved to");
-                                if (parts.length > 1) {
-                                    var fullPath = parts[1].trim().replace(/\\/g, "/");
-                                    var folderPath = fullPath.substring(0, fullPath.lastIndexOf("/"));
-                                    $("#beatmapLinkAnchor")
-                                        .attr("href", "#")
-                                        .text("Click here to open the folder containing your map.")
-                                        .off("click")
-                                        .on("click", function(clickEvent) {
-                                            clickEvent.preventDefault();
-                                            $.get("/open_folder", { folder: folderPath })
-                                                .done(response => console.log("Open folder response:", response))
-                                                .fail(() => alert("Failed to open folder via backend."));
-                                        });
-                                    $("#beatmapLink").show();
-                                }
-                            }
-                        }
-                    };
-                    evtSource.onerror = function(err) {
-                        console.error("EventSource failed:", err);
-                        if (evtSource) evtSource.close(); evtSource = null;
-                        if (!isCancelled && !inferenceErrorOccurred) {
-                            inferenceErrorOccurred = true;
-                            accumulatedErrorMessages.push("Error: Connection to process stream lost.");
-                            $("#progressTitle").text("Connection Error").css('color', 'var(--accent-color)');
-                            $("#progressBar").addClass('error');
-                            showFlashMessage("Error: Connection to process stream lost.", "error");
-                        }
-                        if (!isCancelled) $submitButton.prop("disabled", false);
-                        $cancelButton.hide();
-                    };
-                    evtSource.addEventListener("error_log", function(e) {
-                        errorLogFilePath = e.data;
-                    });
-                    evtSource.addEventListener("end", function(e) {
-                        console.log("Received end event from server.", e.data);
-                        if (evtSource) evtSource.close(); evtSource = null;
-                        if (isCancelled) {
-                            console.log("SSE End event received after cancellation.");
-                            $("#progressTitle").hide(); $("#progressBarContainer").hide();
-                            $("#beatmapLink").hide(); $("#errorLogLink").hide();
-                        } else if (inferenceErrorOccurred) {
-                            console.error("Process finished with errors.");
-                            let specificError = "An error occurred during processing. Check console/logs.";
-                            const fullErrorText = accumulatedErrorMessages.join("\\n");
-                            if (fullErrorText.includes("FileNotFoundError:")) {
-                                const fileNotFoundMatch = fullErrorText.match(/FileNotFoundError:.*? file (.*?) not found/);
-                                specificError = fileNotFoundMatch && fileNotFoundMatch[1] ? `Error: File not found - ${fileNotFoundMatch[1].replace(/\\\\/g, '\\\\')}` : "Error: A required file was not found.";
-                            } else if (fullErrorText.includes("HYDRA_FULL_ERROR=1")) {
-                                specificError = "There was an error while creating the beatmap. Check console/logs for details.";
-                            } else if (fullErrorText.includes("Error executing job")) {
-                                specificError = "There was an error starting or executing the generation task.";
-                            } else if (fullErrorText.includes("Connection to process stream lost")) {
-                                specificError = "Error: Connection to the generation process was lost.";
-                            }
-                            showFlashMessage(specificError, "error");
-                            $("#progressTitle").text("Processing Failed").css('color', 'var(--accent-color)').show();
-                            $("#progressBar").css("width", "100%").addClass('error');
-                            $("#progressBarContainer").show();
-                            $("#beatmapLink").hide();
-                            if (errorLogFilePath) {
-                                $("#errorLogLinkAnchor")
-                                    .off("click")
-                                    .on("click", function(clickEvent) {
-                                        clickEvent.preventDefault();
-                                        $.get("/open_log_file", { path: errorLogFilePath })
-                                            .done(response => console.log("Open log response:", response))
-                                            .fail(() => alert("Failed to open log file via backend."));
-                                    });
-                                $("#errorLogLink").show();
-                            }
-                        } else {
-                            $("#progressTitle").show().text("Processing Complete").css('color', '');
-                            $("#progressBarContainer").show();
-                            $("#progressBar").css("width", "100%").removeClass('error');
-                        }
-                        $submitButton.prop("disabled", false);
-                        $cancelButton.hide();
-                        isCancelled = false;
-                        inferenceErrorOccurred = false;
-                        accumulatedErrorMessages = [];
-                    });
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error("Failed to start inference:", textStatus, errorThrown);
-                    alert("Failed to start inference process. Check backend console.");
-                    $submitButton.prop("disabled", false);
-                    $cancelButton.hide();
-                    $("#progress_output").hide();
+                // Ensure hitsounded for V30
+                if ($("#model").val() === "v30" && !$("#option-item-hitsounded").is(':visible')) {
+                    formData.set('hitsounded', 'true');
                 }
-            });
-        });
-        $("#cancel-button").click(function() {
-            var $cancelBtn = $(this);
-            $cancelBtn.prop('disabled', true).text('Cancelling...');
-            $.ajax({
-                url: "/cancel_inference",
-                method: "POST",
-                success: function(response) {
-                    isCancelled = true;
-                    $("#progress_output").hide();
-                    showFlashMessage("Inference cancelled successfully.", "cancel-success");
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    const errorMsg = jqXHR.responseJSON ? jqXHR.responseJSON.message : "Failed to send cancel request. Unknown error.";
-                    showFlashMessage(errorMsg, "error");
-                    $cancelBtn.prop('disabled', false).text('Cancel');
+
+                return formData;
+            },
+
+            startInference() {
+                $.ajax({
+                    url: "/start_inference",
+                    method: "POST",
+                    data: this.buildFormData(),
+                    processData: false,
+                    contentType: false,
+                    success: () => {
+                        $("#cancel-button").show();
+                        this.connectToSSE();
+                    },
+                    error: (jqXHR, textStatus, errorThrown) => {
+                        console.error("Failed to start inference:", textStatus, errorThrown);
+                        alert("Failed to start inference process. Check backend console.");
+                        $("button[type='submit']").prop("disabled", false);
+                        $("#cancel-button").hide();
+                        $("#progress_output").hide();
+                    }
+                });
+            },
+
+            connectToSSE() {
+                console.log("Connecting to SSE stream...");
+                AppState.evtSource = new EventSource("/stream_output");
+                AppState.errorLogFilePath = null;
+
+                AppState.evtSource.onmessage = (e) => this.handleSSEMessage(e);
+                AppState.evtSource.onerror = (err) => this.handleSSEError(err);
+                AppState.evtSource.addEventListener("error_log", (e) => {
+                    AppState.errorLogFilePath = e.data;
+                });
+                AppState.evtSource.addEventListener("end", (e) => this.handleSSEEnd(e));
+            },
+
+            handleSSEMessage(e) {
+                if ($("#init_message").is(":visible")) $("#init_message").hide();
+                if (AppState.isCancelled) return;
+
+                const messageData = e.data;
+                const errorIndicators = [
+                    "Traceback (most recent call last):", "Error executing job with overrides:",
+                    "FileNotFoundError:", "Exception:", "Set the environment variable HYDRA_FULL_ERROR=1"
+                ];
+
+                const isErrorMessage = errorIndicators.some(indicator => messageData.includes(indicator));
+
+                if (isErrorMessage && !AppState.inferenceErrorOccurred) {
+                    AppState.inferenceErrorOccurred = true;
+                    AppState.accumulatedErrorMessages.push(messageData);
+                    $("#progressTitle").text("Error Detected").css('color', 'var(--accent-color)');
+                    $("#progressBar").addClass('error');
+                } else if (AppState.inferenceErrorOccurred) {
+                    AppState.accumulatedErrorMessages.push(messageData);
+                } else {
+                    this.updateProgress(messageData);
                 }
+            },
+
+            updateProgress(messageData) {
+                // Update progress title based on message content
+                const lowerCaseMessage = messageData.toLowerCase();
+                const progressTitles = {
+                    "generating timing": "Generating Timing",
+                    "generating kiai": "Generating Kiai",
+                    "generating map": "Generating Map",
+                    "seq len": "Refining Positions"
+                };
+
+                Object.entries(progressTitles).forEach(([keyword, title]) => {
+                    if (lowerCaseMessage.includes(keyword)) {
+                        $("#progressTitle").text(title);
+                    }
+                });
+
+                // Update progress bar
+                const progressMatch = messageData.match(/^\s*(\d+)%\|/);
+                if (progressMatch) {
+                    const currentPercent = parseInt(progressMatch[1].trim(), 10);
+                    if (!isNaN(currentPercent)) {
+                        $("#progressBar").css("width", currentPercent + "%");
+                    }
+                }
+
+                // Check for completion message
+                if (messageData.includes("Generated beatmap saved to")) {
+                    const parts = messageData.split("Generated beatmap saved to");
+                    if (parts.length > 1) {
+                        const fullPath = parts[1].trim().replace(/\\/g, "/");
+                        const folderPath = fullPath.substring(0, fullPath.lastIndexOf("/"));
+
+                        $("#beatmapLinkAnchor")
+                            .attr("href", "#")
+                            .text("Click here to open the folder containing your map.")
+                            .off("click")
+                            .on("click", (e) => {
+                                e.preventDefault();
+                                $.get("/open_folder", { folder: folderPath })
+                                    .done(response => console.log("Open folder response:", response))
+                                    .fail(() => alert("Failed to open folder via backend."));
+                            });
+                        $("#beatmapLink").show();
+                    }
+                }
+            },
+
+            handleSSEError(err) {
+                console.error("EventSource failed:", err);
+                if (AppState.evtSource) {
+                    AppState.evtSource.close();
+                    AppState.evtSource = null;
+                }
+
+                if (!AppState.isCancelled && !AppState.inferenceErrorOccurred) {
+                    AppState.inferenceErrorOccurred = true;
+                    AppState.accumulatedErrorMessages.push("Error: Connection to process stream lost.");
+                    $("#progressTitle").text("Connection Error").css('color', 'var(--accent-color)');
+                    $("#progressBar").addClass('error');
+                    Utils.showFlashMessage("Error: Connection to process stream lost.", "error");
+                }
+
+                if (!AppState.isCancelled) {
+                    $("button[type='submit']").prop("disabled", false);
+                }
+                $("#cancel-button").hide();
+            },
+
+            handleSSEEnd(e) {
+                console.log("Received end event from server.", e.data);
+                if (AppState.evtSource) {
+                    AppState.evtSource.close();
+                    AppState.evtSource = null;
+                }
+
+                if (AppState.isCancelled) {
+                    $("#progressTitle, #progressBarContainer, #beatmapLink, #errorLogLink").hide();
+                } else if (AppState.inferenceErrorOccurred) {
+                    this.handleInferenceError();
+                } else {
+                    $("#progressTitle").show().text("Processing Complete").css('color', '');
+                    $("#progressBarContainer").show();
+                    $("#progressBar").css("width", "100%").removeClass('error');
+                }
+
+                $("button[type='submit']").prop("disabled", false);
+                $("#cancel-button").hide();
+                AppState.isCancelled = false;
+                AppState.inferenceErrorOccurred = false;
+                AppState.accumulatedErrorMessages = [];
+            },
+
+            handleInferenceError() {
+                const fullErrorText = AppState.accumulatedErrorMessages.join("\\n");
+                let specificError = "An error occurred during processing. Check console/logs.";
+
+                if (fullErrorText.includes("FileNotFoundError:")) {
+                    const fileNotFoundMatch = fullErrorText.match(/FileNotFoundError:.*? file (.*?) not found/);
+                    specificError = fileNotFoundMatch?.[1] ?
+                        `Error: File not found - ${fileNotFoundMatch[1].replace(/\\\\/g, '\\\\')}` :
+                        "Error: A required file was not found.";
+                } else if (fullErrorText.includes("HYDRA_FULL_ERROR=1")) {
+                    specificError = "There was an error while creating the beatmap. Check console/logs for details.";
+                } else if (fullErrorText.includes("Error executing job")) {
+                    specificError = "There was an error starting or executing the generation task.";
+                } else if (fullErrorText.includes("Connection to process stream lost")) {
+                    specificError = "Error: Connection to the generation process was lost.";
+                }
+
+                Utils.showFlashMessage(specificError, "error");
+                $("#progressTitle").text("Processing Failed").css('color', 'var(--accent-color)').show();
+                $("#progressBar").css("width", "100%").addClass('error');
+                $("#progressBarContainer").show();
+                $("#beatmapLink").hide();
+
+                if (AppState.errorLogFilePath) {
+                    $("#errorLogLinkAnchor").off("click").on("click", (e) => {
+                        e.preventDefault();
+                        $.get("/open_log_file", { path: AppState.errorLogFilePath })
+                            .done(response => console.log("Open log response:", response))
+                            .fail(() => alert("Failed to open log file via backend."));
+                    });
+                    $("#errorLogLink").show();
+                }
+            },
+
+            cancelInference() {
+                const $cancelBtn = $("#cancel-button");
+                $cancelBtn.prop('disabled', true).text('Cancelling...');
+
+                $.ajax({
+                    url: "/cancel_inference",
+                    method: "POST",
+                    success: () => {
+                        AppState.isCancelled = true;
+                        $("#progress_output").hide();
+                        Utils.showFlashMessage("Inference cancelled successfully.", "cancel-success");
+                    },
+                    error: (jqXHR) => {
+                        const errorMsg = jqXHR.responseJSON?.message || "Failed to send cancel request. Unknown error.";
+                        Utils.showFlashMessage(errorMsg, "error");
+                        $cancelBtn.prop('disabled', false).text('Cancel');
+                    }
+                });
+            }
+        };
+
+        // Initialize all components
+        function initializeApp() {
+            // Initialize Select2
+            $('.select2').select2({
+                placeholder: "Select options",
+                allowClear: true,
+                dropdownCssClass: "select2-dropdown-dark",
+                containerCssClass: "select2-container-dark"
             });
-        });
+
+            // Ensure progress title div exists
+            if (!$("#progressTitle").length) {
+                $("#progress_output h3").after("<div id='progressTitle' style='font-weight:bold; padding-bottom:5px;'></div>");
+            }
+
+            // Initialize all managers
+            FileBrowser.init();
+            DescriptorManager.init();
+            ConfigManager.init();
+            InferenceManager.init();
+
+            // Attach event handlers
+            $("#model").on('change', () => UIManager.updateModelSettings());
+            $("#gamemode").on('change', () => UIManager.updateConditionalFields());
+            $("#beatmap_path").on('input', () => UIManager.updateConditionalFields());
+
+            // Initial UI updates
+            UIManager.updateModelSettings();
+        }
+
+        // Start the application
+        initializeApp();
     });
 </script>
 </body>
