@@ -17,3 +17,4 @@ pywebview[qt]
 pyqtwebengine
 flask
 audioop-lts; python_version>='3.13'
+GitPython
