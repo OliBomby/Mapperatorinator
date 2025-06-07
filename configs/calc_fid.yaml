@@ -1,6 +1,6 @@
 defaults:
   - base_fid
-  - inference_tiny_dist3@inference
+  - inference_tiny_dist5@inference
   - _self_
 
 compile: false
@@ -31,4 +31,4 @@ hydra:
     chdir: True
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/tiny-dist3
+    dir: ./logs_fid/tiny-dist5

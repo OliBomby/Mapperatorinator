@@ -72,7 +72,7 @@ class Muon(torch.optim.Optimizer):
 
     Arguments:
         muon_params: The parameters to be optimized by Muon.
-        lr: The learning rate. The updates will have spectral norm of `lr`. (0.02 is a good default)
+        lr: The learning rate. The updates will have spectral norm of `lr`. (0.004 is a good default)
         momentum: The momentum used by the internal SGD. (0.95 is a good default)
         nesterov: Whether to use Nesterov-style momentum in the internal SGD. (recommended)
         ns_steps: The number of Newton-Schulz iterations to run. (6 is probably always enough)
@@ -83,8 +83,8 @@ class Muon(torch.optim.Optimizer):
         adamw_eps: The epsilon for the internal AdamW.
         adamw_wd: The weight decay for the internal AdamW.
     """
-    def __init__(self, muon_params, lr=0.02, momentum=0.95, nesterov=True, ns_steps=6,
-                 adamw_params=None, adamw_lr=3e-4, adamw_betas=(0.95, 0.95), adamw_eps=1e-8, adamw_wd=0):
+    def __init__(self, muon_params, lr=0.004, momentum=0.95, nesterov=True, ns_steps=6,
+                 adamw_params=None, adamw_lr=0.002, adamw_betas=(0.95, 0.95), adamw_eps=1e-8, adamw_wd=0):
 
         defaults = dict(lr=lr, momentum=momentum, nesterov=nesterov, ns_steps=ns_steps,
                         adamw_lr_ratio=adamw_lr/lr, adamw_betas=adamw_betas,

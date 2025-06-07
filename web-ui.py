@@ -54,6 +54,16 @@ app.secret_key = os.urandom(24)  # Set a secret key for Flask
 # --- pywebview API Class ---
 class Api:
     # No __init__ needed as we get the window dynamically
+    def save_file(self, filename):
+        """Opens a save file dialog and returns the selected file path."""
+        # Get the window dynamically from the global list
+        if not webview.windows:
+            print("Error: No pywebview window found.")
+            return None
+        current_window = webview.windows[0]
+        result = current_window.create_file_dialog(webview.SAVE_DIALOG, save_filename=filename)
+        print(f"File dialog result: {result}")  # Debugging
+        return result
 
     def browse_file(self):
         """Opens a file dialog and returns the selected file path."""
@@ -461,19 +471,11 @@ def open_log_file():
 @app.route('/save_config', methods=['POST'])
 def save_config():
     try:
-        folder_path = request.form.get('folder_path')
-        filename = request.form.get('filename')
+        file_path = request.form.get('file_path')
         config_data = request.form.get('config_data')
 
-        if not folder_path or not filename or not config_data:
+        if not file_path or not config_data:
             return jsonify({'success': False, 'error': 'Missing required parameters'})
-
-        # Ensure the folder path exists
-        if not os.path.exists(folder_path):
-            return jsonify({'success': False, 'error': 'Selected folder does not exist'})
-
-        # Create full file path
-        file_path = os.path.join(folder_path, filename)
 
         # Write the configuration file
         with open(file_path, 'w', encoding='utf-8') as f:

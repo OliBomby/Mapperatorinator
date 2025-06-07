@@ -328,8 +328,8 @@ $(document).ready(function() {
         exportConfiguration() {
             const config = this.buildConfigObject();
 
-            if (window.pywebview?.api?.browse_folder) {
-                this.exportToFolder(config);
+            if (window.pywebview?.api?.save_file) {
+                this.exportToFile(config);
             } else {
                 this.fallbackDownload(config);
             }
@@ -374,22 +374,22 @@ $(document).ready(function() {
             return config;
         },
 
-        async exportToFolder(config) {
+        async exportToFile(config) {
             try {
-                const folderPath = await window.pywebview.api.browse_folder();
-                if (!folderPath) {
+                const filename = `mapperatorinator-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+
+                const filePath = await window.pywebview.api.save_file(filename);
+                if (!filePath) {
                     this.showConfigStatus("Export cancelled by user", "error");
                     return;
                 }
 
-                const filename = `mapperatorinator-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
 
                 $.ajax({
                     url: "/save_config",
                     method: "POST",
                     data: {
-                        folder_path: folderPath,
-                        filename: filename,
+                        file_path: filePath,
                         config_data: JSON.stringify(config, null, 2)
                     },
                     success: (response) => {
