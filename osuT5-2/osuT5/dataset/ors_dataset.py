@@ -4,7 +4,7 @@ import json
 import os
 import random
 from multiprocessing.managers import Namespace
-from typing import Optional, Callable
+from typing import Optional, Callable, TextIO
 from pathlib import Path
 import zipfile
 import re
@@ -99,10 +99,11 @@ class OrsDataset(IterableDataset):
             return self.beatmap_files
 
         beatmap_files = []
-        for root, dirs, files in os.walk(self.path):
-            for file in files:
-                if file.endswith(OSZ_FILE_EXTENSION):
-                    beatmap_files.append(Path(root) / file)
+        for track in Path(self.path).iterdir():
+            if track.is_dir():
+                track_idx = int(track.stem[5:])
+                if self.start <= track_idx <= self.end:
+                    beatmap_files.append(track)
         
         # Set random seed for reproducibility
         rng = np.random.RandomState(seed)
@@ -262,7 +263,7 @@ class BeatmapDatasetIterable:
         biased = math.pow(base, 0.5) 
         return min_speed + (max_speed - min_speed) * biased
     
-    def load_audio_file(self, file: BinaryIO, sample_rate: int, speed: float = 1.0) -> npt.NDArray:
+    def load_audio_file(self, file, sample_rate: int, speed: float = 1.0) -> npt.NDArray:
         try:
             audio = AudioSegment.from_file(file, format=file.name.split(".")[-1])
             audio.frame_rate = int(audio.frame_rate * speed)
@@ -728,42 +729,39 @@ class BeatmapDatasetIterable:
             attrs = perf.calculate(map)
             return attrs.difficulty.stars
 
-        for osz_path in self.beatmap_files:
+        for track_path in self.beatmap_files:
             
             speed = self.get_speed(max_speed=1.2, min_speed=1.0) if not self.test else 1.0
 
-            with zipfile.ZipFile(osz_path, 'r') as oz:
-                audio_samples = None
-         
-                for file in oz.namelist():
-                    if file.endswith('.osu'):
-                        with io.TextIOWrapper(oz.open(file), encoding="utf-8-sig") as f:
-                            content = f.read()
-                            beatmap = Beatmap.parse(content)
-                            cfg = self.parse_map_file(content.splitlines())
-                            difficulty = get_difficulty(content, speed)
-                            beatmap_id = int(cfg["Metadata"]["BeatmapID"])
-                            beatmapset_id = cfg["Metadata"]["BeatmapSetID"]
-                            
-                            if difficulty < 1 or difficulty > 10:
-                                continue
-        
-                            if audio_samples is None:
-                                audio_filename = cfg["General"]["AudioFilename"]
-                                if audio_filename in oz.namelist():
-                                    with oz.open(audio_filename) as f:
-                                        audio_samples = self.load_audio_file(f, self.args.sample_rate, speed)
-                                        f.close()
-                                else:   
-                                    print(f"Audio file {audio_filename} not found in {osz_path}")
-                                    continue
-                                if audio_samples is None:
-                                    print(f"Audio samples returned None for {osz_path}")
-                                    break
-                        
-                            for sample in self._get_next_beatmap(audio_samples, beatmap, difficulty, beatmap_id, beatmapset_id, speed):
-                                yield sample
-                oz.close()
+            audio_filename = track_path / "audio.mp3"
+            if not audio_filename.exists():
+                audio_filename = track_path / "audio.ogg"
+                if not audio_filename.exists():
+                    print(f"Audio file not found for {track_path}")
+                    continue
+
+            with audio_filename.open("rb") as f2:
+                audio_samples = self.load_audio_file(f2, self.args.sample_rate, speed)
+                f2.close()
+
+            if audio_samples is None:
+                print(f"Audio samples returned None for {track_path}")
+                continue
+
+            for file in (track_path / "beatmaps").iterdir():
+                with io.TextIOWrapper(file.open("rb"), encoding="utf-8-sig") as f:
+                    content = f.read()
+                    beatmap = Beatmap.parse(content)
+                    cfg = self.parse_map_file(content.splitlines())
+                    difficulty = get_difficulty(content, speed)
+                    beatmap_id = int(cfg["Metadata"]["BeatmapID"])
+                    beatmapset_id = cfg["Metadata"]["BeatmapSetID"]
+
+                    if difficulty < 1 or difficulty > 10:
+                        continue
+
+                    for sample in self._get_next_beatmap(audio_samples, beatmap, difficulty, beatmap_id, beatmapset_id, speed):
+                        yield sample
 
 
     def _get_next_beatmap(self, audio_samples, beatmap, difficulty: float, beatmap_id: int, beatmapset_id: int, speed: float) -> dict:

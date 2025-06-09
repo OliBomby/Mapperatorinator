@@ -3,7 +3,7 @@ defaults:
   - _self_
   - model: whisper_tiny
 seed: 42                # Project seed
-compile: true          # PyTorch 2.0 optimization
+compile: false          # PyTorch 2.0 optimization
 precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
 checkpoint_path: '' 
 pretrained_path: ''     # Path to pretrained model weights (to do transfer learning)
@@ -12,8 +12,8 @@ prune: false
 auto_checkpoint: false
 data:                  # Data settings
   rotary_scaling_factor: 1.0
-  train_dataset_path: '/media/nasser/P400/osu_maps'
-  test_dataset_path: '/media/nasser/P400/maps2_testing'
+  train_dataset_path: '/workspace/datasets/ORS16291'
+  test_dataset_path: '/workspace/datasets/ORS16291'
   log_dir: ''
   special_token_len: 0
   diff_token_index: -1
@@ -37,8 +37,8 @@ data:                  # Data settings
   context_weights: [1]    # List of weights for each context type. Determines how often each context type is sampled
   speeds:  [0.95, 1, 1.1, 1.5]            # List of playback speeds to include in the dataset
   speed_weights: [2, 6, 2, 1]      # List of weights for each playback speed. Determines how often each speed is sampled
-  descriptors_path: "/media/nasser/P400/osuT5_ub/datasets/beatmap_descriptors.csv"   # Path to file with all beatmap descriptors
-  mappers_path: "/media/nasser/P400/osuT5_ub/datasets/beatmap_users.json"       # Path to file with all beatmap mappers
+  descriptors_path: "../../../datasets/beatmap_descriptors.csv"   # Path to file with all beatmap descriptors
+  mappers_path: "../../../datasets/beatmap_users.json"       # Path to file with all beatmap mappers
   add_timing: true      # Model beatmap timing
   only_add_timing: false
   add_hitsounds: true   # Model beatmap hitsounds

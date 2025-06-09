@@ -51,10 +51,10 @@ def main(args: DictConfig):
     )
     run_name = f"{args.model.name}_{args.optim.name}_{time.strftime('%Y-%m-%d_%H-%M-%S')}"
     accelerator.init_trackers(
-        "osuT5_base_v2",  # Project name
+        "osuT5",  # Project name
         init_kwargs={
             "wandb": {
-                "entity": "nasser11r1",
+                "entity": "mappingtools",
                 'name': run_name,
                 "job_type": "training",
                 "config": dict(args),

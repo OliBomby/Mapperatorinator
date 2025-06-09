@@ -286,8 +286,8 @@ def worker_init_fn(worker_id: int) -> None:
     overall_end = dataset.end
     print(f"Worker {worker_id} processing data from {overall_start} to {overall_end}")
     # configure the dataset to only process the split workload
-    per_worker = int(
-        np.ceil((overall_end - overall_start) / float(worker_info.num_workers)),
-    )
-    dataset.start = overall_start + worker_id * per_worker
-    dataset.end = min(dataset.start + per_worker, overall_end)
+    # per_worker = int(
+    #     np.ceil((overall_end - overall_start) / float(worker_info.num_workers)),
+    # )
+    # dataset.start = overall_start + worker_id * per_worker
+    # dataset.end = min(dataset.start + per_worker, overall_end)
