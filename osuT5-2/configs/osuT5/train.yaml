@@ -1,0 +1,103 @@
+compile: true          # PyTorch 2.0 optimization
+device: gpu             # Training device (cpu/gpu)
+precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
+seed: 42                # Project seed
+
+checkpoint_path: ''     # Project checkpoint directory (to resume training)
+pretrained_path: ''     # Path to pretrained model weights (to do transfer learning)
+pretrained_t5_compat: false  # Load weights from a T5 model with different vocab size
+
+data:                  # Data settings
+  train_dataset_path: '/root/ORS16291'  # Training dataset directory
+  train_dataset_start: 0  # Training dataset start index
+  train_dataset_end: 16200    # Training dataset end index
+  test_dataset_path: '/root/ORS16291'   # Testing/validation dataset directory
+  test_dataset_start: 16200   # Testing/validation dataset start index
+  test_dataset_end: 16291     # Testing/validation dataset end index
+  src_seq_len: 512
+  tgt_seq_len: 384
+  sample_rate: ${..model.spectrogram.sample_rate}
+  hop_length: ${..model.spectrogram.hop_length}
+  cycle_length: 8
+  per_track: false      # Loads all beatmaps in a track sequentially which optimizes audio data loading
+  center_pad_decoder: false            # Center pad decoder input
+  num_classes: 64821
+  num_diff_classes: 24  # Number of difficulty classes
+  max_diff: 8          # Maximum difficulty of difficulty classes
+  class_dropout_prob: 0.2
+  diff_dropout_prob: 0.2
+  mapper_dropout_prob: 0.2
+  descriptor_dropout_prob: 0.2
+  special_token_len: 0
+  diff_token_index: -1
+  style_token_index: -1
+  mapper_token_index: -1
+  add_descriptors: false
+  add_empty_sequences: true
+  add_empty_sequences_at_step: -1
+  add_pre_tokens: true
+  add_pre_tokens_at_step: -1
+  max_pre_token_len: -1
+  timing_random_offset: 0
+  add_gd_context: false  # Prefix the decoder with tokens of another beatmap in the mapset
+  min_difficulty: 0     # Minimum difficulty to consider including in the dataset
+  sample_weights_path: ''    # Path to sample weights
+  rhythm_weight: 1.0    # Weight of rhythm tokens in the loss calculation
+  lookback: 0             # Fraction of audio sequence to fill with tokens from previous inference window
+  lookahead: 0            # Fraction of audio sequence to skip at the end of the audio window
+  context_types: []      # List of context types to include in the dataset
+  context_weights: []    # List of weights for each context type. Determines how often each context type is sampled
+  descriptors_path: ''   # Path to file with all beatmap descriptors
+  mappers_path: ''       # Path to file with all beatmap mappers
+  add_timing: false      # Model beatmap timing
+  add_hitsounds: false   # Model beatmap hitsounds
+  add_distances: true   # Model hit object distances
+  add_positions: false   # Model hit object coordinates
+  position_precision: 1  # Precision of hit object coordinates
+  position_split_axes: true  # Split hit object X and Y coordinates into separate tokens
+  position_range: [-256, 768, -256, 640]  # Range of hit object coordinates
+  dt_augment_prob: 0.0   # Probability of augmenting the dataset with DT
+
+
+dataloader:             # Dataloader settings
+  num_workers: 8
+
+optim:                  # Optimizer settings
+  name: adamwscale
+  base_lr: 2e-3         
+  batch_size: 129       # This is the batch size per GPU
+  total_steps: 65536
+  warmup_steps: 5000
+  lr_scheduler: cosine
+  weight_decay: 0.0
+  grad_clip: 1.0
+  grad_acc: 3
+  final_cosine: 1e-4 
+
+eval:                   # Evaluation settings 
+  every_steps: 5000
+  steps: 500
+
+checkpoint:             # Checkpoint settings
+  every_steps: 10000
+
+logging:                # Logging settings
+  log_with: 'wandb'     # Logging service (wandb/tensorboard)
+  every_steps: 10
+  grad_l2: true
+  weights_l2: true
+  mode: 'online'
+
+profile:                # Profiling settings
+  do_profile: false
+  early_stop: false
+  wait: 8
+  warmup: 8
+  active: 8
+  repeat: 1
+
+hydra:
+  job:
+    chdir: True
+  run:
+    dir: ./logs/${now:%Y-%m-%d}/${now:%H-%M-%S}

@@ -1,0 +1,12 @@
+accelerate
+pydub
+nnAudio
+PyYAML
+transformers==4.47.0
+hydra-core
+tensorboard
+slider==0.8.1
+torch_tb_profiler
+wandb
+matplotlib
+rosu_pp_py

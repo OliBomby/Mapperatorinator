@@ -1,0 +1,5 @@
+
+diffusion_steps: 1000             # Number of diffusion steps
+num_classes: 52670          # Number of classes stored in the model
+seq_len: 128                      # Sequence length
+model: 'DiT-B'                    # Model architecture

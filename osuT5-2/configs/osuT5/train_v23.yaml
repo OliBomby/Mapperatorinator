@@ -1,0 +1,87 @@
+defaults:
+  - train
+  - _self_
+  - model: whisper_tiny
+seed: 42                # Project seed
+compile: true          # PyTorch 2.0 optimization
+precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
+checkpoint_path: '' 
+pretrained_path: ''     # Path to pretrained model weights (to do transfer learning)
+lora: false             # Enable LoRA
+prune: false
+auto_checkpoint: false
+data:                  # Data settings
+  rotary_scaling_factor: 1.0
+  train_dataset_path: '/media/nasser/P400/osu_maps'
+  test_dataset_path: '/media/nasser/P400/maps2_testing'
+  log_dir: ''
+  special_token_len: 0
+  diff_token_index: -1
+  mapper_token_index: -1
+  add_descriptors: false
+  add_empty_sequences: false
+  lookback: 0.2             # Fraction of audio sequence to fill with tokens from previous inference window
+  lookahead: 0.0           # Fraction of audio sequence to skip at the end of the audio window
+  timing_random_offset: 2
+  src_seq_len: 2048
+  tgt_seq_len: 2560
+  num_classes: 80742
+  mapper_idx_dropout_prob: 0.1
+  class_dropout_prob: 0.2
+  diff_dropout_prob: 0.2
+  descriptor_dropout_prob: 0.2
+  num_diff_classes: 24  # Number of difficulty classes
+  max_diff: 9          # Maximum difficulty of difficulty classes
+  rhythm_weight: 1.0    # Weight of rhythm tokens in the loss calculation
+  context_types: []      # List of context types to include in the dataset
+  context_weights: [1]    # List of weights for each context type. Determines how often each context type is sampled
+  speeds:  [0.95, 1, 1.1, 1.5]            # List of playback speeds to include in the dataset
+  speed_weights: [2, 6, 2, 1]      # List of weights for each playback speed. Determines how often each speed is sampled
+  descriptors_path: "/media/nasser/P400/osuT5_ub/datasets/beatmap_descriptors.csv"   # Path to file with all beatmap descriptors
+  mappers_path: "/media/nasser/P400/osuT5_ub/datasets/beatmap_users.json"       # Path to file with all beatmap mappers
+  add_timing: true      # Model beatmap timing
+  only_add_timing: false
+  add_hitsounds: true   # Model beatmap hitsounds
+  add_pre_tokens: false
+  max_pre_token_len: -1
+  per_track: false
+  add_distances: true   # Model hit object distances
+  add_positions: true
+  position_precision: 4 # Precision of hit object coordinates
+  position_split_axes: true  # Split hit object X and Y coordinates into separate tokens
+  dt_augment_prob: 0.5   # Probability of augmenting the dataset with DT
+  cycle_length: 1
+
+dataloader:             # Dataloader settings
+  num_workers: 4
+
+optim:                  # Optimizer settings
+  name: muon
+  base_lr: 0.004
+  adamw_lr: 0.001
+  batch_size: 64
+  grad_acc: 4  
+  total_steps: 50000
+  warmup_steps: 0
+  warmdown_steps: 40000
+  lr_scheduler: Triangular
+  weight_decay: 0.01
+  grad_clip: 1.0
+  patience: 2
+
+
+eval:                   # Evaluation settings 
+  every_steps: 1000
+  steps: 500
+
+checkpoint:             # Checkpoint settings
+  every_steps: 2500
+
+
+logging:
+  log_with: 'wandb'  # 'wandb' or 'tensorboard'
+  every_steps: 10
+  grad_l2: true
+  weights_l2: true
+  mode: 'online'
+  

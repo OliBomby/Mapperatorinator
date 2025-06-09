@@ -1,0 +1,7 @@
+defaults:
+  - model
+  - _self_
+
+name: 'google/t5-v1_1-base'
+overwrite:
+  dropout_rate: 0.0

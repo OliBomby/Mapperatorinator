@@ -1,0 +1,85 @@
+osu file format v14
+
+[General]
+AudioFilename: tatoe.mp3
+AudioLeadIn: 0
+PreviewTime: 6538
+Countdown: 0
+SampleSet: Soft
+StackLeniency: 0.7
+Mode: 0
+LetterboxInBreaks: 0
+WidescreenStoryboard: 0
+
+[Editor]
+DistanceSpacing: 1.7
+BeatDivisor: 4
+GridSize: 8
+TimelineZoom: 0.9999999
+
+[Metadata]
+Title:MIIRO vs. Ai no Scenario
+TitleUnicode:海色 vs. アイのシナリオ
+Artist:AKINO from bless4 & CHiCO with HoneyWorks
+ArtistUnicode:AKINO from bless4 & CHiCO with HoneyWorks
+Creator:monstrata
+Version:Ultra Beginner
+Source:
+Tags:kyshiro sukinathan ktgster pishifat smoothie world walaowey toybot sheela901 yuii- Sharkie みいろ tv size opening kantai collection kancolle fleet girls magic kaito 1412 まじっく快斗1412 艦隊これくしょん -艦これ-
+BeatmapID:741477
+BeatmapSetID:325158
+
+[Difficulty]
+HPDrainRate:0
+CircleSize:2
+OverallDifficulty:0
+ApproachRate:0
+SliderMultiplier:0.400000005960464
+SliderTickRate:1
+
+[Events]
+//Background and Video events
+0,0,"miiro_no_scenario.png",0,0
+//Break Periods
+//Storyboard Layer 0 (Background)
+//Storyboard Layer 1 (Fail)
+//Storyboard Layer 2 (Pass)
+//Storyboard Layer 3 (Foreground)
+//Storyboard Sound Samples
+
+[TimingPoints]
+0,307.692307692308,4,2,1,60,1,0
+1230,-300,4,2,1,60,0,0
+3692,-300,4,1,1,60,0,0
+17230,-300,4,2,1,45,0,0
+27076,-300,4,1,1,60,0,0
+36923,-300,4,2,1,45,0,0
+46769,-300,4,2,1,60,0,0
+55692,333.333333333333,4,2,1,45,1,0
+56692,333.333333333333,4,2,1,70,1,1
+56692,-300,4,2,1,70,0,1
+67275,-300,4,2,1,70,0,0
+67358,-300,4,2,1,70,0,1
+78025,-300,4,2,1,70,0,0
+79025,-300,4,2,1,50,0,0
+
+
+[Colours]
+Combo1 : 0,64,128
+Combo2 : 0,255,255
+Combo3 : 128,0,255
+Combo4 : 192,192,192
+
+[HitObjects]
+93,237,1230,6,0,P|129:301|209:309,1,160.000002384186,6|2,0:0|2:0,0:0:0:0:
+358,227,7230,6,0,B|320:128|320:128|265:108|222:151|222:151|149:162|129:103,1,326.666671534379,4|8,0:0|0:0,0:0:0:0:
+97,20,16000,1,4,0:2:0:0:
+186,34,17230,6,0,B|177:72|152:97|116:107|116:107|116:214|116:214|208:208|254:146,1,373.333338896433,2|6,0:0|0:0,0:0:0:0:
+293,63,27076,6,0,B|328:82|347:117|342:151|342:151|448:151,2,213.333336512247,4|6|4,0:0|0:0|0:0,0:0:0:0:
+254,146,38153,6,0,B|249:185|273:220|304:232|304:232|304:339|304:339,1,213.333336512247,2|2,2:0|2:0,0:0:0:0:
+213,336,44307,6,0,B|108:336|108:336|46:303|79:245|79:245,1,213.333336512247,2|0,2:0|0:0,0:0:0:0:
+139,176,50461,1,2,0:0:0:0:
+256,192,51692,12,0,55230,2:0:0:0:
+256,192,56692,6,0,B|236:218|235:261|253:292|253:292|216:339|155:320,2,213.333336512247,6|4|4,0:0|0:0|0:0,0:0:0:0:
+330,242,68691,1,2,0:2:0:0:
+386,313,70025,2,0,P|417:256|386:171,2,160.000002384186,2|4|6,0:0|0:0|0:0,0:0:0:0:
