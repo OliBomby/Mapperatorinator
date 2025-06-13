@@ -4,6 +4,7 @@ import traceback
 from datetime import timedelta
 from pathlib import Path
 from threading import Thread
+from typing import Optional
 
 import hydra
 import numpy as np
@@ -299,10 +300,34 @@ def worker(beatmap_paths, fid_args: FidConfig, return_dict, idx):
     )
 
 
+def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: Optional[str]):
+    if training_set_ids_path is None:
+        return
+
+    if not os.path.exists(training_set_ids_path):
+        print(f"Training set IDs file {training_set_ids_path} does not exist.")
+        return
+
+    with open(training_set_ids_path, "r") as f:
+        training_set_ids = set(int(line.strip()) for line in f)
+
+    in_set = 0
+    out_set = 0
+    for path in tqdm(beatmap_paths):
+        beatmap = Beatmap.from_path(path)
+        if beatmap.beatmap_id in training_set_ids:
+            in_set += 1
+        else:
+            out_set += 1
+    print(f"In training set: {in_set}, Not in training set: {out_set}, Total: {len(beatmap_paths)}, Ratio: {in_set / (in_set + out_set):.2f}")
+
+
 @hydra.main(config_path="configs", config_name="calc_fid", version_base="1.1")
 def main(args: FidConfig):
     beatmap_paths = get_beatmap_paths(args)
     num_processes = args.num_processes
+
+    test_training_set_overlap(beatmap_paths, args.training_set_ids_path)
 
     # Assign beatmaps to processes in a round-robin fashion
     chunks = [[] for _ in range(num_processes)]

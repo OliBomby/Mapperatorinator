@@ -118,6 +118,8 @@ class FidConfig:
     classifier_ckpt: str = 'OliBomby/osu-classifier'
     classifier_batch_size: int = 16
 
+    training_set_ids_path: Optional[str] = None  # Path to training set beatmap IDs
+
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # Training settings for osuT5 model
     hydra: Any = MISSING
 

@@ -18,6 +18,8 @@ dataset_end: 16291
 classifier_ckpt: 'OliBomby/osu-classifier'
 classifier_batch_size: 4
 
+training_set_ids_path: null
+
 inference:
   super_timing: false
   temperature: 0.9        # Sampling temperature
