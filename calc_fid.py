@@ -265,7 +265,7 @@ def worker(beatmap_paths, fid_args: FidConfig, return_dict, idx):
             if fid_args.fid:
                 # Calculate feature vectors for real and generated beatmaps
                 sample_rate = classifier_args.data.sample_rate
-                audio = load_audio_file(audio_path, sample_rate)
+                audio = load_audio_file(audio_path, sample_rate, normalize=args.osut5.data.normalize_audio)
 
                 for example in DataLoader(ExampleDataset(beatmap, audio, classifier_args, classifier_tokenizer, args.device), batch_size=fid_args.classifier_batch_size):
                     classifier_result: OsuClassifierOutput = classifier_model(**example)

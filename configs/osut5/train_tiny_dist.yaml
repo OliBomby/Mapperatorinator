@@ -62,6 +62,7 @@ data:                  # Data settings
   mania_bpm_normalized_scroll_speed: true  # Normalize mania scroll speed by BPM
   add_sv: false  # Model slider velocity in std and ctb
   add_mania_sv: false  # Add mania scroll velocity in map context
+  normalize_audio: false  # Normalize audio data
 
 dataloader:             # Dataloader settings
   num_workers: 8

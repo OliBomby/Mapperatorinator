@@ -635,7 +635,7 @@ class BeatmapDatasetIterable:
 
             speed = self._get_speed_augment()
             audio_path = beatmap_path.parents[1] / list(beatmap_path.parents[1].glob('audio.*'))[0]
-            audio_samples = load_audio_file(audio_path, self.args.sample_rate, speed)
+            audio_samples = load_audio_file(audio_path, self.args.sample_rate, speed, self.args.normalize_audio)
 
             for sample in self._get_next_beatmap(audio_samples, beatmap_path, metadata, speed):
                 yield sample
@@ -653,7 +653,7 @@ class BeatmapDatasetIterable:
 
             speed = self._get_speed_augment()
             audio_path = track_path / list(track_path.glob('audio.*'))[0]
-            audio_samples = load_audio_file(audio_path, self.args.sample_rate, speed)
+            audio_samples = load_audio_file(audio_path, self.args.sample_rate, speed, self.args.normalize_audio)
 
             beatmaps = [list(metadata["Beatmaps"])[-1]] if self.args.only_last_beatmap else metadata["Beatmaps"]
 

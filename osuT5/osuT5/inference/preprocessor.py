@@ -25,6 +25,7 @@ class Preprocessor(object):
         self.lookahead_max_time = (1 - args.lookahead) * self.miliseconds_per_sequence
         self.start_time = args.start_time
         self.end_time = args.end_time
+        self.normalize_audio = args.osut5.data.normalize_audio
 
     def load(self, path: str) -> npt.ArrayLike:
         """Load an audio file as audio frames. Convert stereo to mono, normalize.
@@ -35,7 +36,7 @@ class Preprocessor(object):
         Returns:
             samples: Audio time-series.
         """
-        return load_audio_file(path, self.sample_rate)
+        return load_audio_file(path, self.sample_rate, normalize=self.normalize_audio)
 
     def segment(
             self,

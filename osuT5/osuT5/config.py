@@ -136,6 +136,7 @@ class DataConfig:
     add_mania_sv: bool = False  # Add mania scroll velocity in map context
     min_year: Optional[int] = None  # Minimum year of the beatmap to include in the dataset
     frame_offset_augment_prob: float = 1.0  # Probability of augmenting beatmap sequences with frame offset
+    normalize_audio: bool = True  # Normalize audio data
 
 
 @dataclass

@@ -70,7 +70,7 @@ TIMED_EVENTS = [
 ]
 
 
-def load_audio_file(file: str, sample_rate: int, speed: float = 1.0) -> npt.NDArray:
+def load_audio_file(file: str, sample_rate: int, speed: float = 1.0, normalize: bool = True) -> npt.NDArray:
     """Load an audio file as a numpy time-series array
 
     The signals are resampled, converted to mono channel, and normalized.
@@ -79,6 +79,7 @@ def load_audio_file(file: str, sample_rate: int, speed: float = 1.0) -> npt.NDAr
         file: Path to audio file.
         sample_rate: Sample rate to resample the audio.
         speed: Speed multiplier for the audio.
+        normalize: If True, normalize the audio samples to the range [-1, 1].
 
     Returns:
         samples: Audio time series.
@@ -89,7 +90,8 @@ def load_audio_file(file: str, sample_rate: int, speed: float = 1.0) -> npt.NDAr
     audio = audio.set_frame_rate(sample_rate)
     audio = audio.set_channels(1)
     samples = np.array(audio.get_array_of_samples()).astype(np.float32)
-    samples *= 1.0 / np.max(np.abs(samples))
+    if normalize:
+        samples *= 1.0 / np.max(np.abs(samples))
     return samples
 
 

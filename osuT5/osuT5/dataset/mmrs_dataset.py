@@ -735,7 +735,7 @@ class BeatmapDatasetIterable:
             track_path = self.path / "data" / metadata.iloc[0]["BeatmapSetFolder"]
             audio_path = track_path / metadata.iloc[0]["AudioFile"]
             try:
-                audio_samples = load_audio_file(audio_path, self.args.sample_rate, speed)
+                audio_samples = load_audio_file(audio_path, self.args.sample_rate, speed, self.args.normalize_audio)
             except Exception as e:
                 print(f"Failed to load audio file: {audio_path}")
                 print(e)

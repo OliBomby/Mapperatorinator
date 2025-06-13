@@ -101,6 +101,7 @@ data:                  # Data settings
   add_mania_sv: false  # Add mania scroll velocity in map context
   min_year: null  # Minimum year of the beatmap to include in the dataset
   frame_offset_augment_prob: 1.0  # Probability of augmenting beatmap sequences with frame offset
+  normalize_audio: true  # Normalize audio data
 
 
 dataloader:             # Dataloader settings
