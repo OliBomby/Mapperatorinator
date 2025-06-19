@@ -111,6 +111,30 @@ Example:
 python inference.py beatmap_path="'C:\Users\USER\AppData\Local\osu!\Songs\1 Kenji Ninuma - DISCO PRINCE\Kenji Ninuma - DISCOPRINCE (peppy) [Normal].osu'" gamemode=0 difficulty=5.5 year=2023 descriptors="['jump aim','clean']" in_context=[TIMING,KIAI]
 ```
 
+## Interactive CLI
+For those who prefer a terminal-based workflow but want a guided setup, the interactive CLI script is an excellent alternative to the Web UI.
+
+### Launch the CLI
+Navigate to the cloned directory. You may need to make the script executable first.
+
+```sh
+# Make the script executable (only needs to be done once)
+chmod +x cli.sh
+```
+
+```sh
+# Run the script
+./cli.sh
+```
+
+### Using the CLI
+The script will walk you through a series of prompts to configure all generation parameters, just like the Web UI.
+
+It uses a color-coded interface for clarity.
+It provides an advanced multi-select menu for choosing style descriptors using your arrow keys and spacebar.
+After you've answered all the questions, it will display the final command for your review.
+You can then confirm to execute it directly or cancel and copy the command for manual use.
+
 ## Generation Tips
 
 - You can edit `configs/inference_v29.yaml` and add your arguments there instead of typing them in the terminal every time.
