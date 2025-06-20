@@ -11,8 +11,8 @@ from libs import (
     get_tokenizer,
     get_dataloaders,
 )
-from libs.model.model import OsuClassifier, LitOsuClassifier
-
+from libs.model.model import OsuClassifier
+from libs.utils.model_utils import LitOsuClassifier
 torch.set_float32_matmul_precision('high')
 
 

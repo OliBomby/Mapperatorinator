@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 from transformers.modeling_outputs import Seq2SeqSequenceClassifierOutput
 from transformers.utils import cached_file
 
-import routed_pickle
+from .routed_pickle import Unpickler as routed_pickle
 from ..dataset import OrsDataset, OsuParser
 from ..model import OsuClassifier
 from ..model.model import OsuClassifierOutput
