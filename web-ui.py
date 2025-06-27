@@ -254,6 +254,16 @@ def start_inference():
             current_process = None
             return jsonify({"status": "error", "message": f"Failed to start process: {e}"}), 500
         
+@app.route('/health_check', methods=['GET'])
+def health_check():
+    """Simple health check endpoint."""
+    try:
+        # Check if Flask is running and accessible
+        return jsonify({"status": "ok", "message": "Flask server is running"}), 200
+    except Exception as e:
+        print(f"Health check failed: {e}")
+        return jsonify({"status": "error", "message": f"Flask server is not running: {e}"}), 500
+        
 @app.route('/upload_audio', methods=['POST'])
 def upload_audio():
     """Handles audio file upload."""
