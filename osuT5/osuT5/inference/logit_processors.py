@@ -105,7 +105,9 @@ class LookbackBiasLogitsWarper(LogitsProcessor):
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.Tensor:
         if not self.types_first:
-            return scores
+            scores_processed = scores.clone()
+            scores_processed[:, self.lookback_range] = -torch.inf
+            return scores_processed
 
         scores_processed = scores
 

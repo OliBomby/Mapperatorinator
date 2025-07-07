@@ -1,5 +1,5 @@
 defaults:
-  - base_train
+  - /diffusion/base@_here_
 
 compile: true
 device: gpu

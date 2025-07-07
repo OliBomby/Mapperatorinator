@@ -41,7 +41,7 @@ class InferenceConfig:
 
     # Inference settings
     seed: Optional[int] = None  # Random seed
-    device: str = 'cuda'  # Inference device (cpu/cuda)
+    device: str = 'auto'  # Inference device (cpu/cuda/mps/auto)
     add_to_beatmap: bool = False  # Add generated content to the reference beatmap
     export_osz: bool = False  # Export beatmap as .osz file
     start_time: Optional[int] = None  # Start time of audio to generate beatmap for
@@ -95,13 +95,14 @@ class InferenceConfig:
     overlap_buffer: int = 128  # Buffer zone at start and end of sequence to avoid edge effects (should be less than half of max_seq_len)
 
     # Training settings
-    osut5: TrainConfig = field(default_factory=TrainConfig)  # Training settings for osuT5 model
+    train: TrainConfig = field(default_factory=TrainConfig)  # Training settings for osuT5 model
     diffusion: DiffusionTrainConfig = field(default_factory=DiffusionTrainConfig)  # Training settings for diffusion model
     hydra: Any = MISSING
 
 
 @dataclass
 class FidConfig:
+    device: str = 'auto'  # Inference device (cpu/cuda/mps/auto)
     compile: bool = True
     num_processes: int = 3
     seed: int = 0
@@ -110,17 +111,21 @@ class FidConfig:
     fid: bool = True
     rhythm_stats: bool = True
 
+    dataset_type: str = 'ors'
     dataset_path: str = '/workspace/datasets/ORS16291'
     dataset_start: int = 16200
     dataset_end: int = 16291
+    gamemodes: list[int] = field(default_factory=lambda: [0])  # List of gamemodes to include in the dataset
 
     classifier_ckpt: str = 'OliBomby/osu-classifier'
     classifier_batch_size: int = 16
+
+    training_set_ids_path: Optional[str] = None  # Path to training set beatmap IDs
 
     inference: InferenceConfig = field(default_factory=InferenceConfig)  # Training settings for osuT5 model
     hydra: Any = MISSING
 
 
 cs = ConfigStore.instance()
-cs.store(name="base_inference", node=InferenceConfig)
 cs.store(name="base_fid", node=FidConfig)
+cs.store(group="inference", name="base", node=InferenceConfig)

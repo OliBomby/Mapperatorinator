@@ -819,3 +819,69 @@ input[type="number"]:hover::-webkit-outer-spin-button {
     transform: translateY(0);
   }
 }
+
+/* --- Input with Clear Button Styling --- */
+
+/* Container for input + clear button */
+.input-with-clear {
+  position: relative; /* Required for absolute positioning of clear button */
+  flex-grow: 1; /* Take remaining width in path-input-group */
+  display: flex;
+  align-items: center;
+}
+
+/* Adjust input styling when inside input-with-clear container */
+.input-with-clear input[type="text"] {
+  width: 100%;
+  padding-right: 35px; /* Make room for clear button */
+  flex-grow: 1;
+}
+
+/* Clear button styling */
+.clear-input-btn {
+  position: absolute;
+  right: 8px; /* Position inside the input field */
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color var(--transition-speed), color var(--transition-speed);
+  z-index: 1; /* Ensure it's above the input field */
+  opacity: 0.7;
+}
+
+.clear-input-btn:hover {
+  background-color: var(--accent-color);
+  color: var(--bg-color);
+  opacity: 1;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.clear-input-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Update path-input-group to accommodate the new structure */
+.path-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.path-input-group label {
+  flex-shrink: 0;
+  margin-bottom: 0;
+  width: 100px;
+}

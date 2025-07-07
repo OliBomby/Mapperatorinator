@@ -2,6 +2,7 @@
 __pycache__
 logs
 logs_fid
+multirun
 tensorboard_logs
 .idea
 test

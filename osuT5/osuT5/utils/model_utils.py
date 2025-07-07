@@ -10,10 +10,11 @@ from torch.optim.lr_scheduler import (
     LRScheduler,
     SequentialLR,
     LinearLR,
-    CosineAnnealingLR,
+    CosineAnnealingLR, ConstantLR,
 )
 
-from ..dataset import OrsDataset, OsuParser
+from ..dataset.ors_dataset import OrsDataset
+from ..dataset.osu_parser import OsuParser
 from ..dataset.mmrs_dataset import MmrsDataset
 from ..event import EventType
 from ..model.configuration_mapperatorinator import MapperatorinatorConfig
@@ -64,6 +65,7 @@ def get_model_config(args: TrainConfig, tokenizer: Tokenizer) -> Mapperatorinato
         rhythm_weight=args.data.rhythm_weight,
         rhythm_token_start=tokenizer.event_start[EventType.TIME_SHIFT],
         rhythm_token_end=tokenizer.event_end[EventType.TIME_SHIFT],
+        label_smoothing=args.data.label_smoothing,
         src_seq_len=args.data.src_seq_len,
         tgt_seq_len=args.data.tgt_seq_len,
         rope_type=args.model.rope_type,
@@ -142,12 +144,16 @@ def get_optimizer(model: Mapperatorinator, args: TrainConfig) -> Optimizer:
             param for _, param in model.named_parameters()
             if param not in adamw_param_set
         ]
+        print(f"Number of parameters for Muon: {len(muon_params)}")
+        print(f"Number of parameters for AdamW: {len(adamw_params)}")
 
         optimizer = Muon(
             muon_params=muon_params,
             lr=args.optim.base_lr,
+            adamw_lr=args.optim.base_lr_2,
             adamw_params=adamw_params,
-            adamw_betas=(0.90, 0.95)
+            adamw_betas=(0.90, 0.95),
+            adamw_wd=args.optim.weight_decay,
         )
     else:
         raise NotImplementedError
@@ -156,24 +162,47 @@ def get_optimizer(model: Mapperatorinator, args: TrainConfig) -> Optimizer:
 
 
 def get_scheduler(optimizer: Optimizer, args: TrainConfig, accelerator) -> LRScheduler:
-    scheduler_p1 = LinearLR(
-        optimizer,
-        start_factor=0.5,
-        end_factor=1,
-        total_iters=args.optim.warmup_steps * accelerator.num_processes,
-        last_epoch=-1,
-    )
+    step = 0
+    schedulers = []
+    milestones = []
 
-    scheduler_p2 = CosineAnnealingLR(
-        optimizer,
-        T_max=args.optim.total_steps * accelerator.num_processes - args.optim.warmup_steps * accelerator.num_processes,
-        eta_min=args.optim.final_cosine,
-    )
+    if args.optim.warmup_steps > 0:
+        schedulers.append(LinearLR(
+            optimizer,
+            start_factor=0.5,
+            end_factor=1,
+            total_iters=args.optim.warmup_steps * accelerator.num_processes,
+        ))
+        step += args.optim.warmup_steps * accelerator.num_processes
+        milestones.append(step)
+
+    if args.optim.sustain_steps > 0:
+        schedulers.append(ConstantLR(
+            optimizer,
+            factor=1.0,
+            total_iters=args.optim.sustain_steps * accelerator.num_processes,
+        ))
+        step += args.optim.sustain_steps * accelerator.num_processes
+        milestones.append(step)
+
+    if args.optim.lr_scheduler == "cosine":
+        schedulers.append(CosineAnnealingLR(
+            optimizer,
+            T_max=args.optim.total_steps * accelerator.num_processes - step,
+            eta_min=args.optim.final_cosine,
+        ))
+    elif args.optim.lr_scheduler == "linear":
+        schedulers.append(LinearLR(
+            optimizer,
+            start_factor=1.0,
+            end_factor=args.optim.final_cosine / args.optim.base_lr,
+            total_iters=args.optim.total_steps * accelerator.num_processes - step,
+        ))
 
     scheduler = SequentialLR(
         optimizer,
-        schedulers=[scheduler_p1, scheduler_p2],
-        milestones=[args.optim.warmup_steps * accelerator.num_processes],
+        schedulers=schedulers,
+        milestones=milestones,
     )
 
     return scheduler
@@ -215,8 +244,8 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
             dataset[split],
             batch_size=batch_size,
             num_workers=args.dataloader.num_workers,
-            pin_memory=True,
-            drop_last=False,
+            pin_memory=args.dataloader.pin_memory,
+            drop_last=args.dataloader.drop_last,
             persistent_workers=args.dataloader.num_workers > 0,
             worker_init_fn=worker_init_fn,
         )

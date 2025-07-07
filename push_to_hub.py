@@ -41,7 +41,7 @@ def remove_mappers_from_model(model, tokenizer, removed_users: list[int]):
 def main(args: InferenceConfig):
     model_name = "OliBomby/Mapperatorinator-v31"
 
-    model, tokenizer = load_model(args.model_path, args.osut5, args.device)
+    model, tokenizer = load_model(args.model_path, args.train, args.device)
 
     # Remove mappers from removed_users.csv
     with open("datasets/removed_users.txt", 'r') as f:

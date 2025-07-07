@@ -1,0 +1,15 @@
+defaults:
+  - default
+  - ../train@train: v29
+  - ../diffusion@diffusion: v1
+  - _self_
+
+model_path: 'OliBomby/Mapperatorinator-v29.1'
+diff_ckpt: 'OliBomby/osu-diffusion-v2'
+version: 'Mapperatorinator V29.1'        # Beatmap version
+output_type: [TIMING, KIAI, MAP, SV]    # Output type (map, timing)
+super_timing: true     # Use super timing generator (slow but accurate timing)
+timing_leniency: 3     # Number of milliseconds of error to allow for timing generation
+temperature: 0.9        # Sampling temperature
+top_p: 0.9              # Top-p sampling threshold
+max_batch_size: 8

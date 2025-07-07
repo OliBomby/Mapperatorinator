@@ -35,6 +35,8 @@ def forward_eval(model: Mapperatorinator, batch):
 
 
 def add_prefix(prefix: str, stats: dict[str, float]):
+    if prefix == "":
+        return stats
     return {f"{prefix}/{k}": v for k, v in stats.items()}
 
 
@@ -269,6 +271,8 @@ def get_stats(loss, preds, labels, tokenizer, args: TrainConfig):
     stats = {"loss": loss.detach(),
              "timing_acc": acc_range(preds, labels, tokenizer.event_start[EventType.TIME_SHIFT],
                                      tokenizer.event_end[EventType.TIME_SHIFT]),
+             "fuzzy_timing_acc": fuzzy_acc_range(preds, labels, tokenizer.event_start[EventType.TIME_SHIFT],
+                                                 tokenizer.event_end[EventType.TIME_SHIFT], 2),
              "hitsound_acc": acc_range(preds, labels, tokenizer.event_start[EventType.HITSOUND],
                                        tokenizer.event_end[EventType.HITSOUND]),
              "volume_acc": acc_range(preds, labels, tokenizer.event_start[EventType.VOLUME],

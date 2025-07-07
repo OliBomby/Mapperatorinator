@@ -1,0 +1,81 @@
+defaults:
+  - default
+  - ../model@model: whisper_small_v2
+  - _self_
+
+compile: true          # PyTorch 2.0 optimization
+precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
+flash_attention: false  # Enable Flash Attention
+
+data:                  # Data settings
+  dataset_type: "mmrs"
+  train_dataset_path: "/workspace/datasets/MMRS39389"
+  test_dataset_path: "/workspace/datasets/MMRS39389"
+  train_dataset_start: 0
+  train_dataset_end: 38689
+  test_dataset_start: 38689
+  test_dataset_end: 39389
+  num_classes: 152680
+  # All Special Prefix Tokens
+  add_out_context_types: true  # Add tokens indicating types of the out context
+  add_gamemode_token: true
+  add_style_token: false
+  add_diff_token: false
+  add_mapper_token: false
+  add_year_token: true
+  add_hitsounded_token: true  # Add token for whether the map has hitsounds
+  add_song_length_token: false  # Add token for the length of the song
+  add_global_sv_token: true  # Add token for the global slider velocity in std and ctb
+  add_cs_token: true
+  add_keycount_token: true  # Add token for the number of keys in mania
+  add_hold_note_ratio_token: true  # Add token for the ratio of hold notes in mania
+  add_scroll_speed_ratio_token: true  # Add token for the scroll speed ratio in mania
+  add_descriptors: true  # Add beatmap descriptor tokens
+  add_sv_special_token: true  # Add token for last SV value
+  add_kiai_special_token: true  # Add token for last kiai state
+  add_song_position_token: false  # Add token for the position of the song in the mapset
+  # ---
+  timing_random_offset: 2
+  src_seq_len: 4096
+  tgt_seq_len: 8192
+  rhythm_weight: 1.0    # Weight of rhythm tokens in the loss calculation
+  context_types:       # List of context types to include in the dataset
+    - "in": ['${context_type:none}']
+      "out": ['${context_type:timing}', '${context_type:kiai}', '${context_type:map}', '${context_type:sv}']
+    - "in": ['${context_type:no_hs}']
+      "out": ['${context_type:timing}', '${context_type:kiai}', '${context_type:map}', '${context_type:sv}']
+    - "in": ['${context_type:gd}']
+      "out": ['${context_type:timing}', '${context_type:kiai}', '${context_type:map}', '${context_type:sv}']
+  context_weights: [4, 1, 1]    # List of weights for each context type. Determines how often each context type is sampled
+  mappers_path: "./datasets/beatmap_users.json"       # Path to file with all beatmap mappers
+  add_timing: false      # Interweave timing tokens with the beatmap tokens
+  add_snapping: true    # Model hit object snapping
+  add_timing_points: true  # Model beatmap timing with timing points
+  add_hitsounds: true   # Model beatmap hitsounds
+  add_pre_tokens: false
+  per_track: true
+  add_distances: true   # Model hit object distances
+  add_positions: true
+  position_precision: 4 # Precision of hit object coordinates
+  position_split_axes: true  # Split hit object X and Y coordinates into separate tokens
+  dt_augment_prob: 0.5   # Probability of augmenting the dataset with DT
+  dt_augment_range: [1.25, 1.5]  # Range of DT augmentation
+  types_first: true       # Put the type token at the start of the group before the timeshift token
+  add_kiai: false        # Model kiai times
+  gamemodes: [0, 1, 2, 3]  # List of gamemodes to include in the dataset
+  mania_bpm_normalized_scroll_speed: true  # Normalize mania scroll speed by BPM
+  add_sv: true  # Model slider velocity in std and ctb
+  add_mania_sv: false  # Add mania scroll velocity in map context
+
+dataloader:             # Dataloader settings
+  num_workers: 32
+
+optim:                  # Optimizer settings
+  name: muon
+  base_lr: 1e-2         # Should not be scaled with the number of devices present
+  batch_size: 32        # Batch size per GPU (128 for 4 GPUs)
+  grad_acc: 1
+  total_steps: 65536
+  warmup_steps: 0
+  final_cosine: 1e-5
+

@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 
 from osuT5.config import TrainConfig
-from osuT5.dataset import OsuParser
+from osuT5.dataset.osu_parser import OsuParser
 from osuT5.dataset.ors_dataset import STEPS_PER_MILLISECOND
 from osuT5.model.spectrogram import MelSpectrogram
 from osuT5.tokenizer import EventType

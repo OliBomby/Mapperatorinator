@@ -1,0 +1,10 @@
+defaults:
+  - default
+  - _self_
+
+name: 'openai/whisper-base'
+input_features: true
+do_style_embed: false
+
+overwrite:
+  tie_word_embeddings: false

@@ -7,9 +7,9 @@ import numpy as np
 import numpy.typing as npt
 from slider import Beatmap, Circle, Slider, Spinner, HoldNote, TimingPoint
 from slider.curve import Linear, Catmull, Perfect, MultiBezier
-from sympy import timed
 
-from ..tokenizer import Event, EventType, Tokenizer
+from ..tokenizer import Tokenizer
+from ..event import Event, EventType
 from .data_utils import merge_events, speed_events, get_median_mpb_beatmap
 from ..config import TrainConfig
 

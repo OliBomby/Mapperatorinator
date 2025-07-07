@@ -1,0 +1,12 @@
+defaults:
+  - default
+  - ../train@train: v23
+  - ../diffusion@diffusion: v1
+  - _self_
+
+model_path: './test/ckpt_v23'  # Path to trained model
+version: 'Mapperatorinator V23'        # Beatmap version
+super_timing: true     # Use super timing generator (slow but accurate timing)
+timing_leniency: 3     # Number of milliseconds of error to allow for timing generation
+diff_ckpt: 'OliBomby/osu-diffusion-v2'
+max_batch_size: 8

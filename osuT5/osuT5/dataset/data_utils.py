@@ -1,14 +1,17 @@
 import dataclasses
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import pandas as pd
+from pandas import DataFrame
 from pydub import AudioSegment
 
 import numpy.typing as npt
 from slider import Beatmap, HoldNote, TimingPoint
 
-from ..tokenizer import Event, EventType
+from ..event import Event, EventType
 
 MILISECONDS_PER_SECOND = 1000
 BEAT_TYPES = [
@@ -70,7 +73,7 @@ TIMED_EVENTS = [
 ]
 
 
-def load_audio_file(file: str, sample_rate: int, speed: float = 1.0) -> npt.NDArray:
+def load_audio_file(file: str, sample_rate: int, speed: float = 1.0, normalize: bool = True) -> npt.NDArray:
     """Load an audio file as a numpy time-series array
 
     The signals are resampled, converted to mono channel, and normalized.
@@ -79,6 +82,7 @@ def load_audio_file(file: str, sample_rate: int, speed: float = 1.0) -> npt.NDAr
         file: Path to audio file.
         sample_rate: Sample rate to resample the audio.
         speed: Speed multiplier for the audio.
+        normalize: If True, normalize the audio samples to the range [-1, 1].
 
     Returns:
         samples: Audio time series.
@@ -89,8 +93,73 @@ def load_audio_file(file: str, sample_rate: int, speed: float = 1.0) -> npt.NDAr
     audio = audio.set_frame_rate(sample_rate)
     audio = audio.set_channels(1)
     samples = np.array(audio.get_array_of_samples()).astype(np.float32)
-    samples *= 1.0 / np.max(np.abs(samples))
+    if normalize:
+        samples *= 1.0 / np.max(np.abs(samples))
     return samples
+
+
+def load_mmrs_metadata(path) -> DataFrame:
+    # Loads the metadata parquet from the dataset path
+    df = pd.read_parquet(Path(path) / "metadata.parquet")
+    df["BeatmapIdx"] = df.index
+    df.set_index(["BeatmapSetId", "Id"], inplace=True)
+    df.sort_index(inplace=True)
+    return df
+
+
+def filter_mmrs_metadata(
+        df: DataFrame,
+        *,
+        start: Optional[int] = None,
+        end: Optional[int] = None,
+        subset_ids: Optional[list[int]] = None,
+        gamemodes: Optional[list[int]] = None,
+        min_year: Optional[int] = None,
+        max_year: Optional[int] = None,
+        min_difficulty: Optional[float] = None,
+        max_difficulty: Optional[float] = None,
+) -> DataFrame:
+    """Filter the MMRs metadata DataFrame based on the given criteria.
+
+    Args:
+        df: DataFrame containing the metadata.
+        start: Start split index.
+        end: End split index.
+        subset_ids: List of beatmap IDs to filter by.
+        gamemodes: List of gamemodes to filter by.
+        min_year: Minimum year to filter by.
+        max_year: Maximum year to filter by.
+        min_difficulty: Minimum difficulty star rating to filter by.
+        max_difficulty: Maximum difficulty star rating to filter by.
+
+    Returns:
+        Filtered DataFrame.
+    """
+    if start is not None and end is not None:
+        first_level_labels = df.index.get_level_values(0).unique()
+        start_label = first_level_labels[start]
+        end_label = first_level_labels[end - 1]
+        df = df.loc[start_label:end_label]
+
+    if subset_ids is not None:
+        df = df.loc[subset_ids]
+
+    if gamemodes is not None:
+        df = df[df["ModeInt"].isin(gamemodes)]
+
+    if min_year is not None:
+        df = df[df["RankedDate"] >= datetime(min_year, 1, 1)]
+
+    if max_year is not None:
+        df = df[df["RankedDate"] < datetime(max_year + 1, 1, 1)]
+
+    if min_difficulty is not None:
+        df = df[df["DifficultyRating"] >= min_difficulty]
+
+    if max_difficulty is not None:
+        df = df[df["DifficultyRating"] <= max_difficulty]
+
+    return df
 
 
 def update_event_times(
@@ -351,8 +420,12 @@ def get_groups(
     return groups, group_indices
 
 
-def get_hold_note_ratio(beatmap: Beatmap) -> float:
+def get_hold_note_ratio(beatmap: Beatmap) -> Optional[float]:
     notes = beatmap.hit_objects(stacking=False)
+
+    if len(notes) == 0:
+        return None
+
     hold_note_count = 0
     for note in notes:
         if isinstance(note, HoldNote):
@@ -360,9 +433,13 @@ def get_hold_note_ratio(beatmap: Beatmap) -> float:
     return hold_note_count / len(notes)
 
 
-def get_scroll_speed_ratio(beatmap: Beatmap) -> float:
+def get_scroll_speed_ratio(beatmap: Beatmap) -> Optional[float]:
     # Number of scroll speed changes divided by number of distinct hit object times
     notes = beatmap.hit_objects(stacking=False)
+
+    if len(notes) == 0:
+        return None
+
     last_time = -1
     num_note_times = 0
     for note in notes:

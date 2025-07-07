@@ -28,9 +28,30 @@ from osu_diffusion.config import DiffusionTrainConfig
 
 
 def prepare_args(args: FidConfig | InferenceConfig):
-    if not torch.cuda.is_available() and args.device == "cuda":
-        print("CUDA is not available, using CPU instead.")
-        args.device = "cpu"
+    if args.device == "auto":
+        if torch.cuda.is_available():
+            print("Using CUDA for inference (auto-selected).")
+            args.device = "cuda"
+        elif torch.mps.is_available():
+            print("Using MPS for inference (auto-selected).")
+            args.device = "mps"
+        else:
+            print("Using CPU for inference (auto-selected fallback).")
+            args.device = "cpu"
+    elif args.device != "cpu":
+        if args.device == "cuda":
+            if not torch.cuda.is_available():
+                print("CUDA is not available. Falling back to CPU.")
+                args.device = "cpu"
+        elif args.device == "mps":
+            if not torch.mps.is_available():
+                print("MPS is not available. Falling back to CPU.")
+                args.device = "cpu"
+        else:
+            print(
+                f"Requested device '{args.device}' not available. Falling back to CPU."
+            )
+            args.device = "cpu"
     torch.set_grad_enabled(False)
     torch.set_float32_matmul_precision('high')
     if args.seed is None:
@@ -39,8 +60,78 @@ def prepare_args(args: FidConfig | InferenceConfig):
     set_seed(args.seed)
 
 
+def autofill_paths(args: InferenceConfig):
+    """Autofills audio_path and output_path. Can be used either in Web GUI or CLI."""
+    errors = []
+
+    # Convert paths to Path objects for easier manipulation
+    beatmap_path = Path(args.beatmap_path) if args.beatmap_path else None
+    output_path = Path(args.output_path) if args.output_path else None
+    audio_path = Path(args.audio_path) if args.audio_path else None
+
+    # Helper function to validate beatmap file type
+    def is_valid_beatmap_file(path):
+        """Check if the file exists and has a valid beatmap extension (.osu)."""
+        if not path:
+            return True  # Empty path is valid (optional)
+        return path.exists() and path.suffix.lower() == '.osu'
+
+    # Case 1: Beatmap path is provided - autofill audio and output
+    if beatmap_path and is_valid_beatmap_file(beatmap_path):
+        try:
+            beatmap = Beatmap.from_path(beatmap_path)
+
+            # Autofill audio path if empty
+            if not audio_path:
+                audio_path = beatmap_path.parent / beatmap.audio_filename
+
+            # Autofill output path if empty
+            if not output_path:
+                output_path = beatmap_path.parent
+
+        except Exception as e:
+            error_msg = f"Error reading beatmap file: {e}"
+            errors.append(error_msg)
+
+    # Case 2: Audio path is provided but no output path - autofill output
+    elif audio_path and audio_path.exists() and not output_path:
+        output_path = audio_path.parent
+
+    # Validate all paths
+    valid_audio_extensions = {'.mp3', '.wav', '.ogg', '.m4a', '.flac'}
+    if not audio_path:
+        errors.append("Audio file path is required.")
+    elif not audio_path.exists():
+        errors.append(f"Audio file not found: {audio_path}")
+    elif audio_path.suffix.lower() not in valid_audio_extensions:
+        errors.append(f"Audio file must have one of the following extensions: {', '.join(valid_audio_extensions)}: {audio_path}")
+
+    if beatmap_path:
+        if not beatmap_path.exists():
+            errors.append(f"Beatmap file not found: {beatmap_path}")
+        elif not is_valid_beatmap_file(beatmap_path):
+            errors.append(f"Beatmap file must have .osu extension: {beatmap_path}")
+
+    # Update args
+    args.audio_path = str(audio_path) if audio_path else ""
+    args.output_path = str(output_path) if output_path else ""
+    args.beatmap_path = str(beatmap_path) if beatmap_path else ""
+
+    return {
+        'success': len(errors) == 0,
+        'errors': errors
+    }
+
+
 def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
-    if args.beatmap_path is None or args.beatmap_path == "":
+    result = autofill_paths(args)
+
+    if not result['success']:
+        for error in result['errors']:
+            print(f"Error: {error}")
+        return
+
+    if not args.beatmap_path:
         # populate fair defaults for any inherited args that need to be filled
         if args.gamemode is None:
             args.gamemode = 0
@@ -72,17 +163,8 @@ def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
         return
 
     beatmap_path = Path(args.beatmap_path)
-
-    if not beatmap_path.is_file():
-        raise FileNotFoundError(f"Beatmap file {beatmap_path} not found.")
-
     beatmap = Beatmap.from_path(beatmap_path)
     print(f"Using metadata from beatmap: {beatmap.display_name}")
-
-    if args.audio_path == '':
-        args.audio_path = beatmap_path.parent / beatmap.audio_filename
-    if args.output_path == '':
-        args.output_path = beatmap_path.parent
 
     generation_config = generation_config_from_beatmap(beatmap, tokenizer)
 
@@ -187,7 +269,7 @@ def get_config(args: InferenceConfig):
     # Create tags that describes args
     tags = get_tags_dict(args)
     # Filter to all non-default values
-    defaults = get_tags_dict(OmegaConf.load("configs/inference.yaml"))
+    defaults = get_tags_dict(OmegaConf.load("configs/inference/default.yaml"))
     tags = {k: v for k, v in tags.items() if v != defaults[k]}
     # To string separated by spaces
     tags = " ".join(f"{k}={v}" for k, v in tags.items())
@@ -256,8 +338,13 @@ def generate(
     # Do some validation
     if not Path(audio_path).exists() or not Path(audio_path).is_file():
         raise FileNotFoundError(f"Provided audio file path does not exist: {audio_path}")
-    if beatmap_path and (not Path(beatmap_path).exists() or not Path(beatmap_path).is_file()):
-        raise FileNotFoundError(f"Provided beatmap file path does not exist: {beatmap_path}")
+    if beatmap_path:
+        beatmap_path_obj = Path(beatmap_path)
+        if not beatmap_path_obj.exists() or not beatmap_path_obj.is_file():
+            raise FileNotFoundError(f"Provided beatmap file path does not exist: {beatmap_path}")
+        # Validate beatmap file type
+        if beatmap_path_obj.suffix.lower() != '.osu':
+            raise ValueError(f"Beatmap file must have .osu extension: {beatmap_path}")
 
     preprocessor = Preprocessor(args, parallel=args.parallel)
     processor = Processor(args, model, tokenizer)
@@ -278,7 +365,7 @@ def generate(
         if ContextType.TIMING in output_type:
             output_type.remove(ContextType.TIMING)
     elif (ContextType.NONE in args.in_context and ContextType.MAP in output_type and
-          not any((ContextType.NONE in ctx["in"] or len(ctx["in"]) == 0) and ContextType.MAP in ctx["out"] for ctx in args.osut5.data.context_types)):
+          not any((ContextType.NONE in ctx["in"] or len(ctx["in"]) == 0) and ContextType.MAP in ctx["out"] for ctx in args.train.data.context_types)):
         # Generate timing and convert in_context to timing context
         timing_events, timing_times = processor.generate(
             sequences=sequences,
@@ -293,7 +380,7 @@ def generate(
         if ContextType.TIMING in output_type:
             output_type.remove(ContextType.TIMING)
     elif ContextType.TIMING in args.in_context or (
-            args.osut5.data.add_timing and any(t in args.in_context for t in [ContextType.GD, ContextType.NO_HS])):
+            args.train.data.add_timing and any(t in args.in_context for t in [ContextType.GD, ContextType.NO_HS])):
         # Exact timing is provided in the other beatmap, so we don't need to generate it
         timing = [tp for tp in Beatmap.from_path(Path(beatmap_path)).timing_points if tp.parent is None]
 
@@ -311,7 +398,7 @@ def generate(
 
         events, _ = reduce(merge_events, result)
 
-        if timing is None and (ContextType.TIMING in args.output_type or args.osut5.data.add_timing):
+        if timing is None and (ContextType.TIMING in args.output_type or args.train.data.add_timing):
             timing = postprocessor.generate_timing(events)
 
         # Resnap timing events
@@ -389,6 +476,7 @@ def load_model(
 
         model.eval()
         model.to(device)
+        print(f"Model loaded: {ckpt_path_str} on device {device}")
         return model
 
     return InferenceClient(
@@ -440,11 +528,11 @@ def load_diff_model(
     return model, tokenizer
 
 
-@hydra.main(config_path="configs", config_name="inference_v30", version_base="1.1")
+@hydra.main(config_path="configs/inference", config_name="v30", version_base="1.1")
 def main(args: InferenceConfig):
     prepare_args(args)
 
-    model, tokenizer = load_model(args.model_path, args.osut5, args.device, args.max_batch_size, args.use_server)
+    model, tokenizer = load_model(args.model_path, args.train, args.device, args.max_batch_size, args.use_server)
 
     diff_model, diff_tokenizer, refine_model = None, None, None
     if args.generate_positions:

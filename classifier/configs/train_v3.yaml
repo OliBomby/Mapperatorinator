@@ -3,7 +3,7 @@ defaults:
   - _self_
   - model: whisper_base_v2
 
-pretrained_path: "../../../test/ckpt_v22_1"
+pretrained_path: "../../../test/ckpt_v22"
 
 data:
   augment_flip: true

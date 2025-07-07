@@ -1,9 +1,0 @@
-defaults:
-  - base_inference
-  - inference
-  - osut5: train_v22
-  - diffusion: v1
-  - _self_
-
-version: 'Mapperatorinator V22'        # Beatmap version
-diff_ckpt: 'OliBomby/osu-diffusion-v2'

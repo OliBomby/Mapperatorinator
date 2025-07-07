@@ -1,0 +1,154 @@
+defaults:
+  - /train/base@_here_
+
+compile: true          # PyTorch 2.0 optimization
+device: gpu             # Training device (cpu/gpu)
+precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
+seed: 42                # Project seed
+flash_attention: false  # Enable Flash Attention
+
+checkpoint_path: ''     # Project checkpoint directory (to resume training)
+pretrained_path: ''     # Path to pretrained model weights (to do transfer learning)
+pretrained_t5_compat: false  # Load weights from a T5 model with different vocab size
+mode: 'train'
+
+data:                  # Data settings
+  dataset_type: 'ors'   # Dataset type (ors/mmrs)
+  train_dataset_path: '/root/ORS16291'  # Training dataset directory
+  train_dataset_start: 0  # Training dataset start index
+  train_dataset_end: 16200    # Training dataset end index
+  test_dataset_path: '/root/ORS16291'   # Testing/validation dataset directory
+  test_dataset_start: 16200   # Testing/validation dataset start index
+  test_dataset_end: 16291     # Testing/validation dataset end index
+  src_seq_len: 512
+  tgt_seq_len: 384
+  sample_rate: ${..model.spectrogram.sample_rate}
+  hop_length: ${..model.spectrogram.hop_length}
+  cycle_length: 16
+  per_track: false      # Loads all beatmaps in a track sequentially which optimizes audio data loading
+  only_last_beatmap: false  # Only use the last beatmap in the mapset
+  center_pad_decoder: false            # Center pad decoder input
+  num_classes: 64821
+  num_diff_classes: 24  # Number of difficulty classes
+  max_diff: 12          # Maximum difficulty of difficulty classes
+  num_cs_classes: 21     # Number of circle size classes
+  class_dropout_prob: 0.2
+  diff_dropout_prob: 0.2
+  mapper_dropout_prob: 0.2
+  cs_dropout_prob: 0.2
+  year_dropout_prob: 0.2
+  hold_note_ratio_dropout_prob: 0.2
+  scroll_speed_ratio_dropout_prob: 0.2
+  descriptor_dropout_prob: 0.2
+  # All Special Prefix Tokens
+  add_out_context_types: false  # Add tokens indicating types of the out context
+  add_gamemode_token: false
+  add_style_token: false
+  add_diff_token: false
+  add_mapper_token: false
+  add_year_token: false
+  add_hitsounded_token: false  # Add token for whether the map has hitsounds
+  add_song_length_token: false  # Add token for the length of the song
+  add_global_sv_token: false  # Add token for the global slider velocity in std and ctb
+  add_cs_token: false
+  add_keycount_token: false  # Add token for the number of keys in mania
+  add_hold_note_ratio_token: false  # Add token for the ratio of hold notes in mania
+  add_scroll_speed_ratio_token: false  # Add token for the scroll speed ratio in mania
+  add_descriptors: false  # Add beatmap descriptor tokens
+  add_sv_special_token: false  # Add token for last SV value
+  add_kiai_special_token: false  # Add token for last kiai state
+  add_song_position_token: false  # Add token for the position of the song in the mapset
+  # ---
+  add_empty_sequences: true
+  add_empty_sequences_at_step: -1
+  add_pre_tokens: true
+  add_pre_tokens_at_step: -1
+  max_pre_token_len: -1
+  timing_random_offset: 0
+  timing_random_offset_2: 0
+  timing_random_offset_prob: 1.0  # Probability of using random timing offset
+  add_gd_context: false  # Prefix the decoder with tokens of another beatmap in the mapset
+  min_difficulty: 0     # Minimum difficulty to consider including in the dataset
+  max_difficulty: 100   # Maximum difficulty to consider including in the dataset
+  sample_weights_path: ''    # Path to sample weights
+  rhythm_weight: 1.0    # Weight of rhythm tokens in the loss calculation
+  label_smoothing: 0.0  # Label smoothing for the loss calculation
+  lookback: 0             # Fraction of audio sequence to fill with tokens from previous inference window
+  lookahead: 0            # Fraction of audio sequence to skip at the end of the audio window
+  lookback_prob: 0.0  # Probability of using the lookback augmentation for a beatmap in the dataset
+  context_types:      # List of context types to include in the dataset
+    - "in": []
+      "out": ['${context_type:map}']
+  context_weights: []    # List of weights for each context type. Determines how often each context type is sampled
+  descriptors_path: ''   # Path to file with all beatmap descriptors
+  mappers_path: ''       # Path to file with all beatmap mappers
+  add_timing: false      # Add beatmap timing to map context
+  add_snapping: false    # Model hit object snapping
+  add_timing_points: false  # Model beatmap timing with timing points
+  add_hitsounds: false   # Model beatmap hitsounds
+  add_distances: true   # Model hit object distances
+  add_positions: false   # Model hit object coordinates
+  position_precision: 1  # Precision of hit object coordinates
+  position_split_axes: true  # Split hit object X and Y coordinates into separate tokens
+  position_range: [-256, 768, -256, 640]  # Range of hit object coordinates
+  dt_augment_prob: 0.0   # Probability of augmenting the dataset with DT
+  dt_augment_range: [1.5, 1.5]  # Range of DT augmentation
+  dt_augment_sqrt: false  # Sample DT augmentation from a square root distribution
+  types_first: false       # Put the type token at the start of the group before the timeshift token
+  add_kiai: false        # Add kiai times to map context
+  gamemodes: [0]  # List of gamemodes to include in the dataset
+  mania_bpm_normalized_scroll_speed: false  # Normalize mania scroll speed by BPM
+  add_sv: false  # Model slider velocity in std and ctb
+  add_mania_sv: false  # Add mania scroll velocity in map context
+  min_year: null  # Minimum year of the beatmap to include in the dataset
+  max_year: null  # Maximum year of the beatmap to include in the dataset
+  frame_offset_augment_prob: 1.0  # Probability of augmenting beatmap sequences with frame offset
+  normalize_audio: true  # Normalize audio data
+
+
+dataloader:             # Dataloader settings
+  num_workers: 8
+  pin_memory: true
+  drop_last: false
+
+optim:                  # Optimizer settings
+  name: adamwscale
+  base_lr: 2e-2         # Should be scaled with the number of devices present
+  base_lr_2: 3e-4        # Secondary learning rate for the internal optimizer
+  batch_size: 129       # This is the batch size per GPU
+  total_steps: 65536
+  warmup_steps: 10000
+  sustain_steps: 0      # Steps to sustain the learning rate after warmup
+  lr_scheduler: cosine
+  weight_decay: 0.0
+  grad_clip: 1.0
+  grad_acc: 3
+  final_cosine: 1e-5
+
+eval:                   # Evaluation settings 
+  every_steps: 1000
+  steps: 500
+
+checkpoint:             # Checkpoint settings
+  every_steps: 5000
+
+logging:                # Logging settings
+  log_with: 'wandb'     # Logging service (wandb/tensorboard)
+  every_steps: 10
+  grad_l2: true
+  weights_l2: true
+  mode: 'online'
+
+profile:                # Profiling settings
+  do_profile: false
+  early_stop: false
+  wait: 8
+  warmup: 8
+  active: 8
+  repeat: 1
+
+hydra:
+  job:
+    chdir: True
+  run:
+    dir: ./logs/${now:%Y-%m-%d}/${now:%H-%M-%S}

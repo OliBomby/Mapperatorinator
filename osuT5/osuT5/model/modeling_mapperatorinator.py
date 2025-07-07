@@ -105,11 +105,16 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
 
         if self.embed_decoder_input:
             self.decoder_embedder = nn.Embedding(config.vocab_size_in, d_model)
-            self.decoder_embedder.weight.data.normal_(mean=0.0, std=1.0)
+            self.decoder_embedder.weight.data.normal_(mean=0.0, std=config.init_std)
 
         class_weights = torch.ones(config.vocab_size)
         class_weights[config.rhythm_token_start:config.rhythm_token_end] = config.rhythm_weight
-        self.loss_fn = nn.CrossEntropyLoss(weight=class_weights, reduction="none", ignore_index=LABEL_IGNORE_ID)
+        self.loss_fn = nn.CrossEntropyLoss(
+            weight=class_weights,
+            reduction="none",
+            ignore_index=LABEL_IGNORE_ID,
+            label_smoothing=config.label_smoothing
+        )
 
     def forward(
             self,

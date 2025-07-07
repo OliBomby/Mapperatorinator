@@ -38,6 +38,7 @@ class MapperatorinatorConfig(PretrainedConfig):
         rhythm_weight: float = 3.0,
         rhythm_token_start: int = 17,
         rhythm_token_end: int = 836,
+        label_smoothing: float = 0.0,
         init_std=0.02,
         src_seq_len=1024,
         tgt_seq_len=2048,
@@ -132,6 +133,7 @@ class MapperatorinatorConfig(PretrainedConfig):
         self.rhythm_weight = rhythm_weight
         self.rhythm_token_start = rhythm_token_start
         self.rhythm_token_end = rhythm_token_end
+        self.label_smoothing = 0.0
         self.init_std = init_std
         self.disable_compile = True
 

@@ -1,0 +1,12 @@
+defaults:
+  - default
+  - ../train@train: v19
+  - ../diffusion@diffusion: v1
+  - _self_
+
+model_path: './test/ckpt_v19'  # Path to trained model
+version: 'Mapperatorinator V19'        # Beatmap version
+timeshift_bias: -1.5        # Logit bias for sampling timeshift tokens
+
+# Diffusion settings
+generate_positions: false      # Use diffusion to generate object positions

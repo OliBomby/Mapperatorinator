@@ -98,12 +98,17 @@ class DataConfig:
     add_pre_tokens_at_step: int = -1
     max_pre_token_len: int = -1
     timing_random_offset: int = 2
+    timing_random_offset_2: int = 0
+    timing_random_offset_prob: float = 1.0  # Probability of using random timing offset
     add_gd_context: bool = False  # Prefix the decoder with tokens of another beatmap in the mapset
     min_difficulty: float = 0  # Minimum difficulty to consider including in the dataset
+    max_difficulty: float = 100  # Maximum difficulty to consider including in the dataset
     sample_weights_path: str = ''  # Path to sample weights
     rhythm_weight: float = 3.0  # Weight of rhythm tokens in the loss calculation
+    label_smoothing: float = 0.0  # Label smoothing for the loss calculation
     lookback: float = 0  # Fraction of audio sequence to fill with tokens from previous inference window
     lookahead: float = 0  # Fraction of audio sequence to skip at the end of the audio window
+    lookback_prob: float = 0.0  # Probability of using the lookback augmentation for a beatmap in the dataset
     context_types: list[dict[str, list[ContextType]]] = field(default_factory=lambda: [
         {"in": [ContextType.NONE], "out": [ContextType.TIMING, ContextType.KIAI, ContextType.MAP, ContextType.SV]},
         {"in": [ContextType.NO_HS], "out": [ContextType.TIMING, ContextType.KIAI, ContextType.MAP, ContextType.SV]},
@@ -123,6 +128,7 @@ class DataConfig:
     position_range: list[int] = field(default_factory=lambda: [-256, 768, -256, 640])  # Range of hit object coordinates
     dt_augment_prob: float = 0.5  # Probability of augmenting the dataset with DT
     dt_augment_range: list[float] = field(default_factory=lambda: [1.25, 1.5])  # Range of DT augmentation
+    dt_augment_sqrt: bool = False  # Sample DT augmentation from a square root distribution
     types_first: bool = True  # Put the type token at the start of the group before the timeshift token
     add_kiai: bool = True  # Add kiai times to map context
     gamemodes: list[int] = field(default_factory=lambda: [0, 1, 2, 3])  # List of gamemodes to include in the dataset
@@ -130,20 +136,27 @@ class DataConfig:
     add_sv: bool = True  # Model slider velocity in std and ctb
     add_mania_sv: bool = False  # Add mania scroll velocity in map context
     min_year: Optional[int] = None  # Minimum year of the beatmap to include in the dataset
+    max_year: Optional[int] = None  # Maximum year of the beatmap to include in the dataset
+    frame_offset_augment_prob: float = 1.0  # Probability of augmenting beatmap sequences with frame offset
+    normalize_audio: bool = True  # Normalize audio data
 
 
 @dataclass
 class DataloaderConfig:
     num_workers: int = 8
+    pin_memory: bool = True
+    drop_last: bool = False
 
 
 @dataclass
 class OptimizerConfig:  # Optimizer settings
     name: str = "adamwscale"  # Optimizer
     base_lr: float = 1e-2
+    base_lr_2: float = 3e-4        # Secondary learning rate for the internal optimizer
     batch_size: int = 128  # Batch size per GPU
     total_steps: int = 65536
     warmup_steps: int = 10000
+    sustain_steps: int = 0  # Steps to sustain the learning rate after warmup
     lr_scheduler: str = "cosine"
     weight_decay: float = 0.0
     grad_clip: float = 1.0
@@ -205,5 +218,5 @@ class TrainConfig:
 
 OmegaConf.register_new_resolver("context_type", lambda x: ContextType(x.lower()))
 cs = ConfigStore.instance()
-cs.store(group="osut5", name="base_train", node=TrainConfig)
+cs.store(group="train", name="base", node=TrainConfig)
 

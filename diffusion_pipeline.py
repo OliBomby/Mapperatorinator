@@ -15,7 +15,7 @@ from osu_diffusion import repeat_type
 from osu_diffusion import create_diffusion
 from osu_diffusion import DiT
 from osuT5.osuT5.inference import GenerationConfig, SliderPath
-from osuT5.osuT5.dataset import update_event_times
+from osuT5.osuT5.dataset.data_utils import update_event_times
 from osuT5.osuT5.tokenizer import Event, EventType
 from osuT5.osuT5.dataset.data_utils import get_groups
 
@@ -57,11 +57,11 @@ class DiffisionPipeline(object):
         self.cfg_scale = args.diff_cfg_scale
         self.refine_iters = args.refine_iters
         self.random_init = args.random_init
-        self.types_first = args.osut5.data.types_first
+        self.types_first = args.train.data.types_first
         self.pad_sequence = args.pad_sequence
         self.start_time = args.start_time
         self.end_time = args.end_time
-        self.has_sv = args.osut5.data.add_sv
+        self.has_sv = args.train.data.add_sv
 
     def get_class_vector(
             self,

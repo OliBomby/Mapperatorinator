@@ -17,7 +17,18 @@ from osuT5.utils import (
 )
 
 
-@hydra.main(config_path="../configs/osut5", config_name="train_v29", version_base="1.1")
+
+def print_model_parameters(model):
+    total_params = sum(p.numel() for p in model.parameters())  # Total parameters
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)  # Trainable params
+    frozen_params = total_params - trainable_params  # Non-trainable (frozen) params
+
+    print(f"Total Parameters: {total_params:,}")
+    print(f"Trainable Parameters: {trainable_params:,}")
+    print(f"Frozen Parameters: {frozen_params:,}")
+
+
+@hydra.main(config_path="../configs/train", config_name="v29", version_base="1.1")
 def main(args: TrainConfig):
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(
@@ -66,6 +77,9 @@ def main(args: TrainConfig):
         print("Manually normalizing model weights")
         model.transformer.register_step_post_hook(optimizer)
         model.transformer.norm_weights_()
+
+    print(model)
+    print_model_parameters(model)
 
     # noinspection PyTypeChecker
     (

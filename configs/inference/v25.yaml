@@ -1,0 +1,10 @@
+defaults:
+  - default
+  - ../train@train: v25
+  - ../diffusion@diffusion: v1
+  - _self_
+
+model_path: './test/ckpt_v25'  # Path to trained model
+version: 'Mapperatorinator V25'        # Beatmap version
+diff_ckpt: 'OliBomby/osu-diffusion-v2'
+max_batch_size: 8

@@ -12,7 +12,6 @@ from accelerate.utils import ProjectConfiguration
 from torch import nn
 from tqdm import tqdm
 
-import routed_pickle
 from osuT5.config import TrainConfig
 from osuT5.dataset.ors_dataset import STEPS_PER_MILLISECOND, LABEL_IGNORE_ID
 from osuT5.model import Mapperatorinator
@@ -43,7 +42,7 @@ def load_model(
         if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
             tokenizer = Tokenizer.from_pretrained(ckpt_path_str)
         else:
-            tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=routed_pickle, weights_only=False)
+            tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", weights_only=False)
             tokenizer = Tokenizer()
             tokenizer.load_state_dict(tokenizer_state)
         return tokenizer
@@ -128,9 +127,7 @@ def test(args: TrainConfig, accelerator: Accelerator, model, tokenizer, preprefi
             def gather_metrics(loss, preds, labels, rhythm_complexity=None, prefix=''):
                 # Calculate accuracy metrics
                 stats = get_stats(loss, preds, labels, tokenizer, args)
-
-                if prefix != '':
-                    stats = add_prefix(prefix, stats)
+                stats = add_prefix(prefix, stats)
 
                 averager.update(stats)
 
@@ -285,12 +282,11 @@ def main(args: TrainConfig):
     model = accelerator.prepare(model)
 
     args.data.sample_weights_path = "../../../datasets/rhythm_complexities.csv"
-    args.data.timing_random_offset = 0
-    args.data.dt_augment_prob = 0
-    test(args, accelerator, model, tokenizer, "test")
-
-    args.data.timing_random_offset = 2
     test(args, accelerator, model, tokenizer, "test_noise")
+
+    args.data.timing_random_offset = 0
+    args.data.timing_random_offset_2 = 0
+    test(args, accelerator, model, tokenizer, "test")
 
 
 if __name__ == "__main__":

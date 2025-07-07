@@ -3,7 +3,7 @@ defaults:
   - _self_
   - model: whisper_base
 
-pretrained_path: "../../../test/ckpt_v22_1"
+pretrained_path: "../../../test/ckpt_v22"
 
 optim:                  # Optimizer settings
   base_lr: 1e-4         # Should be scaled with the number of devices present

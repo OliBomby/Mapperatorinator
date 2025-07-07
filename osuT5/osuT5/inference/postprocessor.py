@@ -129,12 +129,12 @@ class Postprocessor(object):
         self.offset = args.offset
         self.beat_length = 60000 / args.bpm
         self.timing_leniency = args.timing_leniency
-        self.types_first = args.osut5.data.types_first
-        self.has_pos = args.osut5.data.add_positions
-        self.mania_bpm_normalized_scroll_speed = args.osut5.data.mania_bpm_normalized_scroll_speed
+        self.types_first = args.train.data.types_first
+        self.has_pos = args.train.data.add_positions
+        self.mania_bpm_normalized_scroll_speed = args.train.data.mania_bpm_normalized_scroll_speed
         self.start_time = args.start_time
         self.end_time = args.end_time
-        self.has_sv = args.osut5.data.add_sv
+        self.has_sv = args.train.data.add_sv
 
     def generate(
             self,

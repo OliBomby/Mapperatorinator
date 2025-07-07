@@ -29,12 +29,12 @@ class SuperTimingGenerator:
         self.processor.top_p = 1
         self.processor.top_k = 50
         self.bpm_change_threshold = args.timer_bpm_threshold
-        self.types_first = args.osut5.data.types_first
+        self.types_first = args.train.data.types_first
         self.iterations = args.timer_iterations
 
-        self.frame_seq_len = args.osut5.data.src_seq_len - 1
-        self.frame_size = args.osut5.model.spectrogram.hop_length
-        self.sample_rate = args.osut5.model.spectrogram.sample_rate
+        self.frame_seq_len = args.train.data.src_seq_len - 1
+        self.frame_size = args.train.model.spectrogram.hop_length
+        self.sample_rate = args.train.model.spectrogram.sample_rate
         self.samples_per_sequence = self.frame_seq_len * self.frame_size
         self.miliseconds_per_sequence = self.samples_per_sequence * MILISECONDS_PER_SECOND / self.sample_rate
 
@@ -66,7 +66,7 @@ class SuperTimingGenerator:
                 sequences=sequences,
                 generation_config=generation_config,
                 in_context=[ContextType.NONE],
-                out_context=[ContextType.MAP] if self.args.osut5.data.add_timing else [ContextType.TIMING],
+                out_context=[ContextType.MAP] if self.args.train.data.add_timing else [ContextType.TIMING],
                 verbose=False,
             )[0]
             groups, _ = get_groups(events, types_first=self.types_first)

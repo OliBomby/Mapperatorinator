@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from config import InferenceConfig
 from .server import InferenceClient, model_generate
-from ..dataset import OsuParser
+from ..dataset.osu_parser import OsuParser
 from ..dataset.data_utils import (update_event_times, remove_events_of_type, get_hold_note_ratio,
                                   get_scroll_speed_ratio, get_hitsounded_status)
 from ..model import Mapperatorinator
@@ -78,10 +78,10 @@ class Processor(object):
         self.args = args
         self.model = model
         self.tokenizer = tokenizer
-        self.tgt_seq_len = args.osut5.data.tgt_seq_len
-        self.frame_seq_len = args.osut5.data.src_seq_len - 1
-        self.frame_size = args.osut5.model.spectrogram.hop_length
-        self.sample_rate = args.osut5.model.spectrogram.sample_rate
+        self.tgt_seq_len = args.train.data.tgt_seq_len
+        self.frame_seq_len = args.train.data.src_seq_len - 1
+        self.frame_size = args.train.model.spectrogram.hop_length
+        self.sample_rate = args.train.model.spectrogram.sample_rate
         self.samples_per_sequence = self.frame_seq_len * self.frame_size
         self.miliseconds_per_sequence = self.samples_per_sequence * MILISECONDS_PER_SECOND / self.sample_rate
         self.lookback_time = args.lookback * self.miliseconds_per_sequence
@@ -89,49 +89,49 @@ class Processor(object):
         self.lookahead_max_time = (1 - args.lookahead) * self.miliseconds_per_sequence
         self.lookahead_time = args.lookahead * self.miliseconds_per_sequence
         self.lookahead_time_range = range(tokenizer.encode(Event(EventType.TIME_SHIFT, int(self.lookahead_max_time / MILISECONDS_PER_STEP))), tokenizer.event_end[EventType.TIME_SHIFT])
-        self.eos_time = (1 - args.osut5.data.lookahead) * self.miliseconds_per_sequence
-        self.center_pad_decoder = args.osut5.data.center_pad_decoder
+        self.eos_time = (1 - args.train.data.lookahead) * self.miliseconds_per_sequence
+        self.center_pad_decoder = args.train.data.center_pad_decoder
         # All Special Prefix Tokens
-        self.add_out_context_types = args.osut5.data.add_out_context_types
-        self.add_gamemode_token = args.osut5.data.add_gamemode_token
-        self.add_style_token = args.osut5.data.add_style_token
-        self.add_diff_token = args.osut5.data.add_diff_token
-        self.add_mapper_token = args.osut5.data.add_mapper_token
-        self.add_year_token = args.osut5.data.add_year_token
-        self.add_hitsounded_token = args.osut5.data.add_hitsounded_token
-        self.add_song_length_token = args.osut5.data.add_song_length_token
-        self.add_global_sv_token = args.osut5.data.add_global_sv_token
-        self.add_cs_token = args.osut5.data.add_cs_token
-        self.add_keycount_token = args.osut5.data.add_keycount_token
-        self.add_hold_note_ratio_token = args.osut5.data.add_hold_note_ratio_token
-        self.add_scroll_speed_ratio_token = args.osut5.data.add_scroll_speed_ratio_token
-        self.add_descriptors = args.osut5.data.add_descriptors
-        self.add_sv_special_token = args.osut5.data.add_sv_special_token
-        self.add_kiai_special_token = args.osut5.data.add_kiai_special_token
-        self.add_song_position_token = args.osut5.data.add_song_position_token
+        self.add_out_context_types = args.train.data.add_out_context_types
+        self.add_gamemode_token = args.train.data.add_gamemode_token
+        self.add_style_token = args.train.data.add_style_token
+        self.add_diff_token = args.train.data.add_diff_token
+        self.add_mapper_token = args.train.data.add_mapper_token
+        self.add_year_token = args.train.data.add_year_token
+        self.add_hitsounded_token = args.train.data.add_hitsounded_token
+        self.add_song_length_token = args.train.data.add_song_length_token
+        self.add_global_sv_token = args.train.data.add_global_sv_token
+        self.add_cs_token = args.train.data.add_cs_token
+        self.add_keycount_token = args.train.data.add_keycount_token
+        self.add_hold_note_ratio_token = args.train.data.add_hold_note_ratio_token
+        self.add_scroll_speed_ratio_token = args.train.data.add_scroll_speed_ratio_token
+        self.add_descriptors = args.train.data.add_descriptors
+        self.add_sv_special_token = args.train.data.add_sv_special_token
+        self.add_kiai_special_token = args.train.data.add_kiai_special_token
+        self.add_song_position_token = args.train.data.add_song_position_token
         # ---
-        self.add_kiai = args.osut5.data.add_kiai
-        self.max_pre_token_len = args.osut5.data.max_pre_token_len
-        self.add_pre_tokens = args.osut5.data.add_pre_tokens
-        self.add_gd_context = args.osut5.data.add_gd_context
-        self.add_timing = args.osut5.data.add_timing
-        self.parser = OsuParser(args.osut5, self.tokenizer)
-        self.do_style_embed = args.osut5.model.do_style_embed
-        self.do_difficulty_embed = args.osut5.model.do_difficulty_embed
-        self.do_mapper_embed = args.osut5.model.do_mapper_embed
-        self.do_song_position_embed = args.osut5.model.do_song_position_embed
-        self.add_positions = args.osut5.data.add_positions
-        self.add_sv = args.osut5.data.add_sv
-        self.add_mania_sv = args.osut5.data.add_mania_sv
+        self.add_kiai = args.train.data.add_kiai
+        self.max_pre_token_len = args.train.data.max_pre_token_len
+        self.add_pre_tokens = args.train.data.add_pre_tokens
+        self.add_gd_context = args.train.data.add_gd_context
+        self.add_timing = args.train.data.add_timing
+        self.parser = OsuParser(args.train, self.tokenizer)
+        self.do_style_embed = args.train.model.do_style_embed
+        self.do_difficulty_embed = args.train.model.do_difficulty_embed
+        self.do_mapper_embed = args.train.model.do_mapper_embed
+        self.do_song_position_embed = args.train.model.do_song_position_embed
+        self.add_positions = args.train.data.add_positions
+        self.add_sv = args.train.data.add_sv
+        self.add_mania_sv = args.train.data.add_mania_sv
         self.context_types: list[dict[str, list[ContextType]]] = \
-            [{k: [ContextType(t) for t in v] for k, v in ct.items()} for ct in args.osut5.data.context_types]
+            [{k: [ContextType(t) for t in v] for k, v in ct.items()} for ct in args.train.data.context_types]
         self.add_to_beatmap = args.add_to_beatmap
         self.start_time = args.start_time
         self.end_time = args.end_time
 
         if self.add_positions:
-            self.position_precision = args.osut5.data.position_precision
-            x_min, x_max, y_min, y_max = args.osut5.data.position_range
+            self.position_precision = args.train.data.position_precision
+            x_min, x_max, y_min, y_max = args.train.data.position_range
             self.x_min = x_min // self.position_precision
             self.x_max = x_max // self.position_precision
             self.y_min = y_min // self.position_precision
@@ -151,7 +151,7 @@ class Processor(object):
         self.max_batch_size = args.max_batch_size
 
         self.timeshift_bias = args.timeshift_bias
-        self.types_first = args.osut5.data.types_first
+        self.types_first = args.train.data.types_first
 
     def model_generate(self, model_kwargs, **generate_kwargs: Any) -> Any:
         generate_kwargs2 = generate_kwargs | dict(
@@ -261,13 +261,13 @@ class Processor(object):
             if generation_config.difficulty is not None:
                 model_kwargs["difficulty"] = torch.tensor([generation_config.difficulty], dtype=torch.float32)
             else:
-                print("WARNING: Difficulty not provided. Selecting 5.0 for difficulty.")
+                # print("WARNING: Difficulty not provided. Selecting 5.0 for difficulty.")
                 model_kwargs["difficulty"] = torch.tensor([5.0], dtype=torch.float32)
         if self.do_mapper_embed:
             if generation_config.mapper_id is not None:
                 model_kwargs["mapper_idx"] = torch.tensor([self.tokenizer.get_mapper_idx(generation_config.mapper_id)], dtype=torch.long)
             else:
-                print("WARNING: Mapper ID not provided. Selecting default mapper.")
+                # print("WARNING: Mapper ID not provided. Selecting default mapper.")
                 model_kwargs["mapper_idx"] = torch.tensor([-1], dtype=torch.long)
 
         # Start generation
@@ -306,7 +306,7 @@ class Processor(object):
 
         # If we are adding to beatmap, add back the events of the reference beatmap
         if self.add_to_beatmap and (self.start_time is not None or self.end_time is not None):
-            parser = OsuParser(self.args.osut5, self.tokenizer)
+            parser = OsuParser(self.args.train, self.tokenizer)
             parser.position_precision = 1
             parser.position_split_axes = True
             for context in out_context_data:
@@ -388,6 +388,7 @@ class Processor(object):
                     ),
                     lookback_time=self.lookback_time if trim_lookback else 0,
                     lookahead_time=self.lookahead_time if trim_lookahead else 0,
+                    context_type=context["context_type"].value,
                 )
 
                 # Only support batch size 1
