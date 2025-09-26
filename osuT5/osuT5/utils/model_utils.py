@@ -2,6 +2,7 @@ import multiprocessing
 import time
 from multiprocessing.managers import Namespace
 from pathlib import Path
+from typing import Iterable
 
 import torch
 import numpy as np
@@ -92,6 +93,7 @@ def load_model(
         precision: str = "fp32",
         eval_mode: bool = True,
         pickle_module=None,
+        lora_path: str | list[str] = None,
 ):
     model_loader, tokenizer_loader = load_model_loaders(
         ckpt_path_str,
@@ -100,6 +102,7 @@ def load_model(
         precision,
         eval_mode,
         pickle_module,
+        lora_path,
     )
     return model_loader(), tokenizer_loader()
 
@@ -111,7 +114,7 @@ def load_model_loaders(
         precision: str = "fp32",
         eval_mode: bool = True,
         pickle_module=None,
-        lora_path=None,
+        lora_path: str | list[str] = None,
 ):
     if ckpt_path_str == "":
         if eval_mode:
@@ -157,7 +160,13 @@ def load_model_loaders(
                 from peft import PeftModel
             except ImportError:
                 raise ImportError("Please install the 'peft' library to use LoRA fine-tuning.")
-            model = PeftModel.from_pretrained(model, lora_path)
+            adapters, weights = parse_lora_paths(lora_path)
+            model = PeftModel.from_pretrained(model, adapters[0], adapter_name=adapters[0])
+            for adapter in adapters[1:]:
+                model.load_adapter(adapter, adapter_name=adapter)
+            weighted_adapter_name = "weighted_lora"
+            model.add_weighted_adapter(adapters, weights, adapter_name=weighted_adapter_name, combination_type="linear")
+            model.set_adapter(weighted_adapter_name)
             model = model.merge_and_unload()
             print(f"Loaded LoRA weights from {lora_path}")
 
@@ -176,6 +185,48 @@ def load_model_loaders(
         return model
 
     return model_loader, tokenizer_loader
+
+
+def parse_lora_paths(lora_input):
+    """
+    Parses a string or list of LoRA paths with optional weights.
+    Format: 'repo_id:weight' or 'local/path:weight'
+    """
+    if isinstance(lora_input, str):
+        # Split the string by commas
+        loras = lora_input.split(',')
+    elif isinstance(lora_input, Iterable):
+        loras = lora_input
+    else:
+        raise ValueError("lora_input must be a string or a list of strings.")
+
+    parsed_loras = []
+    adapters = []
+    weights = []
+    for item in loras:
+        item = item.strip()
+        if not item:
+            continue
+
+        parts = item.split(':')
+        adapter_id = parts[0]
+
+        # Check if a weight (scaling factor) is provided
+        if len(parts) > 1 and parts[1]:
+            try:
+                weight = float(parts[1])
+            except ValueError:
+                # Treat as a repository name if the part after ':' isn't a valid float
+                print(f"Warning: Could not parse '{parts[1]}' as a weight. Using default weight 1.0.")
+                weight = 1.0
+        else:
+            # Default weight is 1.0 if not specified
+            weight = 1.0
+
+        adapters.append(adapter_id)
+        weights.append(weight)
+
+    return adapters, weights
 
 
 def get_tokenizer(args: TrainConfig) -> Tokenizer:

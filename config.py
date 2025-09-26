@@ -17,7 +17,7 @@ class InferenceConfig:
     audio_path: str = ''  # Path to input audio
     output_path: str = ''  # Path to output directory
     beatmap_path: str = ''  # Path to .osu file to autofill metadata and use as reference
-    lora_path: Optional[str] = None  # Path to LoRA weights
+    lora_path: Optional[Any] = None  # Path to LoRA weights
 
     # Conditional generation settings
     gamemode: Optional[int] = None  # Gamemode of the beatmap

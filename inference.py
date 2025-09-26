@@ -464,7 +464,7 @@ def load_model_with_server(
         use_server: bool = False,
         precision: str = "fp32",
         eval_mode: bool = True,
-        lora_path=None,
+        lora_path: str | list[str] = None,
 ):
     model_loader, tokenizer_loader = load_model_loaders(
         ckpt_path_str=ckpt_path_str,
