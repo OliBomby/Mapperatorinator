@@ -498,7 +498,7 @@ class Postprocessor(object):
         """Set the slider velocity at a specific time."""
         if sv == 0:
             return timing
-        tp = TimingPoint(time, -100 / sv, 4, 2, 0, 100, None, False)
+        tp = TimingPoint(time, -100 / sv + 1E-10, 4, 2, -1, 100, None, False)
         tp_change = TimingPointsChange(tp, mpb=True)
         return tp_change.add_change(timing, True)
 

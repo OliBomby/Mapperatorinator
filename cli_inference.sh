@@ -324,6 +324,7 @@ if [ "$gamemode" -eq 3 ]; then
     prompt_input "Scroll Speed Ratio" "" scroll_speed_ratio
 fi
 print_color $BLUE "Generation Settings:"
+prompt_input "LoRA path or Hugging Face repo ID" "" lora_path
 prompt_input "CFG Scale (1-20)" "" cfg_scale
 prompt_input "Temperature (0-2)" "" temperature
 prompt_input "Top P (0-1)" "" top_p
@@ -368,7 +369,7 @@ cmd_args=("$python_executable" "inference.py")
 add_arg() {
     local key=$1
     local value=$2
-    if [ -n "$value" ]; then
+    if [ -n "$value" ] && [ "$value" != "''" ]; then
         # This format 'key=value' is robust for Hydra, even with complex values
         # like lists represented as strings: descriptors='["item1", "item2"]'
         cmd_args+=("${key}=${value}") # Removed extra quotes for direct execution
@@ -393,6 +394,7 @@ add_arg "beatmap_path" "'$beatmap_path'"
 add_arg "gamemode" "$gamemode"
 add_arg "difficulty" "$difficulty"
 add_arg "year" "$year"
+add_arg "lora_path" "'$lora_path'"
 
 # Optional numeric parameters
 add_arg "hp_drain_rate" "$hp_drain_rate"
