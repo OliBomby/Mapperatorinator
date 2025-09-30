@@ -40,7 +40,8 @@ source .venv/bin/activate
 - Python 3.10
 - [Git](https://git-scm.com/downloads)
 - [ffmpeg](http://www.ffmpeg.org/)
-- [PyTorch](https://pytorch.org/get-started/locally/): Make sure to follow the Get Started guide so you install `torch` and `torchaudio` with GPU support.
+- [CUDA](https://developer.nvidia.com/cuda-zone) (For NVIDIA GPUs) or [ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html) (For AMD GPUs on linux)
+- [PyTorch](https://pytorch.org/get-started/locally/): Make sure to follow the Get Started guide so you install `torch` and `torchaudio` with GPU support. Select the correct Compute Platform version that you have installed in the previous step.
 
 - and the remaining Python dependencies:
 
