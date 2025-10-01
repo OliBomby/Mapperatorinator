@@ -48,6 +48,21 @@ def _ansi_style_supressor(func: Callable[..., Any]) -> Callable[..., Any]:
 werkzeug.serving._ansi_style = _ansi_style_supressor(werkzeug.serving._ansi_style)
 # --- End Patch ---
 
+if hasattr(webview, "FileDialog"):
+    OPEN_DIALOG = webview.FileDialog.OPEN
+    FOLDER_DIALOG = webview.FileDialog.FOLDER
+    SAVE_DIALOG = webview.FileDialog.SAVE
+else:
+    OPEN_DIALOG = webview.OPEN_DIALOG
+    FOLDER_DIALOG = webview.FOLDER_DIALOG
+    SAVE_DIALOG = webview.SAVE_DIALOG
+
+
+def parse_file_dialog_result(result):
+    if not result:
+        return None
+    return result[0] if isinstance(result, (list, tuple)) else result
+
 app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 app.secret_key = os.urandom(24)  # Set a secret key for Flask
 
@@ -62,9 +77,9 @@ class Api:
             print("Error: No pywebview window found.")
             return None
         current_window = webview.windows[0]
-        result = current_window.create_file_dialog(webview.SAVE_DIALOG, save_filename=filename)
+        result = current_window.create_file_dialog(SAVE_DIALOG, save_filename=filename)
         print(f"File dialog result: {result}")  # Debugging
-        return result
+        return parse_file_dialog_result(result)
 
     def browse_file(self, file_types=None):
         """Opens a file dialog and returns the selected file path."""
@@ -85,9 +100,9 @@ class Api:
                 file_types=file_types
             )
         except Exception:
-            result = current_window.create_file_dialog(webview.OPEN_DIALOG)
+            result = current_window.create_file_dialog(OPEN_DIALOG)
 
-        return result[0] if result else None
+        return parse_file_dialog_result(result)
 
     def browse_folder(self):
         """Opens a folder dialog and returns the selected folder path."""
@@ -96,10 +111,10 @@ class Api:
             print("Error: No pywebview window found.")
             return None
         current_window = webview.windows[0]
-        result = current_window.create_file_dialog(webview.FOLDER_DIALOG)
+        result = current_window.create_file_dialog(FOLDER_DIALOG)
         print(f"Folder dialog result: {result}")  # Debugging
         # FOLDER_DIALOG also returns a tuple containing the path
-        return result[0] if result else None
+        return parse_file_dialog_result(result)
 
 
 # --- Shared State for Inference Process ---
