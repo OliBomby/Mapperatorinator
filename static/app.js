@@ -401,11 +401,15 @@ $(document).ready(function() {
         },
 
         attachDropdownHandler() {
-            $('.custom-dropdown-descriptors .dropdown-header').click(function() {
+            $('.custom-dropdown-descriptors .dropdown-header').on('click', function() {
                 const $dropdown = $(this).parent();
+                const dropdownContent = document.querySelector('.dropdown-content');
                 $dropdown.toggleClass('open');
                 if ($dropdown.hasClass('open')) {
-                    Utils.smoothScroll(this);
+                    Utils.smoothScroll('.custom-dropdown-descriptors');
+                    dropdownContent.removeAttribute('inert');
+                } else {
+                    dropdownContent.setAttribute('inert', '');
                 }
             });
         },
