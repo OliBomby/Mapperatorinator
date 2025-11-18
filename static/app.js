@@ -47,7 +47,10 @@ $(document).ready(function() {
                 model: 'v30', gamemode: '0', difficulty: '5', hp_drain_rate: '5',
                 circle_size: '4', keycount: '4', overall_difficulty: '8',
                 approach_rate: '9', slider_multiplier: '1.4', slider_tick_rate: '1',
-                year: '2023', cfg_scale: '1.0', temperature: '0.9', top_p: '0.9'
+                year: '2023', cfg_scale: '1.0', temperature: '0.9', top_p: '0.9',
+                // Song metadata defaults
+                title: '', artist: '', creator: '', version: '', bpm: '120',
+                offset: '0', preview_time: '-1', background_image: ''
             };
 
             Object.entries(defaults).forEach(([id, value]) => {
@@ -181,6 +184,8 @@ $(document).ready(function() {
 
                     if (browseType === 'folder') {
                         path = await window.pywebview.api.browse_folder();
+                    } else if (browseType === 'image') {
+                        path = await window.pywebview.api.browse_image();
                     } else {
                         let fileTypes = null;
 

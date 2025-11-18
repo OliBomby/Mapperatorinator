@@ -479,12 +479,16 @@ class Postprocessor(object):
         with open(output_path, "w", encoding='utf-8-sig') as osu_file:
             osu_file.write(result)
 
-    def export_osz(self, osu_path: str, audio_path: str, output_path: str):
+    def export_osz(self, osu_path: str, audio_path: str, output_path: str, background_path: str = None):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         with zipfile.ZipFile(output_path, 'w') as zipf:
             zipf.write(osu_path, os.path.basename(osu_path))
             zipf.write(audio_path, os.path.basename(audio_path))
+
+            # Add background image if provided and exists
+            if background_path and os.path.exists(background_path):
+                zipf.write(background_path, os.path.basename(background_path))
 
     @staticmethod
     def set_volume(time: timedelta, volume: int, timing: list[TimingPoint]) -> list[TimingPoint]:

@@ -82,6 +82,7 @@ class InferenceConfig:
     creator: str = ''  # Beatmap creator
     version: str = ''  # Beatmap version
     background: Optional[str] = None  # File name of background image
+    background_image_path: Optional[str] = None  # Full path to background image file
     preview_time: int = -1  # Time in milliseconds to start previewing the song
 
     # Diffusion settings

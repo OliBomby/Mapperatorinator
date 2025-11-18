@@ -449,7 +449,9 @@ def generate(
 
     if args.export_osz:
         osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
-        postprocessor.export_osz(result_path, audio_path, osz_path)
+        # Pass background image path if available
+        background_path = args.background_image_path if hasattr(args, 'background_image_path') and args.background_image_path else None
+        postprocessor.export_osz(result_path, audio_path, osz_path, background_path)
         if verbose:
             print(f"Generated .osz saved to {osz_path}")
 

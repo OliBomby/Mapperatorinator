@@ -239,6 +239,50 @@ button[type="submit"]:hover {
     width: auto;
 }
 
+/* Metadata row styling */
+.metadata-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.metadata-group {
+    flex: 1;
+    min-width: 250px;
+}
+
+.metadata-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.metadata-group input[type="text"],
+.metadata-group input[type="number"] {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+}
+
+.metadata-group input[type="text"]:focus,
+.metadata-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 5px rgba(255, 59, 63, 0.3);
+}
+
+.metadata-group input::placeholder {
+    color: #888;
+    opacity: 0.8;
+}
+
 .browse-button {
     padding: 10px 15px;
     background-color: var(--input-bg);
