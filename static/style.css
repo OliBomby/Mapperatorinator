@@ -283,6 +283,64 @@ button[type="submit"]:hover {
     opacity: 0.8;
 }
 
+/* Metadata group with browse button styling */
+.metadata-row .metadata-group .input-with-clear {
+    display: flex;
+    align-items: center;
+    position: relative;
+    margin-bottom: 0;
+}
+
+.metadata-row .metadata-group .input-with-clear input[type="text"] {
+    flex: 1;
+    padding: 8px 12px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+}
+
+.metadata-row .metadata-group .input-with-clear input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 5px rgba(255, 59, 63, 0.3);
+}
+
+.metadata-row .metadata-group .browse-button {
+    flex-shrink: 0;
+    margin-left: 10px;
+    margin-bottom: 0;
+}
+
+.metadata-browse-button {
+    padding: 8px 12px!important;
+}
+
+.metadata-row .metadata-group .clear-input-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+}
+
+.metadata-row .metadata-group .clear-input-btn:hover {
+    opacity: 1;
+}
+
 .browse-button {
     padding: 10px 15px;
     background-color: var(--input-bg);

@@ -49,7 +49,8 @@ $(document).ready(function() {
                 approach_rate: '9', slider_multiplier: '1.4', slider_tick_rate: '1',
                 year: '2023', cfg_scale: '1.0', temperature: '0.9', top_p: '0.9',
                 // Song metadata defaults
-                title: '', artist: '', creator: '', version: '', bpm: '120',
+                title: '', title_unicode: '', artist: '', artist_unicode: '',
+                creator: '', version: '', source: '', tags: '', bpm: '120',
                 offset: '0', preview_time: '-1', background_image: ''
             };
 

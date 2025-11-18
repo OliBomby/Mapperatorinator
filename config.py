@@ -78,9 +78,13 @@ class InferenceConfig:
     bpm: int = 120  # Beats per minute of input audio
     offset: int = 0  # Start of beat, in miliseconds, from the beginning of input audio
     title: str = ''  # Song title
+    title_unicode: str = ''  # Song title in Unicode/Japanese
     artist: str = ''  # Song artist
+    artist_unicode: str = ''  # Song artist in Unicode/Japanese
     creator: str = ''  # Beatmap creator
     version: str = ''  # Beatmap version
+    source: str = ''  # Source (anime, game, etc.)
+    tags: str = ''  # Tags for searching and categorizing
     background: Optional[str] = None  # File name of background image
     background_image_path: Optional[str] = None  # Full path to background image file
     preview_time: int = -1  # Time in milliseconds to start previewing the song
