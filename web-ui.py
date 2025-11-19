@@ -215,21 +215,41 @@ def start_inference():
 
         # Helper to quote values for Hydra's command-line parser
         def hydra_quote(value):
-            """Quotes a value for Hydra (handles Japanese characters and special chars)."""
-            value_str = str(value)
-            # For values with spaces, Japanese characters, or special chars, use double quotes
-            if any(c in value_str for c in [' ', '!', '#', '$', '&', '*', '(', ')', '[', ']', '{', '}', '|', '\\', ';', '"', "'", '<', '>', '?', '`']) or not value_str.isascii():
-                # Escape double quotes and backslashes within the value
-                escaped_value = value_str.replace('\\', '\\\\').replace('"', '\\"')
-                return f'"{escaped_value}"'
-            else:
+            """Quotes a value for Hydra (handles Japanese characters and special chars).
+
+            Args:
+                value: The value to quote (can contain Japanese characters)
+
+            Returns:
+                str: Properly quoted and escaped value for Hydra
+            """
+            if value is None:
+                return ""
+
+            value_str = str(value).strip()
+            if not value_str:
+                return '""'
+
+            # Check if value needs quoting (spaces, special chars, or non-ASCII characters)
+            needs_quoting = (
+                any(c in value_str for c in [' ', '!', '#', '$', '&', '*', '(', ')', '[', ']',
+                                             '{', '}', '|', '\\', ';', '"', "'", '<', '>', '?', '`', '\n', '\r', '\t']) or
+                not value_str.isascii() or
+                value_str.startswith('"') or value_str.startswith("'")
+            )
+
+            if not needs_quoting:
                 return value_str
+
+            # Escape backslashes first, then double quotes
+            escaped_value = value_str.replace('\\', '\\\\').replace('"', '\\"')
+            return f'"{escaped_value}"'
 
         # Set of keys known to be paths needing quoting for Hydra
         path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path"}
 
         # Set of keys that might contain Japanese characters
-        text_keys = {"title", "artist", "creator", "version"}
+        text_keys = {"title", "title_unicode", "artist", "artist_unicode", "creator", "version", "source", "tags"}
 
         # Helper to add argument if value exists
         def add_arg(key, value):
