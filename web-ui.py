@@ -248,6 +248,11 @@ def start_inference():
             cmd.append("export_osz=true")
         else :
             cmd.append("export_osz=false")
+
+        if 'normalize_audio' in request.form:
+            cmd.append("normalize_audio=true")
+        else:
+            cmd.append("normalize_audio=false")
         if 'add_to_beatmap' in request.form:
             cmd.append("add_to_beatmap=true")
         else:

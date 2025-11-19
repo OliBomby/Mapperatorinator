@@ -337,6 +337,9 @@ prompt_input "End Time (seconds)" "" end_time
 # 5. Boolean Options
 print_header "Export & Processing Options"
 prompt_yn "Export as .osz file?" "n" export_osz
+if [[ "$export_osz" == "true" ]]; then
+    prompt_yn "Normalize audio volume in OSZ export?" "n" normalize_audio
+fi
 prompt_yn "Add to existing beatmap?" "n" add_to_beatmap
 prompt_yn "Add hitsounds?" "n" hitsounded
 prompt_yn "Use super timing analysis?" "n" super_timing
@@ -421,6 +424,7 @@ add_arg "in_context" "$in_context_options"
 
 # Boolean parameters
 add_bool_arg "export_osz" "$export_osz"
+add_bool_arg "normalize_audio" "$normalize_audio"
 add_bool_arg "add_to_beatmap" "$add_to_beatmap"
 add_bool_arg "hitsounded" "$hitsounded"
 add_bool_arg "super_timing" "$super_timing"

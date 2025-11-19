@@ -449,7 +449,7 @@ def generate(
 
     if args.export_osz:
         osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
-        postprocessor.export_osz(result_path, audio_path, osz_path)
+        postprocessor.export_osz(result_path, audio_path, osz_path, args)
         if verbose:
             print(f"Generated .osz saved to {osz_path}")
 
