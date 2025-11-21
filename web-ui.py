@@ -246,10 +246,10 @@ def start_inference():
             return f'"{escaped_value}"'
 
         # Set of keys known to be paths needing quoting for Hydra
-        path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path"}
+        path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path", "background_image_path"}
 
         # Set of keys that might contain Japanese characters
-        text_keys = {"title", "title_unicode", "artist", "artist_unicode", "creator", "version", "source", "tags"}
+        text_keys = {"title", "title_unicode", "artist", "artist_unicode", "creator", "version", "source", "tags", "background"}
 
         # Helper to add argument if value exists
         def add_arg(key, value):
