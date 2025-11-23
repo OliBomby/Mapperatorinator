@@ -51,6 +51,7 @@ class EventType(Enum):
     DRUMROLL_END = "drumroll_end"
     DENDEN = "denden"
     DENDEN_END = "denden_end"
+    CONTROL = "control"
 
 
 class ContextType(Enum):

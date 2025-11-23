@@ -139,6 +139,7 @@ class DataConfig:
     max_year: Optional[int] = None  # Maximum year of the beatmap to include in the dataset
     frame_offset_augment_prob: float = 1.0  # Probability of augmenting beatmap sequences with frame offset
     normalize_audio: bool = True  # Normalize audio data
+    slider_version: int = 1  # Slider version to use (1 or 2)
 
 
 @dataclass
@@ -204,6 +205,8 @@ class TrainConfig:
     checkpoint_path: str = ""
     pretrained_path: str = ""
     pretrained_t5_compat: bool = False
+    enable_lora: bool = False
+    lora: dict = field(default_factory=lambda: {})
     model: ModelConfig = field(default_factory=ModelConfig)
     data: DataConfig = field(default_factory=DataConfig)
     dataloader: DataloaderConfig = field(default_factory=DataloaderConfig)

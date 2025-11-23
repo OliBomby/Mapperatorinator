@@ -1,8 +1,9 @@
 # Mapperatorinator
 
-Try the model [here](https://colab.research.google.com/github/OliBomby/Mapperatorinator/blob/main/colab/mapperatorinator_inference.ipynb). Check out a video showcase [here](https://youtu.be/FEr7t1L2EoA).
+Try the generative model [here](https://colab.research.google.com/github/OliBomby/Mapperatorinator/blob/main/colab/mapperatorinator_inference.ipynb), or MaiMod [here](https://colab.research.google.com/github/OliBomby/Mapperatorinator/blob/main/colab/mai_mod_inference.ipynb). Check out a video showcase [here](https://youtu.be/FEr7t1L2EoA).
 
-Mapperatorinator is multi-model framework that uses spectrogram inputs to generate fully featured osu! beatmaps for all gamemodes. The goal of this project is to automatically generate rankable quality osu! beatmaps from any song with a high degree of customizability.
+Mapperatorinator is multi-model framework that uses spectrogram inputs to generate fully featured osu! beatmaps for all gamemodes and [assist modding beatmaps](#maimod-the-ai-driven-modding-tool).
+The goal of this project is to automatically generate rankable quality osu! beatmaps from any song with a high degree of customizability.
 
 This project is built upon [osuT5](https://github.com/gyataro/osuT5) and [osu-diffusion](https://github.com/OliBomby/osu-diffusion). In developing this, I spent about 2500 hours of GPU compute across 142 runs on my 4060 Ti and rented 4090 instances on vast.ai.
 
@@ -39,7 +40,8 @@ source .venv/bin/activate
 - Python 3.10
 - [Git](https://git-scm.com/downloads)
 - [ffmpeg](http://www.ffmpeg.org/)
-- [PyTorch](https://pytorch.org/get-started/locally/): Make sure to follow the Get Started guide so you install `torch` and `torchaudio` with GPU support.
+- [CUDA](https://developer.nvidia.com/cuda-zone) (For NVIDIA GPUs) or [ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html) (For AMD GPUs on linux)
+- [PyTorch](https://pytorch.org/get-started/locally/): Make sure to follow the Get Started guide so you install `torch` and `torchaudio` with GPU support. Select the correct Compute Platform version that you have installed in the previous step.
 
 - and the remaining Python dependencies:
 
@@ -150,6 +152,38 @@ You can then confirm to execute it directly or cancel and copy the command for m
 - To generate hitsounds for a beatmap, use the `beatmap_path` and `in_context=[NO_HS,TIMING,KIAI]` arguments.
 - To generate only timing for a song, use the `super_timing=true` and `output_type=[TIMING]` arguments.
 
+## MaiMod: The AI-driven Modding Tool
+
+MaiMod is a modding tool for osu! beatmaps that uses Mapperatorinator predictions to find potential faults and inconsistencies which can't be detected by other automatic modding tools like [Mapset Verifier](https://github.com/Naxesss/MapsetVerifier).
+It can detect issues like:
+- Incorrect snapping or rhythmic patterns
+- Inaccurate timing points
+- Inconsistent hit object positions or new combo placements
+- Weird slider shapes
+- Inconsistent hitsounds or volumes
+
+You can try MaiMod [here](https://colab.research.google.com/github/OliBomby/Mapperatorinator/blob/main/colab/mai_mod_inference.ipynb), or run it locally:
+To run MaiMod locally, you'll need to install Mapperatorinator. Then, run the `mai_mod.py` script, specifying your beatmap's path with the `beatmap_path` argument.
+```sh
+python mai_mod.py beatmap_path="'C:\Users\USER\AppData\Local\osu!\Songs\1 Kenji Ninuma - DISCO PRINCE\Kenji Ninuma - DISCOPRINCE (peppy) [Normal].osu'"
+```
+This will print the modding suggestions to the console, which you can then apply to your beatmap manually.
+Suggestions are ordered chronologically and grouped into categories.
+The first value in the circle indicates the 'surprisal' which is a measure of how unexpected the model found the issue to be, so you can prioritize the most important issues.
+
+The model can make mistakes, especially on low surprisal issues, so always double-check the suggestions before applying them to your beatmap.
+The main goal is to help you narrow down the search space for potential issues, so you don't have to manually check every single hit object in your beatmap.
+
+### MaiMod GUI
+To run the MaiMod Web UI, you'll need to install Mapperatorinator.
+Then, run the `mai_mod_ui.py` script. This will start a local web server and automatically open the UI in a new window:
+
+```sh
+python mai_mod_ui.py
+```
+
+<img width="850" height="1019" alt="afbeelding" src="https://github.com/user-attachments/assets/67c03a43-a7bd-4265-a5b1-5e4d62aca1fa" />
+
 ## Overview
 
 ### Tokenization
@@ -239,20 +273,65 @@ Create your own dataset using the [Mapperator console app](https://github.com/ma
 Mapperator.ConsoleApp.exe dataset2 -t "/Mapperatorinator/datasets/beatmap_descriptors.csv" -i "path/to/osz/files" -o "/datasets/cool_dataset"
 ```
 
-### 3. Create docker container
+### 3. (Optional) Set-up Weight & Biases for logging
+Create an account on [Weight & Biases](https://wandb.ai/site) and get your API key from your account settings.
+Then set the `WANDB_API_KEY` environment variable, so the training process knows to log to this key.
+
+```sh
+export WANDB_API_KEY=<your_api_key>
+```
+
+### 4. Create docker container
 Training in your venv is also possible, but we recommend using Docker on WSL for better performance.
 ```sh
 docker compose up -d --force-recreate
 docker attach mapperatorinator_space
+cd Mapperatorinator
 ```
 
-### 4. Configure parameters and begin training
+### 5. Configure parameters and begin training
 
-All configurations are located in `./configs/osut5/train.yaml`. Begin training by calling `osuT5/train.py`.
+All configurations are located in `./configs/train/default.yaml`. 
+Make sure to set the correct `train_dataset_path` and `test_dataset_path` to your dataset, as well as the start and end mapset indices for train/test split.
+The path is local to the docker container, so if you placed your dataset called `cool_dataset` into the `datasets` directory, then it should be `/workspace/datasets/cool_dataset`.
+
+I recommend making a custom config file that overrides the default config, so you have a record of your training config for reproducibility.
+
+```yaml
+data:
+  train_dataset_path: "/workspace/datasets/cool_dataset"
+  test_dataset_path: "/workspace/datasets/cool_dataset"
+  train_dataset_start: 0
+  train_dataset_end: 90
+  test_dataset_start: 90
+  test_dataset_end: 100
+```
+
+Begin training by calling `python osuT5/train.py` or `torchrun --nproc_per_node=NUM_GPUS osuT5/train.py` for multi-GPU training.
+
 
 ```sh
 python osuT5/train.py -cn train_v29 train_dataset_path="/workspace/datasets/cool_dataset" test_dataset_path="/workspace/datasets/cool_dataset" train_dataset_end=90 test_dataset_start=90 test_dataset_end=100
 ```
+
+### 6. LoRA fine-tuning
+
+You can also fine-tune a pre-trained model with [LoRA](https://arxiv.org/abs/2106.09685) to adapt it to a specific style or gamemode.
+To do this, adapt `configs/train/lora.yaml` to your needs and run the `lora` training config:
+
+```sh
+python osuT5/train.py -cn lora train_dataset_path="/workspace/datasets/cool_dataset" test_dataset_path="/workspace/datasets/cool_dataset" train_dataset_end=90 test_dataset_start=90 test_dataset_end=100
+```
+
+Important LoRA parameters to consider:
+- `pretrained_path`: Path or HF repo of the base model to fine-tune.
+- `r`: Rank of the LoRA matrices. Higher values increase model capacity but also memory usage.
+- `lora_alpha`: Scaling factor for the LoRA updates.
+- `total_steps`: Total number of training steps. Balance this according to your dataset size.
+- `enable_lora`: Whether to use LoRA or full model fine-tuning.
+
+During inference, you can specify the LoRA weights to use with the `lora_path` argument.
+This can be a local path or a Hugging Face repo.
 
 ## See also
 - [Mapper Classifier](./classifier/README.md)

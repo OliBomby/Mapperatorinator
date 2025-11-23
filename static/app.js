@@ -56,14 +56,14 @@ $(document).ready(function() {
 
             // Reset checkboxes
             $('#hitsounded').prop('checked', true);
-            $('#export_osz, #add_to_beatmap, #super_timing').prop('checked', false);
+            $('#export_osz, #add_to_beatmap, #overwrite_reference_beatmap, #super_timing').prop('checked', false);
 
             // Clear descriptors and context options
             $('input[name="descriptors"], input[name="in_context_options"]')
                 .removeClass('positive-check negative-check').prop('checked', false);
 
             // Clear paths and optional fields
-            $('#audio_path, #output_path, #beatmap_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
+            $('#audio_path, #output_path, #beatmap_path, #lora_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
             PathManager.clearPlaceholders();
             PathManager.validateAndAutofillPaths(false);
         }
@@ -104,7 +104,7 @@ $(document).ready(function() {
 
             // Handle beatmap path dependent fields
             const shouldShowBeatmapFields = beatmapPath !== '';
-            ['#in-context-options-box', '#add-to-beatmap-option'].forEach(selector => {
+            ['#in-context-options-box', '#add-to-beatmap-option', '#overwrite-reference-beatmap-option'].forEach(selector => {
                 const $element = $(selector);
                 if (shouldShowBeatmapFields && !$element.is(':visible')) {
                     $element.fadeIn(AppState.animationSpeed);
@@ -112,6 +112,9 @@ $(document).ready(function() {
                     $element.fadeOut(AppState.animationSpeed);
                     if (selector === '#add-to-beatmap-option') {
                         $('#add_to_beatmap').prop('checked', false);
+                    }
+                    if (selector === '#overwrite-reference-beatmap-option') {
+                        $('#overwrite_reference_beatmap').prop('checked', false);
                     }
                 }
             });
@@ -165,10 +168,7 @@ $(document).ready(function() {
     // File Browser Manager
     const FileBrowser = {
         init() {
-            window.addEventListener('pywebviewready', () => {
-                console.log("pywebview API is ready.");
-                this.attachBrowseHandlers();
-            });
+            this.attachBrowseHandlers();
         },
 
         attachBrowseHandlers() {
@@ -227,17 +227,17 @@ $(document).ready(function() {
         init() {
             this.attachPathChangeHandlers();
             this.attachClearButtonHandlers();
-            $('#audio_path, #beatmap_path, #output_path').trigger('blur');
+            $('#audio_path, #beatmap_path, #output_path, #lora_path').trigger('blur');
         },
 
         attachPathChangeHandlers() {
             // Listen for input events (typing)
-            $('#audio_path, #beatmap_path, #output_path').on('input', (e) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('input', (e) => {
                 this.updateClearButtonVisibility(e.target);
             });
 
             // Listen for blur events (leaving field) - immediate validation
-            $('#audio_path, #beatmap_path, #output_path').on('blur', (e) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('blur', (e) => {
                 this.updateClearButtonVisibility(e.target);
                 this.validateAndAutofillPaths(false);
             });
@@ -256,7 +256,7 @@ $(document).ready(function() {
             });
 
             // Initial visibility check for all fields
-            $('#audio_path, #beatmap_path, #output_path').each((index, element) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path').each((index, element) => {
                 this.updateClearButtonVisibility(element);
             });
         },
@@ -401,11 +401,15 @@ $(document).ready(function() {
         },
 
         attachDropdownHandler() {
-            $('.custom-dropdown-descriptors .dropdown-header').click(function() {
+            $('.custom-dropdown-descriptors .dropdown-header').on('click', function() {
                 const $dropdown = $(this).parent();
+                const dropdownContent = document.querySelector('.dropdown-content');
                 $dropdown.toggleClass('open');
                 if ($dropdown.hasClass('open')) {
-                    Utils.smoothScroll(this);
+                    Utils.smoothScroll('.custom-dropdown-descriptors');
+                    dropdownContent.removeAttribute('inert');
+                } else {
+                    dropdownContent.setAttribute('inert', '');
                 }
             });
         },
@@ -541,7 +545,7 @@ $(document).ready(function() {
             if (confirm("Are you sure you want to reset all settings to default values? This cannot be undone.")) {
                 Utils.resetFormToDefaults();
                 $("#model, #gamemode, #beatmap_path").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path').trigger('blur');
+                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
                 this.showConfigStatus("All settings reset to default values", "success");
             }
         },
@@ -603,8 +607,8 @@ $(document).ready(function() {
 
                 // Trigger updates
                 $("#model, #gamemode").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path').trigger('blur');
-                $('#audio_path, #output_path, #beatmap_path').trigger('input');
+                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
+                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('input');
 
                 this.showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
 

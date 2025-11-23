@@ -1,0 +1,41 @@
+defaults:
+  - v30
+  - _self_
+
+compile: true          # PyTorch 2.0 optimization
+precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
+flash_attention: false  # Enable Flash Attention
+enable_lora: true              # Use LoRA for finetuning
+
+pretrained_path: "OliBomby/Mapperatorinator-v30"     # Path to pretrained model weights
+
+data:                  # Data settings
+  dataset_type: "mmrs"
+  train_dataset_path: ""
+  test_dataset_path: ""
+  train_dataset_start: 0
+  train_dataset_end: 38689
+  test_dataset_start: 38689
+  test_dataset_end: 39389
+
+optim:                  # Optimizer settings
+  name: muon
+  base_lr: 0.0004         # Should be scaled with the number of devices present
+  base_lr_2: 0.0001        # Secondary learning rate for the internal optimizer
+  batch_size: 32
+  grad_acc: 16
+  total_steps: 1000
+  warmup_steps: 0
+  sustain_steps: 0      # Steps to sustain the learning rate after warmup
+  weight_decay: 0.01
+  lr_scheduler: cosine
+  final_cosine: 0
+
+lora:
+  r: 64
+  lora_alpha: 128
+  target_modules: ['k_proj', 'v_proj', 'q_proj', 'out_proj']
+  lora_dropout: 0.05
+  bias: "none"
+  init_lora_weights: "pissa"
+

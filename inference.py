@@ -1,4 +1,6 @@
+import excepthook  # noqa
 import os.path
+import uuid
 from functools import reduce
 from pathlib import Path
 import random
@@ -22,7 +24,7 @@ from osuT5.osuT5.inference.server import InferenceClient
 from osuT5.osuT5.inference.super_timing_generator import SuperTimingGenerator
 from osuT5.osuT5.model import Mapperatorinator
 from osuT5.osuT5.tokenizer import Tokenizer, ContextType
-from osuT5.osuT5.utils import get_model
+from osuT5.osuT5.utils import load_model_loaders
 from osu_diffusion import DiT_models
 from osu_diffusion.config import DiffusionTrainConfig
 
@@ -129,7 +131,7 @@ def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
     if not result['success']:
         for error in result['errors']:
             print(f"Error: {error}")
-        return
+        raise ValueError("Invalid paths provided. Please check the errors above.")
 
     if not args.beatmap_path:
         # populate fair defaults for any inherited args that need to be filled
@@ -164,8 +166,11 @@ def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
 
     beatmap_path = Path(args.beatmap_path)
     beatmap = Beatmap.from_path(beatmap_path)
-    print(f"Using metadata from beatmap: {beatmap.display_name}")
 
+    if beatmap.mode not in args.train.data.gamemodes and (any(c in [ContextType.MAP, ContextType.GD, ContextType.NO_HS] for c in args.in_context) or args.add_to_beatmap):
+        raise ValueError(f"Beatmap mode {beatmap.mode} is not supported by the model. Supported modes: {args.train.data.gamemodes}")
+
+    print(f"Using metadata from beatmap: {beatmap.display_name}")
     generation_config = generation_config_from_beatmap(beatmap, tokenizer)
 
     if args.gamemode is None:
@@ -226,6 +231,8 @@ def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
 
 def get_tags_dict(args: DictConfig | InferenceConfig):
     return dict(
+        model=args.model_path,
+        lora=args.lora_path,
         lookback=args.lookback,
         lookahead=args.lookahead,
         beatmap_id=args.beatmap_id,
@@ -402,7 +409,7 @@ def generate(
             timing = postprocessor.generate_timing(events)
 
         # Resnap timing events
-        if timing is not None:
+        if args.resnap_events and timing is not None:
             events = postprocessor.resnap_events(events, timing)
     else:
         events = timing_events
@@ -423,68 +430,57 @@ def generate(
         timing=timing,
     )
 
+    if args.add_to_beatmap:
+        result = postprocessor.add_to_beatmap(result, beatmap_path)
+        if verbose:
+            print(f"Merged generated content with reference beatmap")
+
     result_path = None
     osz_path = None
-    if args.add_to_beatmap:
-        result_path = postprocessor.add_to_beatmap(result, beatmap_path)
-        if verbose:
-            print(f"Added generated content to {result_path}")
-    elif output_path is not None and output_path != "":
-        result_path = postprocessor.write_result(result, output_path)
+
+    if output_path is not None and output_path != "":
+        if args.add_to_beatmap and args.overwrite_reference_beatmap:
+            result_path = beatmap_path
+        else:
+            result_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osu")
+        postprocessor.write_result(result, result_path)
         if verbose:
             print(f"Generated beatmap saved to {result_path}")
 
     if args.export_osz:
-        osz_path = postprocessor.export_osz(result_path, audio_path, output_path)
+        osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
+        postprocessor.export_osz(result_path, audio_path, osz_path)
         if verbose:
             print(f"Generated .osz saved to {osz_path}")
 
     return result, result_path, osz_path
 
 
-def load_model(
+def load_model_with_server(
         ckpt_path_str: str,
         t5_args: TrainConfig,
         device,
         max_batch_size: int = 8,
         use_server: bool = False,
+        precision: str = "fp32",
+        eval_mode: bool = True,
+        lora_path=None,
 ):
-    if ckpt_path_str == "":
-        raise ValueError("Model path is empty.")
-
-    ckpt_path = Path(ckpt_path_str)
-
-    def tokenizer_loader():
-        if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
-            tokenizer = Tokenizer.from_pretrained(ckpt_path_str)
-        else:
-            tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=routed_pickle, weights_only=False)
-            tokenizer = Tokenizer()
-            tokenizer.load_state_dict(tokenizer_state)
-        return tokenizer
-
-    tokenizer = tokenizer_loader()
-
-    def model_loader():
-        if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
-            model = Mapperatorinator.from_pretrained(ckpt_path_str)
-            model.generation_config.disable_compile = True
-        else:
-            model_state = torch.load(ckpt_path / "pytorch_model.bin", map_location=device, weights_only=True)
-            model = get_model(t5_args, tokenizer)
-            model.load_state_dict(model_state)
-
-        model.eval()
-        model.to(device)
-        print(f"Model loaded: {ckpt_path_str} on device {device}")
-        return model
-
+    model_loader, tokenizer_loader = load_model_loaders(
+        ckpt_path_str=ckpt_path_str,
+        t5_args=t5_args,
+        device=device,
+        precision=precision,
+        eval_mode=eval_mode,
+        pickle_module=routed_pickle,
+        lora_path=lora_path,
+    )
     return InferenceClient(
         model_loader,
         tokenizer_loader,
         max_batch_size=max_batch_size,
         socket_path=get_server_address(ckpt_path_str),
-    ) if use_server else model_loader(), tokenizer
+    ) if use_server else model_loader(), tokenizer_loader()
 
 
 def get_server_address(ckpt_path_str: str):
@@ -532,7 +528,15 @@ def load_diff_model(
 def main(args: InferenceConfig):
     prepare_args(args)
 
-    model, tokenizer = load_model(args.model_path, args.train, args.device, args.max_batch_size, args.use_server)
+    model, tokenizer = load_model_with_server(
+        args.model_path,
+        args.train,
+        args.device,
+        max_batch_size=args.max_batch_size,
+        use_server=args.use_server,
+        precision=args.precision,
+        lora_path=args.lora_path,
+    )
 
     diff_model, diff_tokenizer, refine_model = None, None, None
     if args.generate_positions:

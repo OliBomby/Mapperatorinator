@@ -110,6 +110,15 @@
             <!-- Advanced Settings -->
             <fieldset>
                 <legend>Advanced Settings</legend>
+                <label for="lora_path" title="Path to folder or HuggingFace repository with LoRA weights and config. This can be used to tweak the style of the model beyond its usual capabilities.">LoRA Path or ID:</label>
+                <div class="path-input-group" style="margin-bottom: 0;">
+                    <div class="input-with-clear">
+                        <input type="text" id="lora_path" name="lora_path" />
+                        <button type="button" class="clear-input-btn" data-target="lora_path" style="display: none;">×</button>
+                    </div>
+                    <button type="button" class="browse-button" data-browse-type="folder" data-target="lora_path">Browse...</button>
+                </div>
+
                 <label for="mapper_id" title="Mapper user ID for style">Mapper ID:</label>
                 <input type="text" id="mapper_id" name="mapper_id" />
 
@@ -161,7 +170,12 @@
 
                 <div class="option-item conditional-field" id="add-to-beatmap-option" style="display: none;">
                     <input type="checkbox" id="add_to_beatmap" name="add_to_beatmap" value="false" />
-                    <label for="add_to_beatmap" title="Whether to add generated content to the reference beatmap instead of making a new beatmap">Add to Beatmap</label>
+                    <label for="add_to_beatmap" title="Whether to merge the generated content with the reference beatmap">Add to Beatmap</label>
+                </div>
+
+                <div class="option-item conditional-field" id="overwrite-reference-beatmap-option" style="display: none;">
+                    <input type="checkbox" id="overwrite_reference_beatmap" name="overwrite_reference_beatmap" value="false" />
+                    <label for="overwrite_reference_beatmap" title="Whether to overwrite the reference beatmap file instead of creating a new file">Overwrite Reference Beatmap</label>
                 </div>
 
                 <div class="option-item conditional-field" id="option-item-hitsounded" data-hide-for-model="v30">
@@ -177,13 +191,11 @@
 
             <!-- Descriptors -->
             <div class="custom-dropdown-descriptors conditional-field" data-hide-for-model="v30">
-                <div class="dropdown-header">
-                    <div>
-                        <span class="dropdown-title" title="List of descriptors for style (1 click = include, 2 clicks = exclude)">Descriptors</span>
-                    </div>
+                <button class="dropdown-header">
+                    <span class="dropdown-title" title="List of descriptors for style (1 click = include, 2 clicks = exclude)">Descriptors</span>
                     <span class="dropdown-arrow">&#9660;</span>
-                </div>
-                <div class="dropdown-content">
+                </button>
+                <div class="dropdown-content" inert>
                     <div class="descriptors-container">
                         {% set descriptor_groups = [
                         { "title": "General", "items": [

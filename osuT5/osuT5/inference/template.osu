@@ -5,17 +5,19 @@ AudioFilename: $audio_filename
 AudioLeadIn: 0
 PreviewTime: $preview_time
 Countdown: 0
-SampleSet: Soft
+SampleSet: All
 StackLeniency: 0.7
 Mode: $mode
 LetterboxInBreaks: 0
 WidescreenStoryboard: 1
+OverlayPosition: Above
 
 [Editor]
+Bookmarks:-330001
 DistanceSpacing: 1.0
 BeatDivisor: 4
 GridSize: 8
-TimelineZoom: 1
+TimelineZoom: 2.20004
 
 [Metadata]
 Title:$title

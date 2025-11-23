@@ -131,3 +131,53 @@ class LookbackBiasLogitsWarper(LogitsProcessor):
 
         self.last_scores = scores
         return scores_processed
+
+
+class MonotonicTimeShiftLogitsProcessor(LogitsProcessor):
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+        self.time_shift_start = tokenizer.event_start[EventType.TIME_SHIFT]
+        self.time_shift_end = tokenizer.event_end[EventType.TIME_SHIFT]
+        self.sos_ids = torch.tensor([tokenizer.sos_id] + list(getattr(tokenizer, "context_sos", {}).values()))
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        device = input_ids.device
+        batch_size, seq_len = input_ids.shape
+        self.sos_ids = self.sos_ids.to(device)
+
+        # Create masks for time_shift and sos tokens
+        is_time_shift = (input_ids >= self.time_shift_start) & (input_ids < self.time_shift_end)
+        is_sos = torch.isin(input_ids, self.sos_ids)
+
+        # Create a sequence of indices [0, 1, ..., seq_len-1]
+        indices = torch.arange(seq_len, device=device).expand(batch_size, -1)
+
+        # Find the index of the last occurrence of each event type
+        # If not found, it will be -1
+        last_time_shift_idx = torch.max(torch.where(is_time_shift, indices, -1), dim=1).values
+        last_sos_idx = torch.max(torch.where(is_sos, indices, -1), dim=1).values
+
+        # Get the value of the last time_shift token for each sequence
+        # If no time_shift token, value is 0
+        last_time_shift_values = torch.where(
+            last_time_shift_idx != -1,
+            input_ids[torch.arange(batch_size), last_time_shift_idx] - self.time_shift_start,
+            0
+        )
+
+        # Determine which sequences in the batch need masking
+        # Mask if a time_shift token was found and it did not appear after the last SOS token
+        apply_mask = (last_time_shift_idx != -1) & (last_time_shift_idx > last_sos_idx)
+
+        # Create the mask for invalid time_shift tokens
+        time_shift_vocab = torch.arange(self.time_shift_start, self.time_shift_end, device=device)
+        # Shape: (batch_size, num_time_shift_tokens)
+        invalid_mask = time_shift_vocab.unsqueeze(0) < (self.time_shift_start + last_time_shift_values).unsqueeze(1)
+
+        # Apply the mask to the scores for the relevant sequences
+        # Shape: (batch_size, vocab_size)
+        batch_mask = torch.full_like(scores, False, dtype=torch.bool)
+        batch_mask[:, self.time_shift_start:self.time_shift_end] = invalid_mask
+        scores[apply_mask] = scores[apply_mask].masked_fill(batch_mask[apply_mask], -torch.inf)
+
+        return scores

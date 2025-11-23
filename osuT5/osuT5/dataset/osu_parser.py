@@ -34,8 +34,9 @@ class OsuParser:
             dist_range = tokenizer.event_range[EventType.DISTANCE]
             self.dist_min = dist_range.min_value
             self.dist_max = dist_range.max_value
+        self.slider_version = args.data.slider_version
 
-    def parse(self, beatmap: Beatmap, speed: float = 1.0) -> tuple[list[Event], list[int]]:
+    def parse(self, beatmap: Beatmap, speed: float = 1.0, song_length: Optional[float] = None) -> tuple[list[Event], list[int]]:
         # noinspection PyUnresolvedReferences
         """Parse an .osu beatmap.
 
@@ -45,6 +46,7 @@ class OsuParser:
         Args:
             beatmap: Beatmap object parsed from an .osu file.
             speed: Speed multiplier for the beatmap.
+            song_length: Length of the song in milliseconds. If not provided, it will be calculated from the beatmap.
 
         Returns:
             events: List of Event object lists.
@@ -102,7 +104,7 @@ class OsuParser:
             result = merge_events(kiai_events, result)
 
         if self.add_timing:
-            timing_events = self.parse_timing(beatmap)
+            timing_events = self.parse_timing(beatmap, song_length=song_length)
             result = merge_events(timing_events, result)
 
         if speed != 1.0:
@@ -178,13 +180,14 @@ class OsuParser:
 
         events = []
         event_times = []
-        if song_length is None and isinstance(beatmap, Beatmap):
+        if isinstance(beatmap, Beatmap) and len(beatmap.hit_objects(stacking=False)) > 0:
             last_ho = beatmap.hit_objects(stacking=False)[-1]
             last_time = last_ho.end_time if hasattr(last_ho, "end_time") else last_ho.time
+            last_time = last_time.total_seconds() * 1000 + 0.999  # Add a small buffer to the last time
         elif song_length is not None:
-            last_time = timedelta(milliseconds=song_length)
+            last_time = song_length
         else:
-            last_time = timing[-1].offset + timedelta(minutes=10)
+            last_time = timing[-1].offset.total_seconds() * 1000 + 10
 
         # Get all timing points with BPM changes
         timing_points = [tp for tp in timing if tp.bpm]
@@ -192,10 +195,11 @@ class OsuParser:
         for i, tp in enumerate(timing_points):
             # Generate beat and measure events until the next timing point
             next_tp = timing_points[i + 1] if i + 1 < len(timing_points) else None
-            next_time = next_tp.offset - timedelta(milliseconds=10) if next_tp else last_time
-            time = tp.offset
+            next_time = next_tp.offset.total_seconds() * 1000 - 10 if next_tp else last_time
+            start_time = tp.offset.total_seconds() * 1000
+            time = start_time
             measure_counter = 0
-            beat_delta = timedelta(milliseconds=tp.ms_per_beat)
+            beat_delta = tp.ms_per_beat
             while time <= next_time:
                 if self.add_timing_points and measure_counter == 0:
                     event_type = EventType.TIMING_POINT
@@ -206,7 +210,7 @@ class OsuParser:
 
                 self._add_group(
                     event_type,
-                    time,
+                    timedelta(milliseconds=time),
                     events,
                     event_times,
                     beatmap,
@@ -215,7 +219,7 @@ class OsuParser:
                 )
 
                 measure_counter += 1
-                time += beat_delta
+                time = int(start_time + measure_counter * beat_delta)
 
         if speed != 1.0:
             events, event_times = speed_events((events, event_times), speed)
@@ -252,7 +256,7 @@ class OsuParser:
             events: List of events to add to.
             add_snap: Whether to add a snapping event.
         """
-        time_ms = int(time.total_seconds() * 1000)
+        time_ms = int(time.total_seconds() * 1000 + 1e-5)
         events.append(Event(EventType.TIME_SHIFT, time_ms))
         event_times.append(time_ms)
 
@@ -305,7 +309,7 @@ class OsuParser:
                 int(np.clip(p[1], self.y_min / self.position_precision, self.y_max / self.position_precision)))
 
     def _add_position_event(self, pos: npt.NDArray, last_pos: npt.NDArray, time: timedelta, events: list[Event], event_times: list[int]) -> npt.NDArray:
-        time_ms = int(time.total_seconds() * 1000)
+        time_ms = int(time.total_seconds() * 1000 + 1e-5)
         if self.add_distances:
             dist = self._clip_dist(np.linalg.norm(pos - last_pos))
             events.append(Event(EventType.DISTANCE, dist))
@@ -328,7 +332,7 @@ class OsuParser:
         return pos
 
     def _add_mania_column_event(self, pos: npt.NDArray, columns: int, time: timedelta, events: list[Event], event_times: list[int]) -> None:
-        time_ms = int(time.total_seconds() * 1000)
+        time_ms = int(time.total_seconds() * 1000 + 1e-5)
         column = int(np.clip(pos[0] / 512 * columns, 0, columns - 1))
         events.append(Event(EventType.MANIA_COLUMN, column))
         event_times.append(time_ms)
@@ -352,7 +356,7 @@ class OsuParser:
             scroll_speed: Optional[float] = None,
     ) -> npt.NDArray:
         """Add a group of events to the event list."""
-        time_ms = int(time.total_seconds() * 1000) if time is not None else None
+        time_ms = int(time.total_seconds() * 1000 + 1e-5) if time is not None else None
 
         if isinstance(event, EventType):
             event = Event(event)
@@ -452,7 +456,7 @@ class OsuParser:
         def add_anchor(event_type: EventType, i: int, last_pos: npt.NDArray) -> npt.NDArray:
             return self._add_group(
                 event_type,
-                slider.time + i / (control_point_count - 1) * duration,
+                slider.time + i / (control_point_count - 1) * duration if self.slider_version == 1 else slider.time,
                 events,
                 event_times,
                 beatmap,
@@ -473,6 +477,18 @@ class OsuParser:
                 elif slider.curve.points[i] != slider.curve.points[i - 1]:
                     last_pos = add_anchor(EventType.BEZIER_ANCHOR, i, last_pos)
 
+        if self.slider_version == 2:
+            # Add last control point without time
+            last_pos = self._add_group(
+                EventType.LAST_ANCHOR,
+                slider.time,
+                events,
+                event_times,
+                beatmap,
+                pos=np.array(slider.curve.points[-1]),
+                last_pos=last_pos,
+            )
+
         # Add body hitsounds and remaining edge hitsounds
         last_pos = self._add_group(
             EventType.LAST_ANCHOR,
@@ -481,7 +497,7 @@ class OsuParser:
             event_times,
             beatmap,
             time_event=True,
-            pos=np.array(slider.curve.points[-1]),
+            pos=np.array(slider.curve.points[-1]) if self.slider_version == 1 else None,
             last_pos=last_pos,
             hitsound_ref_times=[slider.time + timedelta(milliseconds=1)] + [slider.time + i * duration for i in range(1, slider.repeat)],
             hitsounds=[slider.hitsound] + [slider.edge_sounds[i] if len(slider.edge_sounds) > i else 0 for i in range(1, slider.repeat)],
