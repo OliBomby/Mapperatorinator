@@ -389,6 +389,7 @@ def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: 
 @hydra.main(config_path="configs", config_name="calc_fid", version_base="1.1")
 def main(args: FidConfig):
     prepare_args(args)
+    print(f"Logging to directory: {os.getcwd()}")
 
     # Fix inference model path
     if args.inference.model_path.startswith("./"):

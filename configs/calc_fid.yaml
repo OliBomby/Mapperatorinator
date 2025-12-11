@@ -7,7 +7,7 @@ compile: false
 num_processes: 32
 seed: 0
 
-skip_generation: false
+skip_generation: true
 fid: true
 rhythm_stats: true
 
@@ -37,7 +37,7 @@ hydra:
     chdir: True
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/test
+    dir: ./logs_fid/sweeps/test_1/inference=tiny_dist17
   sweep:
     dir: ./logs_fid/sweeps/test_3
     subdir: ${hydra.job.override_dirname}
