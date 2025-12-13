@@ -1,0 +1,16 @@
+defaults:
+  - base_mai_mod
+  - inference: v30
+  - _self_
+  - override hydra/hydra_logging: disabled
+  - override hydra/job_logging: disabled
+
+beatmap_path: ''
+audio_path: ''
+raw_output: false
+precision: 'amp'         # Lower precision for speed (fp32/bf16/amp)
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .

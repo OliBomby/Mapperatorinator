@@ -145,6 +145,7 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
         inputs_embeds = None
         if encoder_outputs is None and frames is not None:
             frames = self.spectrogram(frames)  # (N, L, M)
+            frames = frames.to(dtype=self.transformer.dtype)  # Ensure correct dtype for the model
             conds = []
 
             if self.do_style_embed:
@@ -198,7 +199,6 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
         past_key_values=None,
         use_cache=None,
         encoder_outputs=None,
-        beatmap_idx=None,
         decoder_attention_mask=None,
         cache_position=None,
         negative_prompt=None,
@@ -215,9 +215,10 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
                 if negative_prompt_attention_mask is not None:
                     decoder_attention_mask[:decoder_attention_mask.shape[0] // 2, :negative_prompt_attention_mask.shape[1]] = negative_prompt_attention_mask
 
-            encoder_outputs = BaseModelOutput(last_hidden_state=encoder_outputs.last_hidden_state.repeat((2, 1, 1)))
+            if encoder_outputs is not None:
+                encoder_outputs = BaseModelOutput(last_hidden_state=encoder_outputs.last_hidden_state.repeat((2, 1, 1)))
 
-        inputs = self.transformer.prepare_inputs_for_generation(
+        model_inputs = self.transformer.prepare_inputs_for_generation(
             input_ids=decoder_input_ids,
             decoder_input_ids=decoder_input_ids,
             past_key_values=past_key_values,
@@ -228,8 +229,12 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
             **kwargs,
         )
 
-        inputs["beatmap_idx"] = beatmap_idx
-        return inputs
+        # 7. Forward ALL kwargs that are uninitialized (e.g. `beatmap_idx`).
+        for key, value in kwargs.items():
+            if key not in model_inputs:
+                model_inputs[key] = value
+
+        return model_inputs
 
     def _prepare_decoder_input_ids_for_generation(
         self,
@@ -344,6 +349,7 @@ class OsuTEncoder(nn.Module):
             beatmap_idx = torch.full([batch_size], self.num_classes, dtype=torch.long, device=device)
 
         frames = self.spectrogram(frames)  # (N, L, M)
+        frames = frames.to(dtype=self.base.dtype)  # Ensure correct dtype for the model
         conds = []
 
         if self.do_style_embed:

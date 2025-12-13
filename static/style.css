@@ -1,1215 +1,739 @@
-/* CSS Variables for dark mode & red accents */
 :root {
-  --bg-color: #121212;
-  --text-color: #e0e0e0;
-  --accent-color: #ff3b3f;
-  --card-bg: #1e1e1e;
-  --border-color: #333;
-  --input-bg: #2a2a2a;
-  --select-bg: #1e1e1e;
-  --transition-speed: 0.35s;
-  --gradient-red: linear-gradient(135deg, #ff3b3f, #e03234, #ff3b3f);
+    --bg-color: #121212;
+    --text-color: #e0e0e0;
+    --accent-color: #ff3b3f;
+    --card-bg: #1e1e1e;
+    --border-color: #333;
+    --input-bg: #2a2a2a;
+    --select-bg: #1e1e1e;
+    --transition-speed: 0.35s;
+    --gradient-red: linear-gradient(135deg, #ff3b3f, #e03234, #ff3b3f);
 }
 
-/* Global Styles */
 * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 body {
-  font-family: 'Roboto', sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  line-height: 1.6;
-  padding: 20px;
-  overflow-x: hidden;
-  position: relative;
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    padding: 20px;
+    overflow-x: hidden;
+    position: relative;
 }
 
-/* Background animation with gradient shifts */
-.background-animation {
-  position: fixed;
-  top: -25%;
-  left: -25%;
-  width: 150%;
-  height: 150%;
-  background: radial-gradient(circle at center, rgba(255, 59, 63, 0.1), rgba(0, 0, 0, 0.95));
-  filter: blur(10px);
-  z-index: -2;
-  animation: backgroundShift 25s ease-in-out infinite alternate;
-}
-
-@keyframes backgroundShift {
-  0% {
-    transform: translate(0, 0) scale(1.1);
-  }
-
-  100% {
-    transform: translate(5%, 5%) scale(1.1);
-  }
-}
-
-/* Particle background elements for extra life */
-.particle-container {
-  pointer-events: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-}
-
-.particle {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  background-color: var(--accent-color);
-  border-radius: 50%;
-  opacity: 0.6;
-  animation: particleFloat 6s linear infinite;
-}
-
-.particle:nth-child(1) {
-  top: 20%;
-  left: 10%;
-  animation-duration: 7s;
-}
-
-.particle:nth-child(2) {
-  top: 50%;
-  left: 80%;
-  animation-duration: 9s;
-}
-
-.particle:nth-child(3) {
-  top: 75%;
-  left: 40%;
-  animation-duration: 8s;
-}
-
-.particle:nth-child(4) {
-  top: 30%;
-  left: 65%;
-  animation-duration: 10s;
-}
-
-.particle:nth-child(5) {
-  top: 60%;
-  left: 20%;
-  animation-duration: 7.5s;
-}
-
-@keyframes particleFloat {
-  0% {
-    transform: translateY(0) scale(0.9);
-    opacity: 0.8;
-  }
-
-  50% {
-    transform: translateY(-15px) scale(1.1);
-    opacity: 0.6;
-  }
-
-  100% {
-    transform: translateY(0) scale(0.9);
-    opacity: 0.8;
-  }
-}
-
-/* Link Styles with animated underline */
 a {
-  color: var(--accent-color);
-  text-decoration: none;
-  position: relative;
+    color: var(--accent-color);
+    text-decoration: none;
+    position: relative;
 }
 
 a::after {
-  content: "";
-  position: absolute;
-  width: 0%;
-  height: 2px;
-  bottom: -2px;
-  left: 0;
-  background: var(--accent-color);
-  transition: width var(--transition-speed) ease;
+    content: "";
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -2px;
+    left: 0;
+    background: var(--accent-color);
+    transition: width var(--transition-speed) ease;
 }
 
 a:hover::after {
-  width: 100%;
+    width: 100%;
 }
 
-/* Headings with fade in down animation */
-h1,
-h2,
-h3 {
-  margin-bottom: 10px;
-  animation: fadeInDown var(--transition-speed) ease-in-out;
+h1, h2, h3 {
+    margin-bottom: 10px;
+    animation: fadeInDown var(--transition-speed) ease-in-out;
 }
 
-/* Container Styles */
 .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  animation: fadeIn 0.6s ease-in-out;
-  position: relative;
-  z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    animation: fadeIn 0.6s ease-in-out;
+    position: relative;
+    z-index: 1;
 }
 
-/* Card style for form sections and general containers */
 .card {
-  background-color: var(--card-bg);
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  transition: transform var(--transition-speed), box-shadow var(--transition-speed), border var(--transition-speed);
-  position: relative;
-  overflow: hidden;
+    background-color: var(--card-bg);
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed), border var(--transition-speed);
+    position: relative;
+    overflow: hidden;
 }
 
 .card::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: var(--gradient-red);
-  opacity: 0;
-  transition: opacity 0.6s, transform 0.6s;
-  z-index: -1;
-  transform: rotate(45deg) scale(0.5);
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: var(--gradient-red);
+    opacity: 0;
+    transition: opacity 0.6s, transform 0.6s;
+    z-index: -1;
+    transform: rotate(45deg) scale(0.5);
 }
 
 .card:hover {
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--accent-color);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--accent-color);
 }
 
 .card:hover::before {
-  opacity: 0.15;
-  transform: rotate(45deg) scale(1);
+    opacity: 0.15;
+    transform: rotate(45deg) scale(1);
 }
 
-/* Form Styles */
 form {
-  display: grid;
-  grid-gap: 20px;
+    display: grid;
+    grid-gap: 20px;
 }
 
 fieldset {
-  border: none;
-  margin-bottom: 15px;
-  padding: 10px;
-  animation: slideIn 0.6s ease-out;
+    border: none;
+    margin-bottom: 15px;
+    padding: 10px;
+    animation: slideIn 0.6s ease-out;
 }
 
 legend {
-  font-size: 1.2em;
-  margin-bottom: 10px;
-  padding-bottom: 5px;
-  border-bottom: 2px solid var(--accent-color);
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid var(--accent-color);
 }
 
-/* Labels */
 label {
-  display: block;
-  margin-bottom: 2px;
-  margin-top: 5px;
-  transition: color var(--transition-speed);
+    display: block;
+    margin-bottom: 2px;
+    margin-top: 5px;
+    transition: color var(--transition-speed);
 }
 
-/* Input, Select Styles with enhanced focus glow */
 input[type="text"],
 input[type="number"],
 select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--input-bg);
-  color: var(--text-color);
-  transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
 }
 
 input[type="text"]:focus,
 input[type="number"]:focus,
+input[type="checkbox"]:focus,
+button:focus,
 select:focus {
-  outline: none;
-  border-color: var(--accent-color);
-  box-shadow: 0 0 8px var(--accent-color);
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 8px var(--accent-color);
 }
 
-/* Custom checkbox styling for dark tone */
 input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  margin-right: 10px;
-  border: 2px solid var(--border-color);
-  border-radius: 3px;
-  background: var(--input-bg);
-  cursor: pointer;
-  vertical-align: middle;
-  position: relative;
-  transition: background var(--transition-speed), border-color var(--transition-speed);
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-right: 10px;
+    border: 2px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--input-bg);
+    cursor: pointer;
+    vertical-align: middle;
+    position: relative;
+    transition: background var(--transition-speed), border-color var(--transition-speed);
 
-  /* Flexbox centering */
-  display: inline-flex;
-  /* Treat as an inline-level flex container */
-  align-items: center;
-  /* Center content vertically */
-  justify-content: center;
-  /* Center content horizontally */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* Default checked state (will be overridden by positive/negative) */
 input[type="checkbox"]:checked {
-  background: var(--accent-color);
-  /* Fallback, should be overridden */
-  border-color: var(--accent-color);
+    background: var(--accent-color);
+    border-color: var(--accent-color);
 }
 
 input[type="checkbox"]:checked::after {
-  content: "✓";
-  /* Default checkmark */
-  font-size: 16px;
-  line-height: 1;
-  color: var(--bg-color);
-  font-weight: bold;
-  /* Ensure the pseudo-element is treated as a flex item */
-  display: block;
-  /* Or inline, depending on final visual tuning */
+    content: "✓";
+    font-size: 16px;
+    line-height: 1;
+    color: var(--bg-color);
+    font-weight: bold;
+    display: block;
 }
 
-/* Positive State (Green Check) */
 input[type="checkbox"].positive-check {
-  background: #2e7d32;
-  /* Green background */
-  border-color: #4caf50;
-  /* Lighter green border */
+    background: #2e7d32;
+    border-color: #4caf50;
 }
 
 input[type="checkbox"].positive-check::after {
-  content: "✓";
-  /* Checkmark */
-  color: #e0e0e0;
-  /* Light text color for contrast */
+    content: "✓";
+    color: #e0e0e0;
 }
 
-/* Negative State (Red X) */
 input[type="checkbox"].negative-check {
-  background: #c62828;
-  /* Red background */
-  border-color: #f44336;
-  /* Lighter red border */
+    background: #c62828;
+    border-color: #f44336;
 }
 
 input[type="checkbox"].negative-check::after {
-  content: "✕";
-  /* Cross mark */
-  color: #e0e0e0;
-  /* Light text color for contrast */
-  font-weight: bold;
+    content: "✕";
+    color: #e0e0e0;
+    font-weight: bold;
 }
 
-/* Checkbox/option alignment */
 .option-item,
 .descriptor-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
 }
 
-/* Button Styles */
 button[type="submit"] {
-  background-color: var(--accent-color);
-  color: var(--bg-color);
-  border: none;
-  padding: 12px 25px;
-  border-radius: 4px;
-  font-size: 1em;
-  cursor: pointer;
-  transition: background-color var(--transition-speed), transform 0.3s;
+    background-color: var(--accent-color);
+    color: var(--bg-color);
+    border: none;
+    padding: 12px 25px;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color var(--transition-speed), transform 0.3s;
 }
 
 button[type="submit"]:hover {
-  background-color: #e03234;
-  transform: scale(1.02);
+    background-color: #e03234;
+    transform: scale(1.02);
 }
 
-/* --- New Styles for Path Input Group and Browse Button --- */
-
-/* Style the container for label, input, and browse button */
 .path-input-group {
-  display: flex;
-  align-items: center;
-  /* Vertically align items */
-  gap: 10px;
-  /* Space between elements */
-  margin-bottom: 15px;
-  /* Consistent spacing below the group */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
-/* Adjust label width and remove default bottom margin */
 .path-input-group label {
-  flex-shrink: 0;
-  /* Prevent label from shrinking */
-  margin-bottom: 0;
-  width: 100px;
-  /* Fixed width for alignment */
+    flex-shrink: 0;
+    margin-bottom: 0;
+    width: 100px;
 }
 
-/* Allow input field to take available space */
 .path-input-group input[type="text"] {
-  flex-grow: 1;
-  /* Take remaining width */
-  width: auto;
-  /* Override default 100% width */
+    flex-grow: 1;
+    width: auto;
 }
 
-/* Style the Browse button */
 .browse-button {
-  padding: 10px 15px;
-  /* Adjust padding */
-  background-color: var(--input-bg);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  /* Match input fields */
-  cursor: pointer;
-  outline: none;
-  font-family: inherit;
-  /* Inherit font from body */
-  transition: background-color var(--transition-speed), border-color var(--transition-speed), box-shadow var(--transition-speed), transform var(--transition-speed);
-  /* Default red glow */
-  box-shadow: 0 0 6px rgba(255, 59, 63, 0.7);
-  flex-shrink: 0;
-  /* Prevent button shrinking */
+    padding: 10px 15px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+    transition: background-color var(--transition-speed), border-color var(--transition-speed), box-shadow var(--transition-speed), transform var(--transition-speed);
+    box-shadow: 0 0 3px var(--accent-color);
+    flex-shrink: 0;
 }
 
-/* Style the Browse button on hover */
 .browse-button:hover {
-  background-color: var(--accent-color);
-  border-color: var(--accent-color);
-  color: var(--bg-color);
-  /* Contrast text color on hover */
-  box-shadow: none;
-  /* Remove glow on hover */
-  transform: scale(1.03);
-  /* Slight scale effect */
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: var(--bg-color);
+    box-shadow: none;
+    transform: scale(1.03);
 }
 
-/* --- End New Styles --- */
+.browse-button:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 8px var(--accent-color);
+}
 
-/* Flash messages */
 .flash-messages .alert {
-  padding: 10px;
-  margin-bottom: 10px;
-  border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
 }
 
 .flash-messages .alert.success {
-  background-color: #2e7d32;
-  color: #fff;
+    background-color: #2e7d32;
+    color: #fff;
 }
 
 .flash-messages .alert.error {
-  background-color: #c62828;
-  color: #fff;
+    background-color: #c62828;
+    color: #fff;
 }
 
-/* Descriptors container styling */
 .descriptors-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  justify-content: center;
-  /* Center the groups horizontally */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
 }
 
 .descriptor-group {
-  flex: 1 1 200px;
-  background-color: #222;
-  padding: 10px;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  transition: transform var(--transition-speed), box-shadow 0.3s;
+    flex: 1 1 200px;
+    background-color: #222;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    transition: transform var(--transition-speed), box-shadow 0.3s;
 }
 
 .descriptor-group:hover {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
-/* Progress bar container and bar styling (static, no slider-like jumping) */
 #progressBarContainer {
-  width: 100%;
-  background-color: #333;
-  border-radius: 5px;
-  margin: 10px 0;
-  overflow: hidden;
+    width: 100%;
+    background-color: #333;
+    border-radius: 5px;
+    margin: 10px 0;
+    overflow: hidden;
 }
 
 #progressBar {
-  width: 0%;
-  height: 20px;
-  background: linear-gradient(90deg, var(--accent-color), #e03234);
-  border-radius: 5px;
-  transition: width 0.35s ease, background 0.35s ease;
+    width: 0;
+    height: 20px;
+    background: linear-gradient(90deg, var(--accent-color), #e03234);
+    border-radius: 5px;
+    transition: width 0.35s ease, background 0.35s ease;
 }
 
-/* Style for the progress bar when an error occurs */
 #progressBar.error {
-  background-color: var(--accent-color);
-  /* Red progress bar on error */
+    background-color: var(--accent-color);
 }
 
-/* Initial process message */
 #init_message {
-  font-style: italic;
-  color: #ccc;
-  margin-bottom: 10px;
+    font-style: italic;
+    color: #ccc;
+    margin-bottom: 10px;
 }
 
-/* Animated Header & Footer */
-.animated-header,
-.animated-footer {
-  animation: headerFadeIn 1s ease-out;
+.animated-header, .animated-footer {
+    animation: headerFadeIn 1s ease-out;
 }
 
 @keyframes headerFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-/* Slide in animations */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
-/* Custom select dropdown styling to force dark tones on highlights and arrow */
-.styled-select {
-  background-color: var(--input-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 10px 40px 10px 10px;
-  color: var(--text-color);
-  width: 100%;
-  appearance: none;
-  -moz-appearance: none;
-  -webkit-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--accent-color) 50%),
-    linear-gradient(135deg, var(--accent-color) 50%, transparent 50%);
-  background-position: calc(100% - 20px) calc(1em + 2px),
-    calc(100% - 15px) calc(1em + 2px);
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
-}
 
-/* Remove default arrow in IE */
-.styled-select::-ms-expand {
-  display: none;
-}
-
-/* Additional hover lift for form cards */
-.form-card:hover {
-  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.4);
-}
-
-/* 1. Dark highlight for Select2 single selection */
 .select2-container--dark .select2-selection--single,
 .select2-container--dark .select2-selection--single:hover,
 .select2-container--dark .select2-selection--single:focus {
-  background-color: var(--input-bg) !important;
-  border-color: var(--border-color) !important;
-  color: var(--text-color) !important;
+    background-color: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-color) !important;
 }
 
-/* 2. Dark hover background for number input spinner arrows (WebKit only) */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 input[type="number"]:hover::-webkit-inner-spin-button,
 input[type="number"]:hover::-webkit-outer-spin-button {
-  background-color: var(--input-bg) !important;
+    background-color: var(--input-bg) !important;
 }
 
-/* Custom select dropdown styling to force dark tones on highlights and arrow */
 .styled-select {
-  background-color: var(--input-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 10px 40px 10px 10px;
-  color: var(--text-color);
-  width: 100%;
-  appearance: none;
-  -moz-appearance: none;
-  -webkit-appearance: none;
-  transition: background-color var(--transition-speed), border-color var(--transition-speed);
-  /* Custom arrow using CSS gradients */
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--accent-color) 50%),
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 10px 40px 10px 10px;
+    color: var(--text-color);
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    transition: background-color var(--transition-speed), border-color var(--transition-speed);
+    background-image: linear-gradient(45deg, transparent 50%, var(--accent-color) 50%),
     linear-gradient(135deg, var(--accent-color) 50%, transparent 50%);
-  background-position: calc(100% - 20px) calc(1em + 2px),
+    background-position: calc(100% - 20px) calc(1em + 2px),
     calc(100% - 15px) calc(1em + 2px);
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
 }
 
 .styled-select:hover {
-  background-color: var(--select-bg);
-  border-color: var(--accent-color);
-  color: var(--text-color);
+    background-color: var(--select-bg);
+    border-color: var(--accent-color);
+    color: var(--text-color);
 }
 
-/* (Optional) For IE edge to remove the default arrow: */
 .styled-select::-ms-expand {
-  display: none;
+    display: none;
 }
 
-/* Custom Select2 dark settings have already been applied in the JS call above */
-
-/* Custom dropdown for descriptors */
 .custom-dropdown-descriptors {
-  background-color: var(--input-bg);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 20px;
-  /* Changed box-shadow to border for a clear outline */
-  border: 1px solid var(--accent-color);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  /* Kept outer shadow */
-  transition: transform var(--transition-speed), border-color var(--transition-speed);
-  /* Added border-color transition */
+    margin-bottom: 20px;
+    transition: transform var(--transition-speed), border-color var(--transition-speed);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
 }
-
-.custom-dropdown-descriptors:hover {}
 
 .dropdown-header {
-  cursor: pointer;
-  padding: 8px 20px;
-  /* Changed background to gray, text to light */
-  background: var(--card-bg);
-  color: var(--text-color);
-  font-weight: 700;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  user-select: none;
-  /* Added transition for background and color */
-  transition: background-color var(--transition-speed), color var(--transition-speed);
+    width: 100%;
+    cursor: pointer;
+    padding: 12px 20px;
+    border: 1px solid var(--accent-color);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background-color var(--transition-speed), color var(--transition-speed);
 }
 
 .dropdown-header:hover {
-  /* Changed hover background to slightly darker gray */
-  background: var(--input-bg);
+    background: var(--input-bg);
 }
 
 .dropdown-header .dropdown-title {
-  font-size: 1.1em;
+    font-size: 1.1em;
 }
 
 .dropdown-arrow {
-  transition: transform 0.35s ease;
+    transition: transform 0.35s ease;
 }
 
 .dropdown-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.5s ease;
-  background-color: var(--input-bg);
-  padding: 0 20px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+    background-color: var(--input-bg);
+    padding: 0 20px;
+    inert;
 }
 
-/* When open, add some padding & animate max-height */
 .custom-dropdown-descriptors.open .dropdown-content {
-  padding-top: 8px;
-  padding-bottom: 8px;
-  max-height: 2000px;
-  /* Increased max-height */
+    padding-top: 8px;
+    padding-bottom: 8px;
+    max-height: 2000px;
+    visibility: visible;
 }
 
-/* Rotate arrow when open */
 .custom-dropdown-descriptors.open .dropdown-arrow {
-  transform: rotate(180deg);
+    transform: rotate(180deg);
 }
 
-/* Reuse descriptors styles */
 .descriptor-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
 }
-
-/* (Keep any other descriptor related CSS as needed) */
-
-/* --- Styles for In-Context Options Box --- */
 
 .context-options-box {
-  /* Renamed class */
-  background-color: var(--card-bg);
-  /* Reuse card background */
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  /* overflow: hidden; REMOVED - not strictly needed */
-  margin-top: 10px;
-  margin-bottom: 15px;
-  padding: 15px 20px;
-  /* Added padding for title and content */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  transition: opacity 0.3s ease;
-  /* Keep fade transition */
-  opacity: 1;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+    padding: 15px 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    transition: opacity 0.3s ease;
+    opacity: 1;
 }
 
-/* Style for the title inside the box */
 .context-options-box h4 {
-  margin-bottom: 12px;
-  /* Space below title */
-  padding-bottom: 5px;
-  /* Space for border */
-  border-bottom: 1px solid var(--border-color);
-  /* Separator line */
-  color: var(--text-color);
-  /* Ensure text color */
-  font-weight: 700;
-  /* Make it bold like legend/header */
-  font-size: 1.1em;
-  /* Match previous header size */
-  /* Remove inherited heading animation if desired */
-  animation: none;
+    margin-bottom: 12px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-weight: 700;
+    font-size: 1.1em;
+    animation: none;
 }
 
-/* Container for the options */
 .context-options-container {
-  display: flex;
-  flex-direction: column;
-  /* Stack options vertically */
-  gap: 8px;
-  /* Space between options */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-/* Style individual option items (reuse descriptor-item styles) */
 .context-option-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 0;
-  /* Remove default margin from descriptor-item if reusing */
-  transition: opacity 0.3s ease;
-  /* For fade in/out */
-  opacity: 1;
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+    transition: opacity 0.3s ease;
+    opacity: 1;
 }
 
-/* Reuse checkbox styling */
 .context-option-item input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  margin-right: 10px;
-  border: 2px solid var(--border-color);
-  border-radius: 3px;
-  background: var(--input-bg);
-  cursor: pointer;
-  vertical-align: middle;
-  position: relative;
-  transition: background var(--transition-speed), border-color var(--transition-speed);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-right: 10px;
+    border: 2px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--input-bg);
+    cursor: pointer;
+    vertical-align: middle;
+    position: relative;
+    transition: background var(--transition-speed), border-color var(--transition-speed);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .context-option-item input[type="checkbox"]:checked {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
+    background: var(--accent-color);
+    border-color: var(--accent-color);
 }
 
 .context-option-item input[type="checkbox"]:checked::after {
-  content: "✓";
-  font-size: 16px;
-  line-height: 1;
-  color: var(--bg-color);
-  font-weight: bold;
-  display: block;
+    content: "✓";
+    font-size: 16px;
+    line-height: 1;
+    color: var(--bg-color);
+    font-weight: bold;
+    display: block;
 }
 
-/* Style label */
 .context-option-item label {
-  margin-bottom: 0;
-  /* Override potential default */
-  cursor: pointer;
-  /* Make label clickable */
+    margin-bottom: 0;
+    cursor: pointer;
 }
 
-/* --- End Styles for In-Context Options Box --- */
-
-/* --- Tooltip Icon Style --- */
 .tooltip-icon {
-  margin-left: 8px;
-  /* Space between label text and icon */
-  display: inline-flex;
-  /* Use flex to help align the image */
-  align-items: center;
-  /* Center the image vertically */
+    margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
 }
 
 .tooltip-icon img {
-  height: 1.35em;
-  /* Increased height slightly */
-  width: auto;
-  /* Maintain aspect ratio */
-  /* Add relative positioning to nudge the icon */
-  position: relative;
-  top: 3px;
-  /* Move down 2 pixels */
-  left: -5px;
-  /* Move left 3 pixels */
+    height: 1.35em;
+    width: auto;
+    position: relative;
+    top: 3px;
+    left: -5px;
 }
 
-/* --- Cancel Button Style --- */
 .cancel-button {
-  background-color: var(--input-bg);
-  /* Dark background */
-  color: var(--text-color);
-  /* Light text */
-  border: 1px solid var(--border-color);
-  /* Subtle border */
-  padding: 8px 20px;
-  border-radius: 4px;
-  font-size: 0.9em;
-  cursor: pointer;
-  transition: background-color var(--transition-speed), color var(--transition-speed), border-color var(--transition-speed), transform 0.2s;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background-color var(--transition-speed), color var(--transition-speed), border-color var(--transition-speed), transform 0.2s;
 }
 
 .cancel-button:hover:not(:disabled) {
-  background-color: var(--accent-color);
-  /* Red background on hover */
-  color: var(--bg-color);
-  /* Dark text on hover */
-  border-color: var(--accent-color);
-  transform: scale(1.03);
+    background-color: var(--accent-color);
+    color: var(--bg-color);
+    border-color: var(--accent-color);
+    transform: scale(1.03);
 }
 
 .cancel-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
-/* --- Flash Message Popup Container --- */
 #flash-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 300px;
-  /* Adjust width as needed */
-  z-index: 1000;
-  /* Ensure it's above other content */
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 300px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-/* Add animation to flash messages within the container */
 #flash-container .alert {
-  animation: slideInRight 0.5s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
-  /* Slides in, fades out after 4.5s (total 5s visibility) */
-  opacity: 1;
-  /* Base styles applied to all alerts in the container */
-  padding: 10px;
-  margin-bottom: 10px;
-  /* Keep consistent spacing */
-  border-radius: 4px;
+    animation: slideInRight 0.5s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
+    opacity: 1;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
 }
 
-/* Style for Success alerts (keep distinct if desired, or unify later) */
 #flash-container .alert.success {
-  background-color: #2e7d32;
-  /* Green background */
-  color: #fff;
-  border: 1px solid #4caf50;
+    background-color: #2e7d32;
+    color: #fff;
+    border: 1px solid #4caf50;
 }
 
-/* Style for Error alerts - Apply Cancelation Style */
 #flash-container .alert.error {
-  background-color: var(--card-bg);
-  /* Use card background gray */
-  color: var(--text-color);
-  /* Standard text color */
-  border: 1px solid var(--border-color);
-  /* Subtle border */
-  box-shadow: 0 0 8px var(--accent-color);
-  /* Red glow effect */
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0 8px var(--accent-color);
 }
 
 @keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 @keyframes fadeOut {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-    /* Optional: add height: 0; padding: 0; margin: 0; for smoother removal */
-  }
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
 }
 
-/* Custom style for Cancellation Success Popup */
 .alert-cancel-success {
-  /* Inherit basic alert padding/margin/radius from .alert if needed,
-     but define specific appearance here */
-  padding: 10px;
-  margin-bottom: 10px;
-  /* Kept for consistency if multiple messages appear */
-  border-radius: 4px;
-  background-color: var(--card-bg);
-  /* Use card background gray */
-  color: var(--text-color);
-  /* Standard text color */
-  border: 1px solid var(--border-color);
-  /* Optional: subtle border */
-  /* Red glow effect */
-  box-shadow: 0 0 8px var(--accent-color);
+    /* Inherit basic alert padding/margin/radius from .alert if needed,
+       but define specific appearance here */
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0 8px var(--accent-color);
 }
 
-/* style.css additions */
 .error-link {
-  color: var(--accent-color);
-  /* Make link stand out */
-  text-decoration: underline;
-  cursor: pointer;
+    color: var(--accent-color);
+    text-decoration: underline;
+    cursor: pointer;
 }
 
 .error-link:hover {
-  color: #ff8080;
-  /* Lighter red on hover */
+    color: #ff8080;
 }
 
-/* Flash message for cancellation success */
 .alert.alert-cancel-success {
-  color: #ffffff;
-  /* White text */
-  background-color: #5cb85c;
-  /* Green background (adjust color as needed) */
-  border-color: #4cae4c;
-  /* Add existing padding, margin, border-radius etc. from .alert */
-  padding: 15px;
-  margin-bottom: 20px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  /* Add animation properties like other alerts */
-  opacity: 1;
-  transition: opacity 0.5s ease-out 4s;
-  /* Start fade out after 4s */
-  animation: slideDownFadeIn 0.5s ease forwards;
-  /* Use existing slide in */
-}
-
-/* Ensure this keyframe animation exists or adapt as needed */
-@keyframes slideDownFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-
-  to {
+    color: #ffffff;
+    background-color: #5cb85c;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid transparent;
+    border-radius: 4px;
     opacity: 1;
-    transform: translateY(0);
-  }
+    transition: opacity 0.5s ease-out 4s;
+    animation: slideDownFadeIn 0.5s ease forwards;
 }
 
-/* --- Input with Clear Button Styling --- */
+@keyframes slideDownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 
-/* Container for input + clear button */
+
 .input-with-clear {
-  position: relative;
-  /* Required for absolute positioning of clear button */
-  flex-grow: 1;
-  /* Take remaining width in path-input-group */
-  display: flex;
-  align-items: center;
+    position: relative;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
 }
 
-/* Adjust input styling when inside input-with-clear container */
 .input-with-clear input[type="text"] {
-  width: 100%;
-  padding-right: 35px;
-  /* Make room for clear button */
-  flex-grow: 1;
+    width: 100%;
+    padding-right: 35px;
+    flex-grow: 1;
 }
 
-/* Clear button styling */
 .clear-input-btn {
-  position: absolute;
-  right: 8px;
-  /* Position inside the input field */
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--text-color);
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  padding: 0;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color var(--transition-speed), color var(--transition-speed);
-  z-index: 1;
-  /* Ensure it's above the input field */
-  opacity: 0.7;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color var(--transition-speed), color var(--transition-speed);
+    z-index: 1;
+    opacity: 0.7;
 }
 
 .clear-input-btn:hover {
-  background-color: var(--accent-color);
-  color: var(--bg-color);
-  opacity: 1;
-  transform: translateY(-50%) scale(1.1);
+    background-color: var(--accent-color);
+    color: var(--bg-color);
+    opacity: 1;
+    transform: translateY(-50%) scale(1.1);
 }
 
 .clear-input-btn:active {
-  transform: translateY(-50%) scale(0.95);
+    transform: translateY(-50%) scale(0.95);
 }
-
-/* Update path-input-group to accommodate the new structure */
-.path-input-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.path-input-group label {
-  flex-shrink: 0;
-  margin-bottom: 0;
-  width: 100px;
-}
-
-/* ─── mapper list & queue ─────────────────────────────── */
-.mapper-item {
-  display: grid;
-  grid-template-columns: 22px 1fr 70px 34px;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
-  background: #262626;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  margin-bottom: 4px;
-}
-
-.mapper-item input[type="text"],
-.mapper-item input[type="number"] {
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
-  padding: 2px 4px;
-  color: #e6e6e6;
-}
-
-.mapper-item button.remove-mapper-btn,
-.queue li button.delete-btn {
-  background: #ff4444;
-  color: #fff;
-  border: none;
-  width: 26px;
-  height: 26px;
-  line-height: 22px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.queue {
-  list-style: none;
-  padding-left: 0
-}
-
-.queue li {
-  padding: 4px 6px;
-  border: 1px solid #3a3a3a;
-  margin-bottom: 4px
-}
-
-.queue li.running {
-  background: #335
-}
-
-
-/* .queue-item::before {
-  content: attr(data-stars) "★ ";
-  opacity: 0.7;
-  margin-right: 4px;
-} */
-
-/* ─── Uniform styling for the NEW text/number inputs ──────────────────
-   These selectors only touch the extra controls we added later so they
-   won’t interfere with any existing field you already tuned.            */
-
-#mapperIdInput,
-/* “Add Mapper ID…”               */
-#artist,
-#title,
-/* Song-metadata text boxes        */
-#mapper_name,
-#difficulty_name,
-.song-metadata input[type="text"],
-.song-metadata input[type="number"],
-.mapper-item input[type="text"],
-.mapper-item input[type="number"] {
-  width: 100%;
-  padding: 10px;
-  background: var(--input-bg);
-  /* #2a2a2a                         */
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  color: var(--text-color);
-  /* #e0e0e0                         */
-  transition: border-color var(--transition-speed),
-    box-shadow var(--transition-speed);
-}
-
-#mapperIdInput:focus,
-#artist:focus,
-#title:focus,
-#mapper_name:focus,
-#difficulty_name:focus {
-  outline: none;
-  border-color: var(--accent-color);
-  box-shadow: 0 0 8px var(--accent-color);
-}
-
-/* dim placeholders so they don’t look like real values                 */
-#mapperIdInput::placeholder,
-#artist::placeholder,
-#title::placeholder,
-#mapper_name::placeholder,
-#difficulty_name::placeholder {
-  color: #777;
-}
-
-
-/* ─── “Add to Queue” button in the same style as Run Inference ─────── */
-
-button.add-queue-btn {
-  /* just add this class to the button tag */
-  background: var(--accent-color);
-  color: var(--bg-color);
-  border: none;
-  padding: 10px 22px;
-  /* a bit larger than before              */
-  border-radius: 4px;
-  font-size: 0.95em;
-  cursor: pointer;
-  transition: background-color var(--transition-speed),
-    transform 0.3s;
-}
-
-button.add-queue-btn:hover {
-  background: #e03234;
-  /* same darker red you use on hover      */
-  transform: scale(1.03);
-}
-
-/* Make any Bootstrap-named .form-control fields match our dark theme */
-input.form-control,
-input.form-control-sm {
-  background: var(--input-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 10px;
-  color: var(--text-color);
-  transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
-}
-
-input.form-control:focus,
-input.form-control-sm:focus {
-  outline: none;
-  border-color: var(--accent-color);
-  box-shadow: 0 0 8px var(--accent-color);
-}
-
-.status-running {
-  color: #4CAF50;
-  font-weight: bold;
-}
-
-.status-pending {
-  color: #FFC107;
-}
-
-
-/* .collapsible.closed {
-  display: none;
-}
-
-#queue-panel {
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.collapse-btn {
-  background: none;
-  border: none;
-  color: var(--accent-color);
-  cursor: pointer;
-  margin-top: -8px;
-} */

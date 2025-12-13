@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import os
-import uuid
 import zipfile
 from datetime import timedelta
 from string import Template
@@ -17,7 +16,6 @@ from .timing_points_change import TimingPointsChange, sort_timing_points
 from ..dataset.data_utils import get_groups, Group, get_median_mpb, BEAT_TYPES
 from ..tokenizer import Event, EventType
 
-OSU_FILE_EXTENSION = ".osu"
 OSU_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "template.osu")
 STEPS_PER_MILLISECOND = 0.1
 
@@ -75,7 +73,7 @@ def beatmap_config_from_beatmap(beatmap: Beatmap) -> BeatmapConfig:
         creator=beatmap.creator,
         version=beatmap.version,
         background_line=background_line(beatmap.background),
-        preview_time=int(beatmap.preview_time.total_seconds() * 1000),
+        preview_time=int(beatmap.preview_time.total_seconds() * 1000 + 1e-5),
         bpm=beatmap.bpm_max(),
         offset=int(round((min(tp.offset.total_seconds() * 1000 for tp in beatmap.timing_points)))),
     )
@@ -165,7 +163,7 @@ class Postprocessor(object):
 
         if timing is None:
             timing = [TimingPoint(
-                timedelta(milliseconds=self.offset), self.beat_length, 4, 2, 0, 100, None, False
+                timedelta(milliseconds=self.offset), self.beat_length, 4, 2, -1, 100, None, False
             )]
 
         groups, _ = get_groups(events, types_first=self.types_first)
@@ -204,7 +202,7 @@ class Postprocessor(object):
                 sampleset = group.samplesets[0] if len(group.samplesets) > 0 else 0
                 addition = group.additions[0] if len(group.additions) > 0 else 0
                 volume = group.volumes[0] if len(group.volumes) > 0 and beatmap_config.mode == 3 else 0
-                hit_object_strings.append(f"{int(round(group.x))},{int(round(group.y))},{int(round(group.time))},{5 if group.new_combo else 1},{hitsound},{sampleset}:{addition}:{volume}:0:")
+                hit_object_strings.append(f"{int(round(group.x))},{int(round(group.y))},{int(round(group.time))},{5 if group.new_combo else 1},{hitsound},{sampleset}:{addition}:-1:{volume}:")
                 if len(group.volumes) > 0 and beatmap_config.mode != 3:
                     timing = self.set_volume(timedelta(milliseconds=int(round(group.time))), group.volumes[0], timing)
                 if beatmap_config.mode == 1 and group.scroll_speed is not None:
@@ -219,7 +217,7 @@ class Postprocessor(object):
                 addition = hold_note_start.additions[0] if len(hold_note_start.additions) > 0 else 0
                 volume = hold_note_start.volumes[0] if len(hold_note_start.volumes) > 0 and beatmap_config.mode == 3 else 0
                 hit_object_strings.append(
-                    f"{int(round(hold_note_start.x))},{192},{int(round(hold_note_start.time))},{128},{hitsound},{int(round(group.time))}:{sampleset}:{addition}:{volume}:0:"
+                    f"{int(round(hold_note_start.x))},{192},{int(round(hold_note_start.time))},{128},{hitsound},{int(round(group.time))}:{sampleset}:{addition}:-1:{volume}:"
                 )
                 if len(hold_note_start.volumes) > 0 and beatmap_config.mode != 3:
                     timing = self.set_volume(timedelta(milliseconds=int(round(hold_note_start.time))), hold_note_start.volumes[0], timing)
@@ -253,7 +251,7 @@ class Postprocessor(object):
                 control_points = "|".join(f"{cp[0]}:{cp[1]}" for cp in anchor_info)
 
                 hit_object_strings.append(
-                    f"{start_pos[0]},{start_pos[1]},{drumroll_start_time},{2},{hitsound},L|{control_points},{1},{length},0:0,0:0|0:0,{sampleset}:{addition}:0:0:"
+                    f"{start_pos[0]},{start_pos[1]},{drumroll_start_time},{2},{hitsound},L|{control_points},{1},{length},0:0,0:0|0:0,{sampleset}:{addition}:-1:0:"
                 )
 
                 drumroll_start = None
@@ -266,7 +264,7 @@ class Postprocessor(object):
                 sampleset = denden_start.samplesets[0] if len(denden_start.samplesets) > 0 else 0
                 addition = denden_start.additions[0] if len(denden_start.additions) > 0 else 0
                 hit_object_strings.append(
-                    f"{256},{192},{int(round(denden_start.time))},{12},{hitsound},{int(round(group.time))},{sampleset}:{addition}:0:0:"
+                    f"{256},{192},{int(round(denden_start.time))},{12},{hitsound},{int(round(group.time))},{sampleset}:{addition}:-1:0:"
                 )
                 if len(denden_start.volumes) > 0:
                     timing = self.set_volume(timedelta(milliseconds=int(round(denden_start.time))), denden_start.volumes[0], timing)
@@ -282,7 +280,7 @@ class Postprocessor(object):
                 sampleset = group.samplesets[0] if len(group.samplesets) > 0 else 0
                 addition = group.additions[0] if len(group.additions) > 0 else 0
                 hit_object_strings.append(
-                    f"{256},{192},{int(round(spinner_start.time))},{12},{hitsound},{int(round(group.time))},{sampleset}:{addition}:0:0:"
+                    f"{256},{192},{int(round(spinner_start.time))},{12},{hitsound},{int(round(group.time))},{sampleset}:{addition}:-1:0:"
                 )
                 if len(group.volumes) > 0:
                     timing = self.set_volume(timedelta(milliseconds=int(round(group.time))), group.volumes[0], timing)
@@ -379,7 +377,7 @@ class Postprocessor(object):
                 node_sampleset = "|".join(f"{s}:{a}" for s, a in zip(node_samplesets, node_additions))
 
                 hit_object_strings.append(
-                    f"{int(round(slider_head.x))},{int(round(slider_head.y))},{slider_start_time},{6 if slider_head.new_combo else 2},{body_hitsound},{curve_type}|{control_points},{slides},{length},{node_hitsounds},{node_sampleset},{body_sampleset}:{body_addition}:0:0:"
+                    f"{int(round(slider_head.x))},{int(round(slider_head.y))},{slider_start_time},{6 if slider_head.new_combo else 2},{body_hitsound},{curve_type}|{control_points},{slides},{length},{node_hitsounds},{node_sampleset},{body_sampleset}:{body_addition}:-1:0:"
                 )
 
                 # Set volume for each node sample
@@ -456,7 +454,7 @@ class Postprocessor(object):
             beatmap_tp = beatmap.timing_point_at(start_time)
 
             result_sv = result_tp.ms_per_beat if result_tp.parent is not None else -100
-            tp = TimingPoint(result_tp.offset, result_sv, 4, 2, 0, result_tp.volume, None, result_tp.kiai_mode)
+            tp = TimingPoint(result_tp.offset, result_sv, 4, 2, -1, result_tp.volume, None, result_tp.kiai_mode)
             tp_change = TimingPointsChange(tp, mpb=True, volume=True, kiai=True)
             beatmap.timing_points = tp_change.add_change(beatmap.timing_points, False)
 
@@ -468,43 +466,31 @@ class Postprocessor(object):
                     abs(result_counter - beatmap_counter) > 1e-4 or
                     abs(result_redline.ms_per_beat - beatmap_redline.ms_per_beat) > 1e-4):
                 offset = start_time - timedelta(milliseconds=result_counter * result_redline.ms_per_beat)
-                tp = TimingPoint(offset, result_redline.ms_per_beat, result_redline.meter, 2, 0, 100, None, False)
+                tp = TimingPoint(offset, result_redline.ms_per_beat, result_redline.meter, 2, -1, 100, None, False)
                 tp_change = TimingPointsChange(tp, mpb=True, meter=True, uninherited=True)
                 beatmap.timing_points = tp_change.add_change(beatmap.timing_points, False)
 
-        # Write the beatmap to the file
-        beatmap.write_path(beatmap_path)
+        return beatmap.pack()
 
-        return beatmap_path
-
-    def write_result(self, result: str, output_path: str) -> str:
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
+    def write_result(self, result: str, output_path: str):
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         # Write .osu file to directory
-        osu_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}{OSU_FILE_EXTENSION}")
-        with open(osu_path, "w", encoding='utf-8-sig') as osu_file:
+        with open(output_path, "w", encoding='utf-8-sig') as osu_file:
             osu_file.write(result)
 
-        return osu_path
+    def export_osz(self, osu_path: str, audio_path: str, output_path: str):
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    def export_osz(self, osu_path: str, audio_path: str, output_path: str) -> str:
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-
-        osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
-
-        with zipfile.ZipFile(osz_path, 'w') as zipf:
+        with zipfile.ZipFile(output_path, 'w') as zipf:
             zipf.write(osu_path, os.path.basename(osu_path))
             zipf.write(audio_path, os.path.basename(audio_path))
-
-        return osz_path
 
     @staticmethod
     def set_volume(time: timedelta, volume: int, timing: list[TimingPoint]) -> list[TimingPoint]:
         """Set the volume of the hitsounds at a specific time."""
-        tp = TimingPoint(time, -100, 4, 2, 0, volume, None, False)
-        tp_change = TimingPointsChange(tp, volume=True)
+        tp = TimingPoint(time, -100, 4, 2, -1, volume, None, False)
+        tp_change = TimingPointsChange(tp, volume=True, index=True)
         return tp_change.add_change(timing, True)
 
     @staticmethod
@@ -512,14 +498,14 @@ class Postprocessor(object):
         """Set the slider velocity at a specific time."""
         if sv == 0:
             return timing
-        tp = TimingPoint(time, -100 / sv, 4, 2, 0, 100, None, False)
+        tp = TimingPoint(time, -100 / sv + 1E-10, 4, 2, -1, 100, None, False)
         tp_change = TimingPointsChange(tp, mpb=True)
         return tp_change.add_change(timing, True)
 
     @staticmethod
     def set_kiai(time: timedelta, kiai: bool, timing: list[TimingPoint]) -> list[TimingPoint]:
         """Set the kiai mode at a specific time."""
-        tp = TimingPoint(time, -100, 4, 2, 0, 100, None, kiai)
+        tp = TimingPoint(time, -100, 4, 2, -1, 100, None, kiai)
         tp_change = TimingPointsChange(tp, kiai=True)
         return tp_change.add_change(timing, True)
 
@@ -680,13 +666,13 @@ class Postprocessor(object):
                 continue
 
             time = marker.time
-            tp = TimingPoint(timedelta(milliseconds=time), 1000, 4, 2, 0, 100, None, False)
+            tp = TimingPoint(timedelta(milliseconds=time), 1000, 4, 2, -1, 100, None, False)
             tp_change = TimingPointsChange(tp, uninherited=True)
             timing = tp_change.add_change(timing, True)
 
         if len(timing) == 0:
             timing = [
-                TimingPoint(timedelta(milliseconds=markers[0].time), 1000, 4, 2, 0, 100, None, False)
+                TimingPoint(timedelta(milliseconds=markers[0].time), 1000, 4, 2, -1, 100, None, False)
             ]
 
         counter = 0
@@ -719,7 +705,7 @@ class Postprocessor(object):
                     redline.meter = counter
                 else:
                     # We need to create a new redline
-                    tp = TimingPoint(timedelta(milliseconds=last_measure_time), 1000, counter, 2, 0, 100, None, False)
+                    tp = TimingPoint(timedelta(milliseconds=last_measure_time), 1000, counter, 2, -1, 100, None, False)
                     tp_change = TimingPointsChange(tp, meter=True, uninherited=True)
                     timing = tp_change.add_change(timing, True)
 
@@ -801,7 +787,7 @@ class Postprocessor(object):
                 mpb = self.get_ms_per_beat(time - last_time, beats_from_split, self.timing_leniency)
                 tp = TimingPoint(
                     timedelta(milliseconds=last_time), mpb,
-                    4, 2, 0, 100, None, False)
+                    4, 2, -1, 100, None, False)
                 tp_change = TimingPointsChange(tp, mpb=True, uninherited=True)
                 timing = tp_change.add_change(timing, True)
                 # Update the counter to the state 1 beat before the last marker with the new redline included
@@ -826,7 +812,7 @@ class Postprocessor(object):
             if marker.is_measure:
                 # Add a redline in case the measure counter is out of sync
                 if counter % redline.meter != 0:
-                    tp = TimingPoint(timedelta(milliseconds=time), redline.ms_per_beat, redline.meter, 2, 0, 100, None, False)
+                    tp = TimingPoint(timedelta(milliseconds=time), redline.ms_per_beat, redline.meter, 2, -1, 100, None, False)
                     tp_change = TimingPointsChange(tp, mpb=True, uninherited=True)
                     timing = tp_change.add_change(timing, True)
                 counter = 0

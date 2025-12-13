@@ -263,9 +263,6 @@ class BeatmapDatasetIterable:
         """
 
         def get_event_indices(events2: list[Event], event_times2: list[int]) -> tuple[list[int], list[int]]:
-            if len(events2) == 0:
-                return [], []
-
             # Corresponding start event index for every audio frame.
             start_indices = []
             event_index = 0

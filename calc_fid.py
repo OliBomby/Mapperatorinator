@@ -18,7 +18,7 @@ from classifier.classify import ExampleDataset
 from classifier.libs.model.model import OsuClassifierOutput
 from classifier.libs.utils import load_ckpt
 from config import FidConfig
-from inference import prepare_args, load_diff_model, generate, load_model
+from inference import prepare_args, load_diff_model, generate, load_model_with_server
 from osuT5.osuT5.dataset.data_utils import load_audio_file, load_mmrs_metadata, filter_mmrs_metadata
 from osuT5.osuT5.inference import generation_config_from_beatmap, beatmap_config_from_beatmap
 from osuT5.osuT5.tokenizer import ContextType
@@ -175,18 +175,18 @@ def get_rhythm(beatmap, passive=False):
     rhythm = set()
     for hit_object in beatmap.hit_objects(stacking=False):
         if isinstance(hit_object, Circle):
-            rhythm.add(int(hit_object.time.total_seconds() * 1000))
+            rhythm.add(int(hit_object.time.total_seconds() * 1000 + 1e-5))
         elif isinstance(hit_object, Slider):
             duration: timedelta = (hit_object.end_time - hit_object.time) / hit_object.repeat
-            rhythm.add(int(hit_object.time.total_seconds() * 1000))
+            rhythm.add(int(hit_object.time.total_seconds() * 1000 + 1e-5))
             if passive:
                 for i in range(hit_object.repeat):
-                    rhythm.add(int((hit_object.time + duration * (i + 1)).total_seconds() * 1000))
+                    rhythm.add(int((hit_object.time + duration * (i + 1)).total_seconds() * 1000 + 1e-5))
         elif isinstance(hit_object, Spinner):
             if passive:
-                rhythm.add(int(hit_object.end_time.total_seconds() * 1000))
+                rhythm.add(int(hit_object.end_time.total_seconds() * 1000 + 1e-5))
         elif isinstance(hit_object, HoldNote):
-            rhythm.add(int(hit_object.time.total_seconds() * 1000))
+            rhythm.add(int(hit_object.time.total_seconds() * 1000 + 1e-5))
 
     return rhythm
 
@@ -198,7 +198,14 @@ def generate_beatmaps(beatmap_paths, fid_args: FidConfig, return_dict, idx):
     torch.set_float32_matmul_precision('high')
 
     model, tokenizer, diff_model, diff_tokenizer, refine_model = None, None, None, None, None
-    model, tokenizer = load_model(args.model_path, args.train, args.device, args.max_batch_size, args.use_server)
+    model, tokenizer = load_model_with_server(
+        args.model_path,
+        args.train,
+        args.device,
+        max_batch_size=args.max_batch_size,
+        use_server=args.use_server,
+        precision=args.precision,
+    )
 
     if args.compile:
         model.transformer.forward = torch.compile(model.transformer.forward, mode="reduce-overhead", fullgraph=True)
@@ -382,6 +389,7 @@ def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: 
 @hydra.main(config_path="configs", config_name="calc_fid", version_base="1.1")
 def main(args: FidConfig):
     prepare_args(args)
+    print(f"Logging to directory: {os.getcwd()}")
 
     # Fix inference model path
     if args.inference.model_path.startswith("./"):

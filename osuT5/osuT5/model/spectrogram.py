@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-import torchaudio.transforms
-from nnAudio import features
 
 
 class MelSpectrogram(nn.Module):
@@ -38,6 +36,7 @@ class MelSpectrogram(nn.Module):
         self.log_scale = log_scale
 
         if implementation == "torchaudio":
+            import torchaudio.transforms
             self.transform = torchaudio.transforms.MelSpectrogram(
                 sample_rate=sample_rate,
                 n_fft=n_ftt,
@@ -49,6 +48,7 @@ class MelSpectrogram(nn.Module):
                 pad_mode=pad_mode,
             )
         elif implementation == "nnAudio":
+            from nnAudio import features
             self.transform = features.MelSpectrogram(
                 sr=sample_rate,
                 n_fft=n_ftt,

@@ -4,10 +4,10 @@ defaults:
   - _self_
 
 compile: false
-num_processes: ${inference.max_batch_size}
+num_processes: 32
 seed: 0
 
-skip_generation: false
+skip_generation: true
 fid: true
 rhythm_stats: true
 
@@ -29,15 +29,15 @@ inference:
   lookback: 0.5             # Fraction of audio sequence to fill with tokens from previous inference window
   lookahead: 0.4            # Fraction of audio sequence to skip at the end of the audio window
   year: 2023
-  resnap_events: true
-  use_server: true
+  resnap_events: false
+  use_server: false
 
 hydra:
   job:
     chdir: True
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/test
+    dir: ./logs_fid/sweeps/test_1/inference=tiny_dist17
   sweep:
-    dir: ./logs_fid/sweeps/test_2
+    dir: ./logs_fid/sweeps/test_3
     subdir: ${hydra.job.override_dirname}

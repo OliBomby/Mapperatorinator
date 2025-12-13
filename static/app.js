@@ -1,4 +1,4 @@
-$(document).ready(function () {
+$(document).ready(function() {
     // Application state and configuration
     const AppState = {
         evtSource: null,
@@ -26,8 +26,8 @@ $(document).ready(function () {
         showFlashMessage(message, type = 'success') {
             const flashContainer = $('#flash-container');
             const alertClass = type === 'success' ? 'alert success' :
-                type === 'cancel-success' ? 'alert alert-cancel-success' :
-                    'alert error';
+                             type === 'cancel-success' ? 'alert alert-cancel-success' :
+                             'alert error';
             const messageDiv = $(`<div class="${alertClass}">${message}</div>`);
             flashContainer.append(messageDiv);
             setTimeout(() => messageDiv.remove(), 5000);
@@ -56,19 +56,18 @@ $(document).ready(function () {
 
             // Reset checkboxes
             $('#hitsounded').prop('checked', true);
-            $('#export_osz, #add_to_beatmap, #super_timing').prop('checked', false);
+            $('#export_osz, #add_to_beatmap, #overwrite_reference_beatmap, #super_timing').prop('checked', false);
 
             // Clear descriptors and context options
             $('input[name="descriptors"], input[name="in_context_options"]')
                 .removeClass('positive-check negative-check').prop('checked', false);
 
             // Clear paths and optional fields
-            $('#audio_path, #output_path, #beatmap_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
+            $('#audio_path, #output_path, #beatmap_path, #lora_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
             PathManager.clearPlaceholders();
             PathManager.validateAndAutofillPaths(false);
         }
     };
-    window.Utils = Utils;
 
     // UI Manager for conditional visibility
     const UIManager = {
@@ -78,7 +77,7 @@ $(document).ready(function () {
             const beatmapPath = $('#beatmap_path').val().trim();
 
             // Handle gamemode-based visibility
-            $('.conditional-field[data-show-for-gamemode]').each(function () {
+            $('.conditional-field[data-show-for-gamemode]').each(function() {
                 const $field = $(this);
                 const supportedModes = $field.data('show-for-gamemode').toString().split(',');
                 const shouldShow = supportedModes.includes(selectedGamemode);
@@ -91,7 +90,7 @@ $(document).ready(function () {
             });
 
             // Handle model-based visibility
-            $('.conditional-field[data-hide-for-model]').each(function () {
+            $('.conditional-field[data-hide-for-model]').each(function() {
                 const $field = $(this);
                 const hiddenModels = $field.data('hide-for-model').toString().split(',');
                 const shouldHide = hiddenModels.includes(selectedModel);
@@ -105,7 +104,7 @@ $(document).ready(function () {
 
             // Handle beatmap path dependent fields
             const shouldShowBeatmapFields = beatmapPath !== '';
-            ['#in-context-options-box', '#add-to-beatmap-option'].forEach(selector => {
+            ['#in-context-options-box', '#add-to-beatmap-option', '#overwrite-reference-beatmap-option'].forEach(selector => {
                 const $element = $(selector);
                 if (shouldShowBeatmapFields && !$element.is(':visible')) {
                     $element.fadeIn(AppState.animationSpeed);
@@ -113,6 +112,9 @@ $(document).ready(function () {
                     $element.fadeOut(AppState.animationSpeed);
                     if (selector === '#add-to-beatmap-option') {
                         $('#add_to_beatmap').prop('checked', false);
+                    }
+                    if (selector === '#overwrite-reference-beatmap-option') {
+                        $('#overwrite_reference_beatmap').prop('checked', false);
                     }
                 }
             });
@@ -126,7 +128,7 @@ $(document).ready(function () {
             const $gamemodeSelect = $("#gamemode");
             if (selectedModel === "v30") {
                 $gamemodeSelect.val('0').prop('disabled', true);
-                $gamemodeSelect.find("option").each(function () {
+                $gamemodeSelect.find("option").each(function() {
                     $(this).prop('disabled', $(this).val() !== '0');
                 });
             } else {
@@ -136,9 +138,9 @@ $(document).ready(function () {
 
             // Handle in-context options
             const supportedContext = capabilities.supportedInContextOptions ||
-                ['NONE', 'TIMING', 'KIAI', 'MAP', 'GD', 'NO_HS'];
+                                   ['NONE', 'TIMING', 'KIAI', 'MAP', 'GD', 'NO_HS'];
 
-            $('input[name="in_context_options"]').each(function () {
+            $('input[name="in_context_options"]').each(function() {
                 const $checkbox = $(this);
                 const value = $checkbox.val();
                 const $item = $checkbox.closest('.context-option-item');
@@ -166,14 +168,11 @@ $(document).ready(function () {
     // File Browser Manager
     const FileBrowser = {
         init() {
-            window.addEventListener('pywebviewready', () => {
-                console.log("pywebview API is ready.");
-                this.attachBrowseHandlers();
-            });
+            this.attachBrowseHandlers();
         },
 
         attachBrowseHandlers() {
-            $('.browse-button[data-browse-type]').click(async function () {
+            $('.browse-button[data-browse-type]').click(async function() {
                 const browseType = $(this).data('browse-type');
                 const targetId = $(this).data('target');
 
@@ -223,30 +222,22 @@ $(document).ready(function () {
         }
     };
 
-    let lastDetectedAudioPath = "";
     // Path Manager for autofill, validation and clear button support
     const PathManager = {
         init() {
             this.attachPathChangeHandlers();
             this.attachClearButtonHandlers();
-            $('#audio_path, #beatmap_path, #output_path').trigger('blur');
+            $('#audio_path, #beatmap_path, #output_path, #lora_path').trigger('blur');
         },
 
         attachPathChangeHandlers() {
-            let lastAudioPath = '';
-            $('#audio_path').on('change', function () {
-                if (this.value.trim() !== lastAudioPath) {
-                    $('#song_artist, #song_title').val('');
-                    lastAudioPath = this.value.trim();
-                }
-            });
             // Listen for input events (typing)
-            $('#audio_path, #beatmap_path, #output_path').on('input', (e) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('input', (e) => {
                 this.updateClearButtonVisibility(e.target);
             });
 
             // Listen for blur events (leaving field) - immediate validation
-            $('#audio_path, #beatmap_path, #output_path').on('blur', (e) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('blur', (e) => {
                 this.updateClearButtonVisibility(e.target);
                 this.validateAndAutofillPaths(false);
             });
@@ -265,7 +256,7 @@ $(document).ready(function () {
             });
 
             // Initial visibility check for all fields
-            $('#audio_path, #beatmap_path, #output_path').each((index, element) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path').each((index, element) => {
                 this.updateClearButtonVisibility(element);
             });
         },
@@ -318,6 +309,7 @@ $(document).ready(function () {
                 });
             });
         },
+
         handleValidationResponse(response, showFlashMessages = false) {
             this.clearValidationErrors();
             const $audioPathInput = $('#audio_path');
@@ -335,23 +327,6 @@ $(document).ready(function () {
             } else if (!$outputPathInput.val().trim()) {
                 $outputPathInput.attr('placeholder', '');
             }
-
-            $('#song_artist').val(response.detected_artist ?? '');
-            $('#song_title').val(response.detected_title ?? '');
-
-            // ── Flash message: did we detect song metadata? ────────────────────
-            const audioPathProvided = $('#audio_path').val().trim();      // current form value
-            if (audioPathProvided &&
-                audioPathProvided !== lastDetectedAudioPath &&     // new!
-                (response.detected_artist || response.detected_title)) {
-                const art = response.detected_artist || "Unknown artist";
-                const ttl = response.detected_title || "Unknown title";
-                Utils.showFlashMessage(`Detected song: ${art} – ${ttl}`, 'success');
-                lastDetectedAudioPath = audioPathProvided;
-            } else if (audioPathProvided && !response.detected_artist && !response.detected_title) {
-                Utils.showFlashMessage("Could not detect song metadata.", 'error');
-            }
-
 
             if (showFlashMessages) {
                 // Show errors as flash messages and inline indicators
@@ -417,7 +392,7 @@ $(document).ready(function () {
             }
         }
     };
-    window.PathManager = PathManager;
+
     // Descriptor Manager
     const DescriptorManager = {
         init() {
@@ -426,17 +401,21 @@ $(document).ready(function () {
         },
 
         attachDropdownHandler() {
-            $('.custom-dropdown-descriptors .dropdown-header').click(function () {
+            $('.custom-dropdown-descriptors .dropdown-header').on('click', function() {
                 const $dropdown = $(this).parent();
+                const dropdownContent = document.querySelector('.dropdown-content');
                 $dropdown.toggleClass('open');
                 if ($dropdown.hasClass('open')) {
-                    Utils.smoothScroll(this);
+                    Utils.smoothScroll('.custom-dropdown-descriptors');
+                    dropdownContent.removeAttribute('inert');
+                } else {
+                    dropdownContent.setAttribute('inert', '');
                 }
             });
         },
 
         attachDescriptorClickHandlers() {
-            $('.descriptors-container').on('click', 'input[name="descriptors"]', function (e) {
+            $('.descriptors-container').on('click', 'input[name="descriptors"]', function(e) {
                 e.preventDefault();
                 const $checkbox = $(this);
 
@@ -485,20 +464,18 @@ $(document).ready(function () {
             };
 
             // Export form fields
-            const skip = new Set(['artist', 'title', 'mapper_name', 'difficulty_name', 'audio_path', 'beatmap_path', 'output_path']);
-            $('#inferenceForm').find('input, select, textarea').each(function () {
+            $('#inferenceForm').find('input, select, textarea').each(function() {
                 const $field = $(this);
                 const name = $field.attr('name');
                 const type = $field.attr('type');
 
                 if (name && type !== 'file') {
-                    if (skip.has(name)) return;
                     config.settings[name] = type === 'checkbox' ? $field.prop('checked') : $field.val();
                 }
             });
 
             // Export descriptors
-            $('input[name="descriptors"]').each(function () {
+            $('input[name="descriptors"]').each(function() {
                 const $checkbox = $(this);
                 const value = $checkbox.val();
                 if ($checkbox.hasClass('positive-check')) {
@@ -509,13 +486,9 @@ $(document).ready(function () {
             });
 
             // Export in-context options
-            $('input[name="in_context_options"]:checked').each(function () {
+            $('input[name="in_context_options"]:checked').each(function() {
                 config.inContextOptions.push($(this).val());
             });
-            // Export mapper list
-            if (typeof MapperManager !== "undefined") {
-                config.mappers = MapperManager.getAll();
-            }
 
             return config;
         },
@@ -572,11 +545,7 @@ $(document).ready(function () {
             if (confirm("Are you sure you want to reset all settings to default values? This cannot be undone.")) {
                 Utils.resetFormToDefaults();
                 $("#model, #gamemode, #beatmap_path").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path').trigger('blur');
-                if (typeof MapperManager !== "undefined") {
-                    MapperManager.clearAll();
-                    if (window.queueAPI?.clear) window.queueAPI.clear();   // also wipe queue
-                }
+                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
                 this.showConfigStatus("All settings reset to default values", "success");
             }
         },
@@ -635,14 +604,11 @@ $(document).ready(function () {
                 config.inContextOptions?.forEach(value => {
                     $(`input[name="in_context_options"][value="${value}"]`).prop('checked', true);
                 });
-                // Import mapper list (must come **after** the DOM is ready)
-                if (config.mappers && typeof MapperManager !== "undefined") {
-                    MapperManager.loadFromArray(config.mappers);
-                }
+
                 // Trigger updates
                 $("#model, #gamemode").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path').trigger('blur');
-                $('#audio_path, #output_path, #beatmap_path').trigger('input');
+                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
+                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('input');
 
                 this.showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
 
@@ -655,8 +621,8 @@ $(document).ready(function () {
         showConfigStatus(message, type) {
             const $status = $("#config-status");
             $status.text(message)
-                .css('color', type === 'success' ? '#28a745' : '#dc3545')
-                .fadeIn();
+                   .css('color', type === 'success' ? '#28a745' : '#dc3545')
+                   .fadeIn();
             setTimeout(() => $status.fadeOut(), 5000);
         }
     };
@@ -670,16 +636,6 @@ $(document).ready(function () {
 
         async handleSubmit(e) {
             e.preventDefault();
-            /* ----------------------------------------------------------
-   If there is ANYTHING in the queue, let the queue run and
-   skip the normal single-map path.
-   (window.queueAPI is defined in queue_manager.js)
----------------------------------------------------------- */
-            if (!window._queueInProgress &&
-                window.queueAPI?.hasJobs && window.queueAPI.hasJobs()) {
-                window.queueAPI.start();            // kick off queue
-                return;                             // ← stop here
-            }
 
             // Apply placeholder values before validation
             if (!await this.validateForm()) return;
@@ -721,15 +677,6 @@ $(document).ready(function () {
                 return false;
             }
 
-            if (!beatmapPath) {
-                const artist = $('#song_artist').val().trim();
-                const title = $('#song_title').val().trim();
-                if (!artist || !title) {
-                    Utils.smoothScroll('#song_artist');
-                    Utils.showFlashMessage("Artist and Title are required when no beatmap is provided.", 'error');
-                    return false;
-                }
-            }
             return true;
         },
 
@@ -764,7 +711,7 @@ $(document).ready(function () {
             const positiveDescriptors = [];
             const negativeDescriptors = [];
 
-            $('input[name="descriptors"]').each(function () {
+            $('input[name="descriptors"]').each(function() {
                 const $cb = $(this);
                 if ($cb.hasClass('positive-check')) {
                     positiveDescriptors.push($cb.val());
@@ -802,9 +749,9 @@ $(document).ready(function () {
                         errorMsg = jqXHR.responseJSON.message;
                     } else if (jqXHR.responseText) {
                         try {
-                            const parsed = JSON.parse(jqXHR.responseText);
-                            if (parsed && parsed.message) errorMsg = parsed.message;
-                        } catch (e) { /* ignore parsing error */ }
+                           const parsed = JSON.parse(jqXHR.responseText);
+                           if(parsed && parsed.message) errorMsg = parsed.message;
+                        } catch(e) { /* ignore parsing error */ }
                     }
                     Utils.showFlashMessage(errorMsg, 'error');
                     $("button[type='submit']").prop("disabled", false);
@@ -940,13 +887,6 @@ $(document).ready(function () {
             $("button[type='submit']").prop("disabled", false);
             $("#cancel-button").hide();
             AppState.isCancelled = false;
-            /* ────────────────────────────────────────────────────────────────
-   NEW: notify queue_manager.js that this map is finished
----------------------------------------------------------------- */
-            if (window._queueResolver) {
-                window._queueResolver();   // resolve the Promise the queue is awaiting
-                window._queueResolver = null;
-            }
         },
 
         handleInferenceError() {
@@ -983,8 +923,6 @@ $(document).ready(function () {
             }
         },
 
-        // Update cancelInference function
-        // In the cancelInference function
         cancelInference() {
             const $cancelBtn = $("#cancel-button");
             $cancelBtn.prop('disabled', true).text('Cancelling...');
@@ -992,26 +930,18 @@ $(document).ready(function () {
             $.ajax({
                 url: "/cancel_inference",
                 method: "POST",
-                success: (response) => {
-                    // NEW: Clear queue if flag is present
-                    if (response.clear_queue && window.queueAPI?.clear) {
-                        window.queueAPI.clear();
-                    }
-
-                    if (window.queueAPI?.stop) {
-                        window.queueAPI.stop();
-                    }
+                success: (response) => { // Expecting JSON response
                     AppState.isCancelled = true;
-                    Utils.showFlashMessage("Queue and inference cancelled", "cancel-success");
+                    Utils.showFlashMessage(response.message || "Inference cancelled successfully.", "cancel-success");
                 },
                 error: (jqXHR) => {
-                    const errorMsg = jqXHR.responseJSON?.message || "Failed to cancel";
+                    const errorMsg = jqXHR.responseJSON?.message || "Failed to send cancel request. Unknown error.";
                     Utils.showFlashMessage(errorMsg, "error");
                     $cancelBtn.prop('disabled', false).text('Cancel');
                 }
             });
         }
-    }
+    };
 
     // Initialize all components
     function initializeApp() {
@@ -1045,30 +975,4 @@ $(document).ready(function () {
 
     // Start the application
     initializeApp();
-    // $('#adv-toggle').on('click', () => $('#adv-wrapper').toggleClass('closed'));
-    // $('#queue-toggle').on('click', () => {
-    //     $('#queue-panel').toggleClass('closed');
-    //     $('#queue-toggle').text($('#queue-panel').hasClass('closed') ? 'Queue ▸' : 'Queue ▼');
-    // });
-    window.startInferenceWithFormData = function (formDataObj) {
-        return new Promise((resolve, reject) => {
-            // 1. shove the supplied values into the DOM form fields
-            //    (this lets all your existing validation & Ajax code run untouched)
-            Object.entries(formDataObj).forEach(([k, v]) => {
-                const $field = $('[name="' + k + '"]');
-                if (!$field.length) return;
-                if ($field.attr('type') === 'checkbox') {
-                    $field.prop('checked', !!v);
-                } else {
-                    $field.val(v);
-                }
-            });
-
-            // 2. save the resolver so handleSSEEnd can call it
-            window._queueResolver = resolve;
-
-            // 3. submit the form exactly as the normal UI does
-            $('#inferenceForm').trigger('submit');
-        });
-    };
 });

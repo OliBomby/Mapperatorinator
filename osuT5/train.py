@@ -2,20 +2,19 @@ import hydra
 import torch
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from accelerate.utils import ProjectConfiguration
+from omegaconf import OmegaConf
 
 from osuT5.config import TrainConfig
 from osuT5.utils import (
     setup_args,
     train,
     train_profiling,
-    get_model,
-    get_tokenizer,
+    load_model,
     get_scheduler,
     get_optimizer,
     get_dataloaders,
     get_shared_training_state,
 )
-
 
 
 def print_model_parameters(model):
@@ -45,7 +44,6 @@ def main(args: TrainConfig):
         "osuT5",
         init_kwargs={
             "wandb": {
-                "entity": "mappingtools",
                 "job_type": "training",
                 "sync_tensorboard": args.profile.do_profile,
                 "mode": args.logging.mode,
@@ -56,22 +54,20 @@ def main(args: TrainConfig):
     setup_args(args)
 
     shared = get_shared_training_state()
-    tokenizer = get_tokenizer(args)
-    model = get_model(args, tokenizer)
-    optimizer = get_optimizer(model, args)
-    scheduler = get_scheduler(optimizer, args, accelerator)
+    model, tokenizer = load_model(args.pretrained_path, args, accelerator.device, eval_mode=False)
     train_dataloader, test_dataloader = get_dataloaders(tokenizer, args, shared)
 
-    if args.pretrained_path:
-        state_dict = torch.load(args.pretrained_path)
-        if args.pretrained_t5_compat:
-            del state_dict["shared.weight"]
-            del state_dict["encoder.embed_tokens.weight"]
-            del state_dict["decoder.embed_tokens.weight"]
-            del state_dict["lm_head.weight"]
-            model.transformer.load_state_dict(state_dict, strict=False)
-        else:
-            model.load_state_dict(state_dict)
+    if args.enable_lora:
+        from peft import LoraConfig, get_peft_model
+        lora_config = LoraConfig(**OmegaConf.to_object(args.lora))
+        model = get_peft_model(model, lora_config)
+        lora_params = {n: p for n, p in model.named_parameters() if "lora" in n}
+        for n, p in lora_params.items():
+            print(n, p.sum())
+        model.print_trainable_parameters()
+
+    optimizer = get_optimizer(model, args)
+    scheduler = get_scheduler(optimizer, args, accelerator)
 
     if args.model.manual_norm_weights:
         print("Manually normalizing model weights")

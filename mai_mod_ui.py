@@ -48,21 +48,6 @@ def _ansi_style_supressor(func: Callable[..., Any]) -> Callable[..., Any]:
 werkzeug.serving._ansi_style = _ansi_style_supressor(werkzeug.serving._ansi_style)
 # --- End Patch ---
 
-if hasattr(webview, "FileDialog"):
-    OPEN_DIALOG = webview.FileDialog.OPEN
-    FOLDER_DIALOG = webview.FileDialog.FOLDER
-    SAVE_DIALOG = webview.FileDialog.SAVE
-else:
-    OPEN_DIALOG = webview.OPEN_DIALOG
-    FOLDER_DIALOG = webview.FOLDER_DIALOG
-    SAVE_DIALOG = webview.SAVE_DIALOG
-
-
-def parse_file_dialog_result(result):
-    if not result:
-        return None
-    return result[0] if isinstance(result, (list, tuple)) else result
-
 app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 app.secret_key = os.urandom(24)  # Set a secret key for Flask
 
@@ -77,9 +62,9 @@ class Api:
             print("Error: No pywebview window found.")
             return None
         current_window = webview.windows[0]
-        result = current_window.create_file_dialog(SAVE_DIALOG, save_filename=filename)
+        result = current_window.create_file_dialog(webview.SAVE_DIALOG, save_filename=filename)
         print(f"File dialog result: {result}")  # Debugging
-        return parse_file_dialog_result(result)
+        return result
 
     def browse_file(self, file_types=None):
         """Opens a file dialog and returns the selected file path."""
@@ -100,9 +85,9 @@ class Api:
                 file_types=file_types
             )
         except Exception:
-            result = current_window.create_file_dialog(OPEN_DIALOG)
+            result = current_window.create_file_dialog(webview.OPEN_DIALOG)
 
-        return parse_file_dialog_result(result)
+        return result[0] if result else None
 
     def browse_folder(self):
         """Opens a folder dialog and returns the selected folder path."""
@@ -111,10 +96,10 @@ class Api:
             print("Error: No pywebview window found.")
             return None
         current_window = webview.windows[0]
-        result = current_window.create_file_dialog(FOLDER_DIALOG)
+        result = current_window.create_file_dialog(webview.FOLDER_DIALOG)
         print(f"Folder dialog result: {result}")  # Debugging
         # FOLDER_DIALOG also returns a tuple containing the path
-        return parse_file_dialog_result(result)
+        return result[0] if result else None
 
 
 # --- Shared State for Inference Process ---
@@ -162,7 +147,7 @@ def format_list_arg(items):
 def index():
     """Renders the main HTML page."""
     # Jinja rendering is now handled by Flask's render_template
-    return render_template('index.html')
+    return render_template('index_mai_mod.html')
 
 
 @app.route('/start_inference', methods=['POST'])
@@ -175,12 +160,7 @@ def start_inference():
 
         # --- Construct Command List (shell=False) ---
         python_executable = sys.executable  # Get path to current Python interpreter
-        cmd = [python_executable, "inference.py", "-cn"]
-
-        # Get the model name from the form
-        model_name = request.form.get('model')
-        config_name = model_name
-        cmd.append(config_name)  # Add the config name to the command
+        cmd = [python_executable, "mai_mod.py", "raw_output=true"]
 
         # Helper to quote values for Hydra's command-line parser
         def hydra_quote(value):
@@ -191,7 +171,7 @@ def start_inference():
             return f"'{escaped_value}'"
 
         # Set of keys known to be paths needing quoting for Hydra
-        path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path"}
+        path_keys = {"audio_path", "output_path", "beatmap_path"}
 
         # Helper to add argument if value exists
         def add_arg(key, value):
@@ -211,73 +191,9 @@ def start_inference():
                 items_str = ",".join(quoted_items)
                 cmd.append(f"{key}=[{items_str}]")
 
-        # Required Paths
-        add_arg("audio_path", request.form.get('audio_path'))
-        add_arg("output_path", request.form.get('output_path'))
         # Beatmap path
         beatmap_path = request.form.get('beatmap_path')
         add_arg("beatmap_path", beatmap_path)
-
-        # Optional LoRA path
-        if 'lora_path' in request.form:
-            add_arg("lora_path", request.form.get('lora_path'))
-
-        # Basic settings
-        if 'gamemode' in request.form:
-            add_arg("gamemode", request.form.get('gamemode'))
-        else:
-            # Default to 0 if not provided
-            add_arg("gamemode", 0)
-        add_arg("difficulty", request.form.get('difficulty'))
-        add_arg("year", request.form.get('year'))
-
-        # Numeric settings
-        for param in ['hp_drain_rate', 'circle_size', 'overall_difficulty', 'approach_rate', 'slider_multiplier',
-                      'slider_tick_rate', 'keycount', 'hold_note_ratio', 'scroll_speed_ratio',
-                      'cfg_scale', 'temperature', 'top_p', 'seed']:
-            add_arg(param, request.form.get(param))
-        # mapper_id
-        add_arg("mapper_id", request.form.get('mapper_id'))
-
-        # Timing and segmentation
-        for param in ['start_time', 'end_time']:
-            add_arg(param, request.form.get(param))
-
-        # Checkboxes
-        if 'export_osz' in request.form:
-            cmd.append("export_osz=true")
-        else :
-            cmd.append("export_osz=false")
-        if 'add_to_beatmap' in request.form:
-            cmd.append("add_to_beatmap=true")
-        else:
-            cmd.append("add_to_beatmap=false")
-        if 'overwrite_reference_beatmap' in request.form:
-            cmd.append("overwrite_reference_beatmap=true")
-        else:
-            cmd.append("overwrite_reference_beatmap=false")
-        if 'hitsounded' in request.form:
-            cmd.append("hitsounded=true")
-        else:
-            cmd.append("hitsounded=false")
-        if 'super_timing' in request.form:
-            cmd.append("super_timing=true")
-        else:
-            cmd.append("super_timing=false")
-
-        # Descriptors
-        descriptors = request.form.getlist('descriptors')
-        add_list_arg("descriptors", descriptors)
-
-        # Negative Descriptors
-        negative_descriptors = request.form.getlist('negative_descriptors')
-        add_list_arg("negative_descriptors", negative_descriptors)
-
-        # In-Context Options
-        in_context_options = request.form.getlist('in_context_options')
-        if in_context_options and beatmap_path:  # Only add if not empty
-            add_list_arg("in_context", in_context_options)
-        # --- End Command List Construction ---
 
         print("Executing Command List (shell=False):", cmd)
 
@@ -539,14 +455,10 @@ def validate_paths():
     """Validates and autofills missing paths."""
     try:
         # Get paths
-        audio_path = request.form.get('audio_path', '').strip()
         beatmap_path = request.form.get('beatmap_path', '').strip()
-        output_path = request.form.get('output_path', '').strip()
 
         inference_args = InferenceConfig()
-        inference_args.audio_path = audio_path
         inference_args.beatmap_path = beatmap_path
-        inference_args.output_path = output_path
 
         result = autofill_paths(inference_args)
 
@@ -629,7 +541,7 @@ if __name__ == '__main__':
     # --- End Calculate Responsive Window Size ---
 
     # Create the pywebview window pointing to the Flask server
-    window_title = 'Mapperatorinator'
+    window_title = 'MaiMod'
     flask_url = f'http://127.0.0.1:{flask_port}/'
 
     print(f"Creating pywebview window loading URL: {flask_url}")
@@ -648,7 +560,7 @@ if __name__ == '__main__':
     )
 
     # Start the pywebview event loop (no args needed here now)
-    webview.start()
+    webview.start(debug=False)
 
     print("Pywebview window closed. Exiting application.")
     # Flask thread will exit automatically as it's a daemon

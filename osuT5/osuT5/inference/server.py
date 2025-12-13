@@ -36,12 +36,15 @@ def get_eos_token_id(tokenizer, lookback_time: float = 0, lookahead_time: float 
     return eos_token_id
 
 
+@torch.no_grad()
 def model_generate(model, tokenizer, model_kwargs, generate_kwargs):
     # To device
     model_kwargs = {k: v.to(model.device) if isinstance(v, torch.Tensor) else v for k, v in model_kwargs.items()}
+    model_kwargs = {k: v.to(model.dtype) if k != "inputs" and isinstance(v, torch.Tensor) and v.dtype == torch.float32 else v for k, v in model_kwargs.items()}
     batch_size = model_kwargs['inputs'].shape[0]
     # print(f"[Model Generate] Batch size: {batch_size}, Model device: {model.device}")
 
+    precision = generate_kwargs.pop('precision', 'fp32')
     cfg_scale = generate_kwargs.pop('cfg_scale', 1.0)
     timeshift_bias = generate_kwargs.pop('timeshift_bias', 0)
     types_first = generate_kwargs.pop('types_first', False)
@@ -90,14 +93,42 @@ def model_generate(model, tokenizer, model_kwargs, generate_kwargs):
     cache = get_cache(model, batch_size, generate_kwargs.get('num_beams', 1), cfg_scale)
 
     # Perform batched generation
-    return model.generate(
-        **model_kwargs,
-        **generate_kwargs,
-        use_cache=True,
-        past_key_values=cache,
-        logits_processor=logits_processor_list,
-        eos_token_id=get_eos_token_id(tokenizer, lookback_time=lookback_time, lookahead_time=lookahead_time, context_type=context_type),
-    ).cpu()
+    with torch.autocast(device_type=model.device.type, dtype=torch.bfloat16, enabled=precision == 'amp'):
+        result = model.generate(
+            **model_kwargs,
+            **generate_kwargs,
+            use_cache=True,
+            past_key_values=cache,
+            logits_processor=logits_processor_list,
+            eos_token_id=get_eos_token_id(tokenizer, lookback_time=lookback_time, lookahead_time=lookahead_time, context_type=context_type),
+        ).cpu()
+
+    return result
+
+
+@torch.no_grad()
+def model_forward(model, model_kwargs, generate_kwargs):
+    # To device
+    model_kwargs = {k: v.to(model.device) if isinstance(v, torch.Tensor) else v for k, v in model_kwargs.items()}
+    model_kwargs = {k: v.to(model.dtype) if k != "inputs" and isinstance(v, torch.Tensor) and v.dtype == torch.float32 else v for k, v in model_kwargs.items()}
+    model_kwargs["frames"] = model_kwargs.pop('inputs', None)  # Rename for compatibility
+    precision = generate_kwargs.pop('precision', 'fp32')
+    cfg_scale = generate_kwargs.pop('cfg_scale', 1.0)
+
+    # Prepare inputs for the model
+    model_kwargs = model.prepare_inputs_for_generation(**model_kwargs)
+
+    # Create the logits processors
+    logits_processor_list = LogitsProcessorList()
+    if cfg_scale > 1.0:
+        logits_processor_list.append(ClassifierFreeGuidanceLogitsProcessor(cfg_scale))
+
+    # Perform forward pass
+    with torch.autocast(device_type=model.device.type, dtype=torch.bfloat16, enabled=precision == 'amp'):
+        logits = model.forward(**model_kwargs).logits.to(torch.float32)
+
+    logits = logits_processor_list(model_kwargs["decoder_input_ids"], logits).cpu()
+    return logits
 
 
 class InferenceServer:

@@ -165,7 +165,7 @@ class OsuParser:
             events: List of events to add to.
             add_snap: Whether to add a snapping event.
         """
-        time_ms = int(time.total_seconds() * 1000)
+        time_ms = int(time.total_seconds() * 1000 + 1e-5)
         events.append(Event(EventType.TIME_SHIFT, time_ms))
         event_times.append(time_ms)
 
@@ -226,7 +226,7 @@ class OsuParser:
 
     def _add_position_event(self, pos: npt.NDArray, last_pos: npt.NDArray, time: timedelta, events: list[Event],
                             event_times: list[int], flip_x: bool, flip_y: bool) -> npt.NDArray:
-        time_ms = int(time.total_seconds() * 1000)
+        time_ms = int(time.total_seconds() * 1000 + 1e-5)
         if self.add_distances:
             dist = self._clip_dist(np.linalg.norm(pos - last_pos))
             events.append(Event(EventType.DISTANCE, dist))
@@ -271,7 +271,7 @@ class OsuParser:
             flip_y: bool = False,
     ) -> npt.NDArray:
         """Add a group of events to the event list."""
-        time_ms = int(time.total_seconds() * 1000) if time is not None else None
+        time_ms = int(time.total_seconds() * 1000 + 1e-5) if time is not None else None
 
         if self.types_first:
             events.append(Event(event_type))

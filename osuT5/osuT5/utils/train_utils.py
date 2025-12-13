@@ -40,7 +40,7 @@ def add_prefix(prefix: str, stats: dict[str, float]):
     return {f"{prefix}/{k}": v for k, v in stats.items()}
 
 
-def maybe_save_checkpoint(accelerator: Accelerator, args: TrainConfig, shared: Namespace):
+def maybe_save_checkpoint(model, accelerator: Accelerator, args: TrainConfig, shared: Namespace):
     if (
             shared.current_train_step > args.optim.total_steps
             or shared.current_train_step % args.checkpoint.every_steps == 0
@@ -59,6 +59,10 @@ def maybe_save_checkpoint(accelerator: Accelerator, args: TrainConfig, shared: N
         output_dir = f"checkpoint-{shared.current_train_step}"
         # Saving T5 has an issue that safe serialization removes shared tensors and then the model can't be loaded.
         accelerator.save_state(output_dir=output_dir, safe_serialization=False)
+
+        if args.enable_lora:
+            unwrapped_model = accelerator.unwrap_model(model)
+            unwrapped_model.save_pretrained(os.path.join(output_dir, "lora"))
 
         wandb_tracker = accelerator.get_tracker("wandb")
         if wandb_tracker is not None:
@@ -81,8 +85,12 @@ def maybe_save_checkpoint(accelerator: Accelerator, args: TrainConfig, shared: N
                 },
             )
 
-            for file in os.listdir(output_dir):
-                art.add_file(os.path.join(output_dir, file))
+            # Iterate over all files in the output_dir and subfolders and add them to the artifact
+            for root, _, files in os.walk(output_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    artifact_path = os.path.relpath(file_path, output_dir)
+                    art.add_file(file_path, artifact_path)
 
             wandb.log_artifact(art, aliases=["best"] if is_best else None)
             logger.info(f"Logged checkpoint to wandb: {art.name}")
@@ -97,8 +105,9 @@ def maybe_eval(
         shared: Namespace,
 ):
     if (
-            shared.current_train_step > args.optim.total_steps
-            or shared.current_train_step % args.eval.every_steps == 0
+            (shared.current_train_step > args.optim.total_steps
+             or shared.current_train_step % args.eval.every_steps == 0)
+            and args.data.test_dataset_end > args.data.test_dataset_start
     ):
         model.eval()
 
@@ -365,7 +374,7 @@ def train(
                 if accelerator.sync_gradients:
                     maybe_logging(model, accelerator, optimizer, train_averager, args, shared)
                     maybe_eval(model, accelerator, test_dataloader, tokenizer, args, shared)
-                    maybe_save_checkpoint(accelerator, args, shared)
+                    maybe_save_checkpoint(model, accelerator, args, shared)
 
                     shared.current_train_step += 1
 
@@ -373,7 +382,7 @@ def train(
 
     if not (args.profile.do_profile and args.profile.early_stop):
         maybe_eval(model, accelerator, test_dataloader, tokenizer, args, shared)
-        maybe_save_checkpoint(accelerator, args, shared)
+        maybe_save_checkpoint(model, accelerator, args, shared)
 
     accelerator.end_training()
 
