@@ -1,4 +1,4 @@
-$(document).ready(function() {
+$(document).ready(function () {
     // Application state and configuration
     const AppState = {
         evtSource: null,
@@ -26,8 +26,8 @@ $(document).ready(function() {
         showFlashMessage(message, type = 'success') {
             const flashContainer = $('#flash-container');
             const alertClass = type === 'success' ? 'alert success' :
-                             type === 'cancel-success' ? 'alert alert-cancel-success' :
-                             'alert error';
+                type === 'cancel-success' ? 'alert alert-cancel-success' :
+                    'alert error';
             const messageDiv = $(`<div class="${alertClass}">${message}</div>`);
             flashContainer.append(messageDiv);
             setTimeout(() => messageDiv.remove(), 5000);
@@ -66,6 +66,53 @@ $(document).ready(function() {
             $('#audio_path, #output_path, #beatmap_path, #lora_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
             PathManager.clearPlaceholders();
             PathManager.validateAndAutofillPaths(false);
+        },
+
+        showConfirmDialog(title, message, onConfirm, onCancel) {
+            // Remove existing confirm dialog if any
+            $('#confirm-dialog-modal').remove();
+
+            const modalHtml = `
+                <div id="confirm-dialog-modal" class="confirm-modal-overlay">
+                    <div class="confirm-modal">
+                        <div class="confirm-modal-header">
+                            <h3>${title}</h3>
+                        </div>
+                        <div class="confirm-modal-body">
+                            ${message}
+                        </div>
+                        <div class="confirm-modal-footer">
+                            <button type="button" class="confirm-no">Cancel</button>
+                            <button type="button" class="confirm-yes">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('body').append(modalHtml);
+
+            // Handle confirm
+            $('#confirm-dialog-modal .confirm-yes').on('click', () => {
+                $('#confirm-dialog-modal').remove();
+                if (onConfirm) onConfirm();
+            });
+
+            // Handle cancel
+            $('#confirm-dialog-modal .confirm-no').on('click', () => {
+                $('#confirm-dialog-modal').remove();
+                if (onCancel) onCancel();
+            });
+
+            // Handle clicking outside
+            $('#confirm-dialog-modal.confirm-modal-overlay').on('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    $('#confirm-dialog-modal').remove();
+                    if (onCancel) onCancel();
+                }
+            });
+
+            // Prevent clicks inside modal from closing
+            $('#confirm-dialog-modal .confirm-modal').on('click', (e) => e.stopPropagation());
         }
     };
 
@@ -77,7 +124,7 @@ $(document).ready(function() {
             const beatmapPath = $('#beatmap_path').val().trim();
 
             // Handle gamemode-based visibility
-            $('.conditional-field[data-show-for-gamemode]').each(function() {
+            $('.conditional-field[data-show-for-gamemode]').each(function () {
                 const $field = $(this);
                 const supportedModes = $field.data('show-for-gamemode').toString().split(',');
                 const shouldShow = supportedModes.includes(selectedGamemode);
@@ -90,7 +137,7 @@ $(document).ready(function() {
             });
 
             // Handle model-based visibility
-            $('.conditional-field[data-hide-for-model]').each(function() {
+            $('.conditional-field[data-hide-for-model]').each(function () {
                 const $field = $(this);
                 const hiddenModels = $field.data('hide-for-model').toString().split(',');
                 const shouldHide = hiddenModels.includes(selectedModel);
@@ -128,7 +175,7 @@ $(document).ready(function() {
             const $gamemodeSelect = $("#gamemode");
             if (selectedModel === "v30") {
                 $gamemodeSelect.val('0').prop('disabled', true);
-                $gamemodeSelect.find("option").each(function() {
+                $gamemodeSelect.find("option").each(function () {
                     $(this).prop('disabled', $(this).val() !== '0');
                 });
             } else {
@@ -138,9 +185,9 @@ $(document).ready(function() {
 
             // Handle in-context options
             const supportedContext = capabilities.supportedInContextOptions ||
-                                   ['NONE', 'TIMING', 'KIAI', 'MAP', 'GD', 'NO_HS'];
+                ['NONE', 'TIMING', 'KIAI', 'MAP', 'GD', 'NO_HS'];
 
-            $('input[name="in_context_options"]').each(function() {
+            $('input[name="in_context_options"]').each(function () {
                 const $checkbox = $(this);
                 const value = $checkbox.val();
                 const $item = $checkbox.closest('.context-option-item');
@@ -161,6 +208,20 @@ $(document).ready(function() {
                 $('#hitsounded').prop('checked', true);
             }
 
+            // Immediately hide/show model-specific fields (Year, Descriptors)
+            // This ensures they're properly hidden on page load without animation issues
+            $('.conditional-field[data-hide-for-model]').each(function () {
+                const $field = $(this);
+                const hiddenModels = $field.data('hide-for-model').toString().split(',');
+                const shouldHide = hiddenModels.includes(selectedModel);
+
+                if (shouldHide) {
+                    $field.hide();
+                } else {
+                    $field.show();
+                }
+            });
+
             this.updateConditionalFields();
         }
     };
@@ -172,9 +233,22 @@ $(document).ready(function() {
         },
 
         attachBrowseHandlers() {
-            $('.browse-button[data-browse-type]').click(async function() {
+            // Use event delegation on document for more robust handling
+            $(document).on('click', '.browse-button[data-browse-type]', async function () {
                 const browseType = $(this).data('browse-type');
                 const targetId = $(this).data('target');
+
+                if (!targetId) {
+                    console.warn('Browse button missing data-target attribute');
+                    return;
+                }
+
+                // Check if pywebview API is available
+                if (!window.pywebview?.api) {
+                    console.warn('pywebview API not available - running in browser mode');
+                    Utils.showFlashMessage('File browser not available in browser mode. Please use the desktop app.', 'error');
+                    return;
+                }
 
                 try {
                     let path;
@@ -227,17 +301,17 @@ $(document).ready(function() {
         init() {
             this.attachPathChangeHandlers();
             this.attachClearButtonHandlers();
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').trigger('blur');
+            $('#audio_path, #beatmap_path, #output_path, #lora_path, #background_path').trigger('blur');
         },
 
         attachPathChangeHandlers() {
             // Listen for input events (typing)
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('input', (e) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path, #background_path').on('input', (e) => {
                 this.updateClearButtonVisibility(e.target);
             });
 
             // Listen for blur events (leaving field) - immediate validation
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('blur', (e) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path, #background_path').on('blur', (e) => {
                 this.updateClearButtonVisibility(e.target);
                 this.validateAndAutofillPaths(false);
             });
@@ -256,7 +330,7 @@ $(document).ready(function() {
             });
 
             // Initial visibility check for all fields
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').each((index, element) => {
+            $('#audio_path, #beatmap_path, #output_path, #lora_path, #background_path').each((index, element) => {
                 this.updateClearButtonVisibility(element);
             });
         },
@@ -393,6 +467,514 @@ $(document).ready(function() {
         }
     };
 
+    // Beatmap Customization Manager (Preview Time & Background)
+    const BeatmapCustomization = {
+        audioElement: null,
+        lastAudioPath: '',
+        lastPickerPosition: 0, // Store the last picker position (separate from saved preview time)
+
+        init() {
+            this.attachEventHandlers();
+            this.setupBackgroundPreview();
+            this.updatePreviewDisplay();
+        },
+
+        attachEventHandlers() {
+            // Pick preview button
+            $('#pick-preview-btn').on('click', () => this.openPreviewPicker());
+
+            // Preview time input change
+            $('#preview_time').on('input', () => this.updatePreviewDisplay());
+
+            // Background path change - show preview
+            $('#background_path').on('input blur', () => this.updateBackgroundPreview());
+
+            // Reset preview time and background when audio path changes
+            $('#audio_path').on('change blur', () => this.onAudioPathChanged());
+        },
+
+        setupBackgroundPreview() {
+            // Setup clear button handler for background
+            $(document).on('click', '.clear-input-btn[data-target="background_path"]', () => {
+                setTimeout(() => this.updateBackgroundPreview(), 10);
+            });
+        },
+
+        onAudioPathChanged() {
+            const currentAudioPath = $('#audio_path').val().trim();
+
+            // Only reset if the audio path actually changed to a different file
+            if (this.lastAudioPath && currentAudioPath !== this.lastAudioPath) {
+                this.clearCustomizations();
+            }
+
+            this.lastAudioPath = currentAudioPath;
+        },
+
+        clearCustomizations() {
+            // Clear preview time
+            $('#preview_time').val('');
+            $('#preview-time-display').text('').removeClass('has-value');
+
+            // Clear last picker position since audio changed
+            this.lastPickerPosition = 0;
+
+            // Clear background
+            $('#background_path').val('');
+            $('#background-preview').hide();
+
+            // Update clear button visibility
+            PathManager.updateClearButtonVisibility($('#background_path')[0]);
+        },
+
+        updatePreviewDisplay() {
+            const ms = parseInt($('#preview_time').val());
+            const $display = $('#preview-time-display');
+
+            if (!isNaN(ms) && ms >= 0) {
+                const seconds = ms / 1000;
+                const minutes = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                $display.text(`(${minutes}:${secs.toString().padStart(2, '0')})`).addClass('has-value');
+            } else {
+                $display.text('').removeClass('has-value');
+            }
+        },
+
+        updateBackgroundPreview() {
+            const bgPath = $('#background_path').val().trim();
+            const $preview = $('#background-preview');
+            const $img = $('#background-preview-img');
+
+            if (!bgPath) {
+                $preview.hide();
+                return;
+            }
+
+            // Request preview from backend
+            $.ajax({
+                url: '/get_image_preview',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ path: bgPath }),
+                success: (response) => {
+                    if (response.success && response.data) {
+                        $img.attr('src', 'data:image/' + response.type + ';base64,' + response.data);
+                        $preview.show();
+                    } else {
+                        $preview.hide();
+                    }
+                },
+                error: () => {
+                    $preview.hide();
+                }
+            });
+        },
+
+        openPreviewPicker() {
+            const audioPath = $('#audio_path').val().trim() || $('#audio_path').attr('placeholder');
+
+            if (!audioPath) {
+                Utils.showFlashMessage('Please select an audio file first.', 'error');
+                return;
+            }
+
+            // Create modal for preview picker
+            this.createPreviewModal(audioPath);
+        },
+
+        createPreviewModal(audioPath) {
+            // Remove existing modal if any
+            $('#preview-picker-modal').remove();
+
+            const modalHtml = `
+                <div id="preview-picker-modal" class="preview-modal-overlay">
+                    <div class="preview-modal">
+                        <div class="preview-modal-header">
+                            <h3>Pick Preview Point</h3>
+                            <button type="button" class="preview-modal-close">×</button>
+                        </div>
+                        <div class="preview-modal-body">
+                            <div class="preview-controls-row">
+                                <label>Playback Speed:</label>
+                                <select id="preview-speed">
+                                    <option value="0.25">25%</option>
+                                    <option value="0.5">50%</option>
+                                    <option value="0.75">75%</option>
+                                    <option value="1" selected>100%</option>
+                                </select>
+                            </div>
+                            <div class="preview-slider-container" id="preview-slider-track">
+                                <div class="preview-slider-fill" id="preview-slider-fill"></div>
+                                <div class="preview-slider-thumb" id="preview-slider-thumb"></div>
+                            </div>
+                            <div class="preview-time-labels">
+                                <span id="preview-current-time">0:00</span>
+                                <span id="preview-total-time">--:--</span>
+                            </div>
+                            <div class="preview-input-row">
+                                <div class="preview-input-item">
+                                    <label>Milliseconds:</label>
+                                    <input type="number" id="preview-ms-input" min="0" value="0" />
+                                </div>
+                                <div class="preview-input-item">
+                                    <label>Seconds:</label>
+                                    <input type="number" id="preview-sec-input" min="0" step="1" value="0" />
+                                </div>
+                            </div>
+                            <div class="preview-volume-row">
+                                <label>Volume:</label>
+                                <div class="volume-slider-container" id="volume-slider-track">
+                                    <div class="volume-slider-fill" id="volume-slider-fill"></div>
+                                    <div class="volume-slider-thumb" id="volume-slider-thumb"></div>
+                                </div>
+                            </div>
+                            <div class="preview-buttons-row">
+                                <button type="button" id="preview-play-btn" class="browse-button">Play / Pause</button>
+                                <button type="button" id="preview-test-btn" class="browse-button" title="Play 10 seconds from current position">Test Preview</button>
+                                <button type="button" id="preview-set-btn" class="browse-button accent">Use This Point</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('body').append(modalHtml);
+
+            // Setup audio and controls
+            this.setupPreviewAudio(audioPath);
+        },
+
+        setupPreviewAudio(audioPath) {
+            // Request audio data from backend
+            $.ajax({
+                url: '/get_audio_info',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ path: audioPath }),
+                success: (response) => {
+                    if (response.success) {
+                        this.initializeAudioPlayer(response.url || audioPath, response.duration);
+                    } else {
+                        Utils.showFlashMessage('Failed to load audio: ' + (response.message || 'Unknown error'), 'error');
+                        $('#preview-picker-modal').remove();
+                    }
+                },
+                error: () => {
+                    // Try direct file URL as fallback
+                    this.initializeAudioPlayer('file:///' + audioPath.replace(/\\/g, '/'));
+                }
+            });
+
+            // Setup modal close
+            $('.preview-modal-close, .preview-modal-overlay').on('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    this.closePreviewModal();
+                }
+            });
+
+            // Prevent clicks inside modal from closing it
+            $('.preview-modal').on('click', (e) => e.stopPropagation());
+        },
+
+        initializeAudioPlayer(audioUrl, duration) {
+            if (this.audioElement) {
+                this.audioElement.pause();
+                this.audioElement = null;
+            }
+
+            this.audioElement = new Audio();
+            this.audioElement.crossOrigin = 'anonymous';
+
+            const self = this;
+            const $sliderTrack = $('#preview-slider-track');
+            const $sliderFill = $('#preview-slider-fill');
+            const $sliderThumb = $('#preview-slider-thumb');
+            const $volumeTrack = $('#volume-slider-track');
+            const $volumeFill = $('#volume-slider-fill');
+            const $volumeThumb = $('#volume-slider-thumb');
+            const $msInput = $('#preview-ms-input');
+            const $secInput = $('#preview-sec-input');
+            const $currentTime = $('#preview-current-time');
+            const $totalTime = $('#preview-total-time');
+            const $speed = $('#preview-speed');
+
+            // Get existing preview time to restore position, or use last picker position
+            const existingPreviewTime = parseInt($('#preview_time').val()) || 0;
+            const initialPosition = existingPreviewTime > 0 ? existingPreviewTime : self.lastPickerPosition;
+
+            // Set initial volume
+            this.audioElement.volume = 0.5;
+
+            // Initialize volume slider visual (50%)
+            $volumeFill.css('width', '50%');
+            $volumeThumb.css('left', '50%');
+
+            // Track state
+            self.sliderDragging = false;
+            self.audioLoaded = false;
+            self.audioDuration = 0;
+            self.currentMs = 0;
+
+            // Function to update slider visual position
+            function updateSliderVisual(ms) {
+                if (self.audioDuration <= 0) return;
+                const percent = Math.min(100, Math.max(0, (ms / self.audioDuration) * 100));
+                $sliderFill.css('width', percent + '%');
+                $sliderThumb.css('left', percent + '%');
+            }
+
+            // Function to update all displays WITHOUT changing audio position
+            function updateDisplays(ms) {
+                self.currentMs = ms;
+                $msInput.val(Math.floor(ms));
+                $secInput.val(Math.floor(ms / 1000));
+                $currentTime.text(self.formatTime(ms));
+                updateSliderVisual(ms);
+            }
+
+            // Simple direct seek - no event listeners, just set and verify
+            function seekAudioTo(ms) {
+                const targetSec = Math.max(0, Math.min(ms / 1000, self.audioElement.duration || 0));
+                self.audioElement.currentTime = targetSec;
+            }
+
+            this.audioElement.addEventListener('loadedmetadata', () => {
+                self.audioDuration = self.audioElement.duration * 1000;
+                $msInput.attr('max', Math.floor(self.audioDuration));
+                $secInput.attr('max', Math.floor(self.audioDuration / 1000));
+                $totalTime.text(self.formatTime(self.audioDuration));
+
+                // Restore to initial position if set and valid
+                if (initialPosition > 0 && initialPosition <= self.audioDuration) {
+                    updateDisplays(initialPosition);
+                    seekAudioTo(initialPosition);
+                } else {
+                    updateDisplays(0);
+                }
+
+                self.audioLoaded = true;
+            });
+
+            this.audioElement.addEventListener('timeupdate', () => {
+                // Only update display if user is not dragging the slider
+                if (!self.sliderDragging && self.audioLoaded) {
+                    const ms = self.audioElement.currentTime * 1000;
+                    updateDisplays(ms);
+                }
+            });
+
+            // Custom slider mouse handling
+            // Only updates visual display - does NOT seek audio during drag
+            function handleSliderInteraction(e) {
+                if (!self.audioLoaded || self.audioDuration <= 0) return 0;
+
+                const rect = $sliderTrack[0].getBoundingClientRect();
+                const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const newMs = Math.floor(percent * self.audioDuration);
+
+                // Only update visual display - don't seek yet
+                updateDisplays(newMs);
+
+                return newMs;
+            }
+
+            // Track if audio was playing before user interaction
+            let wasPlaying = false;
+
+            $sliderTrack.on('mousedown', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                self.sliderDragging = true;
+
+                // Remember if audio was playing and pause it
+                wasPlaying = !self.audioElement.paused;
+                if (wasPlaying) {
+                    self.audioElement.pause();
+                }
+
+                // Handle the click - only updates display, no seek yet
+                handleSliderInteraction(e);
+
+                function onMouseMove(moveEvent) {
+                    // Only update display while dragging - no audio seek
+                    handleSliderInteraction(moveEvent);
+                }
+
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+
+                    // Now do the actual seek
+                    seekAudioTo(self.currentMs);
+
+                    // If was playing, wait for seek to settle then resume
+                    if (wasPlaying) {
+                        // Use seeked event to know when seek is complete
+                        const onSeeked = () => {
+                            self.audioElement.removeEventListener('seeked', onSeeked);
+                            self.audioElement.play();
+                            self.sliderDragging = false;
+                        };
+                        self.audioElement.addEventListener('seeked', onSeeked);
+
+                        // Fallback in case seeked doesn't fire
+                        setTimeout(() => {
+                            self.audioElement.removeEventListener('seeked', onSeeked);
+                            if (self.audioElement.paused && wasPlaying) {
+                                self.audioElement.play();
+                            }
+                            self.sliderDragging = false;
+                        }, 300);
+                    } else {
+                        self.sliderDragging = false;
+                    }
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            // Custom volume slider handling
+            function handleVolumeInteraction(e) {
+                const rect = $volumeTrack[0].getBoundingClientRect();
+                const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+
+                self.audioElement.volume = percent;
+                $volumeFill.css('width', (percent * 100) + '%');
+                $volumeThumb.css('left', (percent * 100) + '%');
+            }
+
+            $volumeTrack.on('mousedown', function (e) {
+                e.preventDefault();
+
+                handleVolumeInteraction(e);
+
+                function onMouseMove(moveEvent) {
+                    handleVolumeInteraction(moveEvent);
+                }
+
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            $msInput.on('change', () => {
+                const ms = parseInt($msInput.val()) || 0;
+                if (self.audioLoaded) {
+                    updateDisplays(ms);
+                    seekAudioTo(ms);
+                }
+            });
+
+            $secInput.on('change', () => {
+                const sec = parseInt($secInput.val()) || 0;
+                const ms = sec * 1000;
+                if (self.audioLoaded) {
+                    updateDisplays(ms);
+                    seekAudioTo(ms);
+                }
+            });
+
+            $speed.on('change', () => {
+                self.audioElement.playbackRate = parseFloat($speed.val());
+            });
+
+            $('#preview-play-btn').on('click', () => {
+                if (self.audioElement.paused) {
+                    // Simply seek to current position and play
+                    if (self.audioLoaded) {
+                        seekAudioTo(self.currentMs);
+                        self.audioElement.play();
+                    } else {
+                        self.audioElement.play();
+                    }
+                } else {
+                    self.audioElement.pause();
+                }
+            });
+
+            // Test Preview button - plays 10 seconds from the selected position
+            // then returns to the original position without affecting selection
+            let testPreviewTimeout = null;
+            let savedPosition = 0;
+            let isTestingPreview = false;
+
+            $('#preview-test-btn').on('click', () => {
+                if (isTestingPreview) {
+                    // Stop the test preview
+                    clearTimeout(testPreviewTimeout);
+                    self.audioElement.pause();
+
+                    // Restore the saved position
+                    seekAudioTo(savedPosition);
+                    updateDisplays(savedPosition);
+
+                    isTestingPreview = false;
+                    $('#preview-test-btn').text('Test Preview');
+                    return;
+                }
+
+                // Save current position
+                savedPosition = self.currentMs;
+                isTestingPreview = true;
+                $('#preview-test-btn').text('Stop Test');
+
+                // Seek to the saved position and play
+                seekAudioTo(savedPosition);
+                self.audioElement.play();
+
+                // Stop after 10 seconds and restore position
+                testPreviewTimeout = setTimeout(() => {
+                    self.audioElement.pause();
+                    seekAudioTo(savedPosition);
+                    updateDisplays(savedPosition);
+
+                    isTestingPreview = false;
+                    $('#preview-test-btn').text('Test Preview');
+                }, 10000);
+            });
+
+            $('#preview-set-btn').on('click', () => {
+                const ms = parseInt($msInput.val()) || 0;
+                $('#preview_time').val(ms);
+                self.updatePreviewDisplay();
+                self.closePreviewModal();
+                Utils.showFlashMessage(`Preview point set to ${self.formatTime(ms)}`, 'success');
+            });
+
+            // Load audio
+            this.audioElement.src = audioUrl;
+            this.audioElement.load();
+        },
+
+        formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        },
+
+        closePreviewModal() {
+            // Save the current picker position before closing
+            const currentMs = parseInt($('#preview-ms-input').val()) || 0;
+            if (currentMs > 0) {
+                this.lastPickerPosition = currentMs;
+            }
+
+            if (this.audioElement) {
+                this.audioElement.pause();
+                this.audioElement = null;
+            }
+            $('#preview-picker-modal').remove();
+        }
+    };
+
     // Descriptor Manager
     const DescriptorManager = {
         init() {
@@ -401,7 +983,7 @@ $(document).ready(function() {
         },
 
         attachDropdownHandler() {
-            $('.custom-dropdown-descriptors .dropdown-header').on('click', function() {
+            $('.custom-dropdown-descriptors .dropdown-header').on('click', function () {
                 const $dropdown = $(this).parent();
                 const dropdownContent = document.querySelector('.dropdown-content');
                 $dropdown.toggleClass('open');
@@ -415,7 +997,7 @@ $(document).ready(function() {
         },
 
         attachDescriptorClickHandlers() {
-            $('.descriptors-container').on('click', 'input[name="descriptors"]', function(e) {
+            $('.descriptors-container').on('click', 'input[name="descriptors"]', function (e) {
                 e.preventDefault();
                 const $checkbox = $(this);
 
@@ -442,6 +1024,17 @@ $(document).ready(function() {
             $('#import-config-btn').click(() => $('#import-config-input').click());
             $('#reset-config-btn').click(() => this.resetToDefaults());
             $('#import-config-input').change((e) => this.handleFileImport(e));
+
+            // Handle auto-detect checkbox toggle
+            $('#auto_detect_metadata').on('change', function () {
+                if ($(this).prop('checked')) {
+                    // Trigger detection if audio path exists
+                    SongDetection.forceDetect();
+                } else {
+                    // Hide detection status when disabled
+                    $('#song-detection-status').hide();
+                }
+            });
         },
 
         exportConfiguration() {
@@ -456,15 +1049,24 @@ $(document).ready(function() {
 
         buildConfigObject() {
             const config = {
-                version: "1.0",
+                version: "1.1",
                 timestamp: new Date().toISOString(),
                 settings: {},
                 descriptors: { positive: [], negative: [] },
-                inContextOptions: []
+                inContextOptions: [],
+                mapperList: [],
+                songMetadata: {
+                    artist: $('#detected_artist').val() || '',
+                    title: $('#detected_title').val() || ''
+                },
+                beatmapCustomization: {
+                    previewTime: $('#preview_time').val() || '',
+                    backgroundPath: $('#background_path').val() || ''
+                }
             };
 
             // Export form fields
-            $('#inferenceForm').find('input, select, textarea').each(function() {
+            $('#inferenceForm').find('input, select, textarea').each(function () {
                 const $field = $(this);
                 const name = $field.attr('name');
                 const type = $field.attr('type');
@@ -475,7 +1077,7 @@ $(document).ready(function() {
             });
 
             // Export descriptors
-            $('input[name="descriptors"]').each(function() {
+            $('input[name="descriptors"]').each(function () {
                 const $checkbox = $(this);
                 const value = $checkbox.val();
                 if ($checkbox.hasClass('positive-check')) {
@@ -486,9 +1088,14 @@ $(document).ready(function() {
             });
 
             // Export in-context options
-            $('input[name="in_context_options"]:checked').each(function() {
+            $('input[name="in_context_options"]:checked').each(function () {
                 config.inContextOptions.push($(this).val());
             });
+
+            // Export mapper list
+            if (typeof MapperManager !== 'undefined' && MapperManager.getAll) {
+                config.mapperList = MapperManager.getAll();
+            }
 
             return config;
         },
@@ -542,12 +1149,42 @@ $(document).ready(function() {
         },
 
         resetToDefaults() {
-            if (confirm("Are you sure you want to reset all settings to default values? This cannot be undone.")) {
-                Utils.resetFormToDefaults();
-                $("#model, #gamemode, #beatmap_path").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
-                this.showConfigStatus("All settings reset to default values", "success");
-            }
+            Utils.showConfirmDialog(
+                "Reset All Settings",
+                "Are you sure you want to reset all settings to default values? This will also clear the queue and mapper list. This cannot be undone.",
+                () => {
+                    // On confirm
+                    Utils.resetFormToDefaults();
+                    $("#model, #gamemode, #beatmap_path").trigger('change');
+                    $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
+
+                    // Clear queue
+                    if (typeof QueueManager !== 'undefined') {
+                        QueueManager.clear();
+                    }
+
+                    // Clear mapper list
+                    if (typeof MapperManager !== 'undefined') {
+                        MapperManager.clearAll();
+                    }
+
+                    // Clear song detection status
+                    $('#song-detection-status').hide().text('').removeClass('success error detecting');
+                    $('#detected_artist, #detected_title').val('');
+
+                    // Clear beatmap customization (preview time and background)
+                    if (typeof BeatmapCustomization !== 'undefined') {
+                        BeatmapCustomization.clearCustomizations();
+                    }
+
+                    // Update UI
+                    if (typeof QueueUI !== 'undefined') {
+                        QueueUI.updateUI();
+                    }
+
+                    this.showConfigStatus("All settings reset to default values", "success");
+                }
+            );
         },
 
         handleFileImport(e) {
@@ -605,10 +1242,56 @@ $(document).ready(function() {
                     $(`input[name="in_context_options"][value="${value}"]`).prop('checked', true);
                 });
 
+                // Import mapper list
+                if (config.mapperList && typeof MapperManager !== 'undefined' && MapperManager.loadFromArray) {
+                    MapperManager.loadFromArray(config.mapperList);
+                }
+
+                // Import saved song metadata (artist/title) if present
+                if (config.songMetadata) {
+                    if (config.songMetadata.artist) {
+                        $('#detected_artist').val(config.songMetadata.artist);
+                    }
+                    if (config.songMetadata.title) {
+                        $('#detected_title').val(config.songMetadata.title);
+                    }
+                    // Don't auto-detect if we already have saved metadata
+                    if (config.songMetadata.artist || config.songMetadata.title) {
+                        SongDetection.lastAudioPath = $('#audio_path').val().trim(); // Prevent re-detection
+                        $('#song-detection-status').text('✓ Song info loaded from config').addClass('success').show();
+                    }
+                }
+
+                // Import beatmap customization (preview time and background)
+                if (config.beatmapCustomization) {
+                    if (config.beatmapCustomization.previewTime) {
+                        $('#preview_time').val(config.beatmapCustomization.previewTime);
+                        BeatmapCustomization.updatePreviewDisplay();
+                    }
+                    if (config.beatmapCustomization.backgroundPath) {
+                        $('#background_path').val(config.beatmapCustomization.backgroundPath);
+                        PathManager.updateClearButtonVisibility($('#background_path')[0]);
+                        BeatmapCustomization.updateBackgroundPreview();
+                    }
+                }
+
                 // Trigger updates
                 $("#model, #gamemode").trigger('change');
                 $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
                 $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('input');
+
+                // Only trigger song detection if checkbox is checked AND no saved metadata AND audio path exists
+                if ($('#auto_detect_metadata').prop('checked') &&
+                    $('#audio_path').val().trim() &&
+                    !config.songMetadata?.artist &&
+                    !config.songMetadata?.title) {
+                    SongDetection.forceDetect();
+                }
+
+                // Update queue UI
+                if (typeof QueueUI !== 'undefined') {
+                    QueueUI.updateUI();
+                }
 
                 this.showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
 
@@ -621,21 +1304,43 @@ $(document).ready(function() {
         showConfigStatus(message, type) {
             const $status = $("#config-status");
             $status.text(message)
-                   .css('color', type === 'success' ? '#28a745' : '#dc3545')
-                   .fadeIn();
+                .css('color', type === 'success' ? '#28a745' : '#dc3545')
+                .fadeIn();
             setTimeout(() => $status.fadeOut(), 5000);
         }
     };
 
     // Inference Manager
     const InferenceManager = {
+        isRunning: false,
+
         init() {
             $('#inferenceForm').submit((e) => this.handleSubmit(e));
-            $('#cancel-button').click(() => this.cancelInference());
+            $('#cancel-button').click(() => this.handleCancelClick());
+        },
+
+        handleCancelClick() {
+            // If queue is running, cancel the whole queue; otherwise cancel single inference
+            if (QueueUI.queueRunning) {
+                QueueUI.cancelQueue();
+            } else {
+                this.cancelInference();
+            }
         },
 
         async handleSubmit(e) {
             e.preventDefault();
+
+            // Prevent double-clicks and clicks during song detection
+            if (this.isRunning) {
+                Utils.showFlashMessage('Inference is already running. Please wait.', 'error');
+                return;
+            }
+
+            if (SongDetection.isInProgress()) {
+                Utils.showFlashMessage('Please wait for song detection to complete.', 'error');
+                return;
+            }
 
             // Apply placeholder values before validation
             if (!await this.validateForm()) return;
@@ -711,7 +1416,7 @@ $(document).ready(function() {
             const positiveDescriptors = [];
             const negativeDescriptors = [];
 
-            $('input[name="descriptors"]').each(function() {
+            $('input[name="descriptors"]').each(function () {
                 const $cb = $(this);
                 if ($cb.hasClass('positive-check')) {
                     positiveDescriptors.push($cb.val());
@@ -732,6 +1437,9 @@ $(document).ready(function() {
         },
 
         startInference() {
+            this.isRunning = true;
+            $("button[type='submit']").prop("disabled", true);
+
             $.ajax({
                 url: "/start_inference",
                 method: "POST",
@@ -749,11 +1457,12 @@ $(document).ready(function() {
                         errorMsg = jqXHR.responseJSON.message;
                     } else if (jqXHR.responseText) {
                         try {
-                           const parsed = JSON.parse(jqXHR.responseText);
-                           if(parsed && parsed.message) errorMsg = parsed.message;
-                        } catch(e) { /* ignore parsing error */ }
+                            const parsed = JSON.parse(jqXHR.responseText);
+                            if (parsed && parsed.message) errorMsg = parsed.message;
+                        } catch (e) { /* ignore parsing error */ }
                     }
                     Utils.showFlashMessage(errorMsg, 'error');
+                    this.isRunning = false;
                     $("button[type='submit']").prop("disabled", false);
                     $("#cancel-button").hide();
                     $("#progress_output").hide();
@@ -861,6 +1570,7 @@ $(document).ready(function() {
             }
 
             if (!AppState.isCancelled) {
+                this.isRunning = false;
                 $("button[type='submit']").prop("disabled", false);
             }
             $("#cancel-button").hide();
@@ -884,6 +1594,7 @@ $(document).ready(function() {
                 $("#progressBar").css("width", "100%").removeClass('error');
             }
 
+            this.isRunning = false;
             $("button[type='submit']").prop("disabled", false);
             $("#cancel-button").hide();
             AppState.isCancelled = false;
@@ -943,6 +1654,1049 @@ $(document).ready(function() {
         }
     };
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // QUEUE SYSTEM INTEGRATION
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // Mapper Lookup Manager
+    const MapperLookup = {
+        cache: {},
+        pendingLookups: {},
+
+        init() {
+            $('#mapper_id').on('blur', () => this.lookupCurrentMapper());
+            $('#mapper_id').on('input', () => this.clearDisplay());
+        },
+
+        clearDisplay() {
+            $('#mapper_name_display').removeClass('visible loading error').text('');
+            $('#mapper_name').val('');
+        },
+
+        async lookupCurrentMapper() {
+            const mapperId = $('#mapper_id').val().trim();
+            console.log('[MapperLookup] Looking up mapper:', mapperId);
+            if (!mapperId) {
+                this.clearDisplay();
+                return;
+            }
+
+            const $display = $('#mapper_name_display');
+            console.log('[MapperLookup] Display element found:', $display.length > 0);
+
+            // Check cache first
+            if (this.cache[mapperId]) {
+                console.log('[MapperLookup] Using cached value:', this.cache[mapperId]);
+                $display.text(`(${this.cache[mapperId]})`).removeClass('loading error').addClass('visible');
+                $('#mapper_name').val(this.cache[mapperId]);
+                return;
+            }
+
+            // Show loading state
+            $display.text('Looking up...').removeClass('error visible').addClass('loading visible');
+
+            try {
+                const name = await this.lookup(mapperId);
+                console.log('[MapperLookup] Lookup returned:', name);
+                if (name) {
+                    this.cache[mapperId] = name;
+                    $display.text(`(${name})`).removeClass('loading error').addClass('visible');
+                    $('#mapper_name').val(name);
+                    console.log('[MapperLookup] Display updated to:', $display.text());
+                } else {
+                    $display.text('(Not found)').removeClass('loading visible').addClass('error visible');
+                    $('#mapper_name').val('');
+                }
+            } catch (error) {
+                console.error('Mapper lookup error:', error);
+                $display.text('(Lookup failed)').removeClass('loading visible').addClass('error visible');
+                $('#mapper_name').val('');
+            }
+        },
+
+        async lookup(mapperId) {
+            // Avoid duplicate requests
+            if (this.pendingLookups[mapperId]) {
+                return this.pendingLookups[mapperId];
+            }
+
+            this.pendingLookups[mapperId] = new Promise((resolve, reject) => {
+                $.ajax({
+                    url: '/lookup_mapper_name',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ mapper_id: mapperId }),
+                    success: (response) => {
+                        console.log('[MapperLookup] Response:', response);
+                        delete this.pendingLookups[mapperId];
+                        resolve(response.username || null);
+                    },
+                    error: (xhr) => {
+                        console.error('[MapperLookup] Error:', xhr.responseJSON);
+                        delete this.pendingLookups[mapperId];
+                        reject(new Error(xhr.responseJSON?.error || 'Lookup failed'));
+                    }
+                });
+            });
+
+            return this.pendingLookups[mapperId];
+        }
+    };
+
+    // Difficulty Name Generator
+    const DifficultyNameGenerator = {
+        init() {
+            // Listen for star rating changes
+            $('#difficulty').on('input change', () => this.updateDifficultyName());
+
+            // Listen for checkbox changes
+            $('#auto_generate_diff_name').on('change', () => {
+                if ($('#auto_generate_diff_name').prop('checked')) {
+                    this.updateDifficultyName();
+                }
+            });
+        },
+
+        getDifficultyName(stars) {
+            stars = parseFloat(stars) || 5.0;
+            if (stars < 2.0) return 'Easy';
+            if (stars < 2.7) return 'Normal';
+            if (stars < 4.0) return 'Hard';
+            if (stars < 5.3) return 'Insane';
+            if (stars < 6.5) return 'Expert';
+            return 'Expert+';
+        },
+
+        updateDifficultyName() {
+            if (!$('#auto_generate_diff_name').prop('checked')) {
+                return;
+            }
+
+            const stars = $('#difficulty').val();
+            const diffName = this.getDifficultyName(stars);
+            $('#diff_name').val(diffName);
+        }
+    };
+
+    // Song Detection Manager
+    const SongDetection = {
+        lastAudioPath: '',
+        isDetecting: false,
+
+        init() {
+            // Listen for audio path changes to trigger detection (only if checkbox is checked)
+            $('#audio_path').on('blur', () => this.detectSongInfo());
+        },
+
+        async detectSongInfo() {
+            // Only detect if the auto-detect checkbox is checked
+            if (!$('#auto_detect_metadata').prop('checked')) {
+                return;
+            }
+
+            const audioPath = $('#audio_path').val().trim();
+            if (!audioPath || audioPath === this.lastAudioPath) {
+                return;
+            }
+            this.lastAudioPath = audioPath;
+
+            const $status = $('#song-detection-status');
+            const $addBtn = $('#add-to-queue-btn');
+            const $runBtn = $('button[type="submit"]');
+
+            // Mark as detecting and disable buttons
+            this.isDetecting = true;
+            $status.html('Detecting song info... <span class="detection-cancel" title="Cancel detection">×</span>').removeClass('success error').addClass('detecting').show();
+
+            // Add click handler for cancel button
+            $status.find('.detection-cancel').on('click', (e) => {
+                e.stopPropagation();
+                this.cancelDetection();
+            });
+            $addBtn.prop('disabled', true).addClass('detecting');
+            $runBtn.prop('disabled', true);
+
+            // Update queue UI buttons to disable mapper buttons during detection
+            if (typeof QueueUI !== 'undefined') {
+                QueueUI.updateButtons();
+            }
+
+            // Clear previous values before detection
+            $('#detected_artist').val('');
+            $('#detected_title').val('');
+
+            // Reset cancelled flag
+            this.detectionCancelled = false;
+
+            try {
+                // Use validate_paths which now includes song detection
+                const response = await $.ajax({
+                    url: '/validate_paths',
+                    method: 'POST',
+                    data: { audio_path: audioPath, beatmap_path: '', output_path: '', detect_song: true }
+                });
+
+                // Check if cancelled during request
+                if (this.detectionCancelled) {
+                    return;
+                }
+
+                if (response.detected_artist) {
+                    $('#detected_artist').val(response.detected_artist);
+                }
+                if (response.detected_title) {
+                    $('#detected_title').val(response.detected_title);
+                }
+
+                if (response.detected_artist || response.detected_title) {
+                    $status.text('✓ Song detected!').addClass('success');
+                } else {
+                    $status.text('Could not detect song info automatically.').addClass('error');
+                }
+            } catch (error) {
+                // Check if cancelled during request
+                if (this.detectionCancelled) {
+                    return;
+                }
+                console.error('Song detection error:', error);
+                $status.text('Detection failed.').addClass('error');
+            } finally {
+                // Only update state if not cancelled (cancelDetection already did that)
+                if (!this.detectionCancelled) {
+                    // Re-enable buttons
+                    this.isDetecting = false;
+                    $status.removeClass('detecting');
+                    $('#add-to-queue-btn').removeClass('detecting');
+                    $('button[type="submit"]').prop('disabled', false);
+                    // Update queue UI buttons (this will re-enable Add to Queue)
+                    if (typeof QueueUI !== 'undefined') {
+                        QueueUI.updateButtons();
+                    }
+                }
+            }
+        },
+
+        // Force detection (used when checkbox is toggled on)
+        forceDetect() {
+            this.lastAudioPath = '';
+            this.detectSongInfo();
+        },
+
+        // Cancel detection in progress
+        cancelDetection() {
+            if (!this.isDetecting) return;
+
+            // Mark as cancelled
+            this.isDetecting = false;
+            this.detectionCancelled = true;
+
+            // Uncheck the Auto-detect Metadata checkbox
+            $('#auto_detect_metadata').prop('checked', false);
+
+            // Update status message
+            const $status = $('#song-detection-status');
+            $status.text('Detection cancelled').removeClass('detecting').addClass('error');
+
+            // Re-enable buttons
+            $('#add-to-queue-btn').removeClass('detecting').prop('disabled', false);
+            $('button[type="submit"]').prop('disabled', false);
+
+            // IMPORTANT: Update queue UI buttons immediately to disable mapper buttons
+            if (typeof QueueUI !== 'undefined') {
+                QueueUI.updateButtons();
+            }
+        },
+
+        isInProgress() {
+            return this.isDetecting;
+        }
+    };
+
+    // Queue UI Manager
+    const QueueUI = {
+        queueRunning: false,
+
+        init() {
+            // Ensure QueueManager exists (from queue_manager.js)
+            if (typeof QueueManager === 'undefined') {
+                console.warn('QueueManager not loaded. Queue features disabled.');
+                $('#queue_panel, #mapper_panel').hide();
+                return;
+            }
+
+            this.attachEventHandlers();
+            this.updateUI();
+        },
+
+        attachEventHandlers() {
+            // Add to Queue button
+            $('#add-to-queue-btn').on('click', () => this.addCurrentFormToQueue());
+
+            // Run Queue button
+            $('#run-queue-btn').on('click', () => this.runQueue());
+
+            // Clear Queue button
+            $('#clear-queue-btn').on('click', () => this.clearQueue());
+
+            // Cancel Queue button
+            $('#cancel-queue-button').on('click', () => this.cancelQueue());
+
+            // Mapper panel handlers
+            $('#add-mapper-btn').on('click', () => this.addMapper());
+            $('#generate-from-mappers-btn').on('click', () => this.generateTasksFromMappers());
+
+            // Listen for queue state changes from QueueManager
+            window.addEventListener('queueStateChanged', () => this.updateUI());
+
+            // Listen for audio path changes to update Add to Queue button state
+            $('#audio_path').on('input blur change', () => this.updateButtons());
+
+            // Enter key for adding mapper
+            $('#add-mapper-id').on('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.addMapper();
+                }
+            });
+        },
+
+        addCurrentFormToQueue() {
+            // Check if song detection is still in progress
+            if (SongDetection.isInProgress()) {
+                Utils.showFlashMessage('Please wait for song detection to complete.', 'error');
+                return;
+            }
+
+            // Collect current form data
+            const formData = {};
+            $('#inferenceForm').find('input, select, textarea').each(function () {
+                const $field = $(this);
+                const name = $field.attr('name');
+                const type = $field.attr('type');
+
+                if (name && type !== 'file') {
+                    formData[name] = type === 'checkbox' ? $field.prop('checked') : $field.val();
+                }
+            });
+
+            // Add descriptors
+            formData.descriptors = { positive: [], negative: [] };
+            $('input[name="descriptors"]').each(function () {
+                const $cb = $(this);
+                if ($cb.hasClass('positive-check')) {
+                    formData.descriptors.positive.push($cb.val());
+                } else if ($cb.hasClass('negative-check')) {
+                    formData.descriptors.negative.push($cb.val());
+                }
+            });
+
+            // Get mapper info
+            const mapperName = $('#mapper_name').val() || '';
+            const mapperId = $('#mapper_id').val() || '';
+            formData.mapper_name = mapperName;
+            formData.mapper_id = mapperId;
+
+            // Build display name for queue item (use detected_artist/detected_title from form)
+            const artist = formData.detected_artist || formData.song_artist || formData.artist || '??';
+            const title = formData.detected_title || formData.song_title || formData.title || '??';
+            const model = formData.model || 'v30';
+            const creator = mapperName || `Mapperatorinator ${model.toUpperCase()}`;
+            const stars = parseFloat(formData.difficulty) || 5.0;
+            const baseDiff = stars < 2.0 ? 'Easy' : stars < 2.7 ? 'Normal' : stars < 4.0 ? 'Hard' : stars < 5.3 ? 'Insane' : stars < 6.5 ? 'Expert' : 'Expert+';
+            const diffName = formData.diff_name || formData.difficulty_name || (mapperId ? `${creator}'s ${baseDiff}` : baseDiff);
+
+            // Check for duplicates and append number if needed
+            const baseDisplayName = `${artist} - ${title} (${creator}) [${diffName}]`;
+            const existingTasks = QueueManager.getAllTasks();
+            let count = 0;
+            existingTasks.forEach(task => {
+                const existingName = task.formData.display_name || '';
+                // Match base name or numbered variants like "name (1)", "name (2)"
+                if (existingName === baseDisplayName || existingName.match(new RegExp(`^${baseDisplayName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(\\d+\\)$`))) {
+                    count++;
+                }
+            });
+
+            formData.display_name = count > 0 ? `${baseDisplayName} (${count})` : baseDisplayName;
+
+            // Add to queue
+            QueueManager.addTask(formData);
+            this.updateUI();
+            Utils.showFlashMessage('Task added to queue!', 'success');
+        },
+
+        async runQueue() {
+            if (QueueManager.isEmpty()) {
+                Utils.showFlashMessage('Queue is empty!', 'error');
+                return;
+            }
+
+            // Reset queue cancelled flag
+            await $.ajax({ url: '/reset_queue', method: 'POST' });
+
+            // Check if we should compile as beatmap set
+            const compileAsBeatmapSet = $('#compile-as-beatmapset').prop('checked');
+
+            // Initialize beatmap set tracking if enabled
+            if (compileAsBeatmapSet) {
+                await $.ajax({
+                    url: '/init_beatmapset',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ enabled: true })
+                });
+            }
+
+            // Disable run button
+            $('#run-queue-btn').prop('disabled', true);
+            this.queueRunning = true;
+
+            const tasks = QueueManager.getAllTasks();
+            let completedCount = 0;
+            let queueCancelled = false;
+
+            for (let i = 0; i < tasks.length; i++) {
+                // Check if cancelled before starting task
+                const statusResponse = await $.ajax({ url: '/queue_status', method: 'GET' });
+                if (statusResponse.cancelled) {
+                    queueCancelled = true;
+                    // Don't show message here - cancelQueue already showed it
+                    break;
+                }
+
+                const task = tasks[i];
+                QueueManager.setTaskStatus(task.id, 'running');
+                this.currentRunningTaskId = task.id;
+                this.updateUI();
+
+                try {
+                    await this.runSingleTask(task);
+
+                    // Check again after task completes in case user cancelled during task
+                    const postTaskStatus = await $.ajax({ url: '/queue_status', method: 'GET' });
+                    if (postTaskStatus.cancelled) {
+                        queueCancelled = true;
+                        // Task completed but queue was cancelled - mark as pending so it can run again
+                        QueueManager.setTaskStatus(task.id, 'pending');
+                        // Don't show message here - cancelQueue already showed it
+                        break;
+                    }
+
+                    QueueManager.setTaskStatus(task.id, 'completed');
+                    completedCount++;
+                } catch (error) {
+                    console.error('Task failed:', error);
+
+                    // Check if this was a skip request (not full queue cancel)
+                    const errorStatus = await $.ajax({ url: '/queue_status', method: 'GET' });
+                    if (errorStatus.cancelled) {
+                        queueCancelled = true;
+                        // Task was interrupted - mark as pending so it can run again
+                        QueueManager.setTaskStatus(task.id, 'pending');
+                        // Don't show message here - cancelQueue already showed it
+                        break;
+                    }
+
+                    // Task was skipped but queue continues
+                    if (error.message === 'Task skipped') {
+                        QueueManager.setTaskStatus(task.id, 'skipped');
+                        Utils.showFlashMessage('Task skipped.', 'cancel-success');
+                    } else {
+                        QueueManager.setTaskStatus(task.id, 'failed');
+                    }
+                }
+
+                this.updateUI();
+            }
+
+            // Clean up
+            this.queueRunning = false;
+            this.currentRunningTaskId = null;
+
+            // Re-enable controls
+            $('#run-queue-btn').prop('disabled', false);
+            this.updateUI(); // Ensure UI is up to date
+
+            if (queueCancelled) {
+                // Don't clear the queue or show additional messages
+                // cancelQueue() already showed the notification
+                // Tasks remain so user can run again
+            } else {
+                // Finalize beatmap set if enabled
+                if (compileAsBeatmapSet && completedCount > 0) {
+                    try {
+                        const response = await $.ajax({
+                            url: '/finalize_beatmapset',
+                            method: 'POST'
+                        });
+                        if (response.success) {
+                            Utils.showFlashMessage(`Queue completed: ${completedCount}/${tasks.length} tasks. Beatmap set created: ${response.filename}`, 'success');
+                        } else {
+                            Utils.showFlashMessage(`Queue completed: ${completedCount}/${tasks.length} tasks. Beatmap set creation failed.`, 'error');
+                        }
+                    } catch (error) {
+                        console.error('Failed to finalize beatmap set:', error);
+                        Utils.showFlashMessage(`Queue completed: ${completedCount}/${tasks.length} tasks successful.`, 'success');
+                    }
+                } else {
+                    Utils.showFlashMessage(`Queue completed: ${completedCount}/${tasks.length} tasks successful.`, 'success');
+                }
+            }
+        },
+
+        runSingleTask(task) {
+            return new Promise((resolve, reject) => {
+                this.currentTaskResolve = resolve;
+                this.currentTaskReject = reject;
+
+                // Build form data from task
+                const formData = new FormData();
+                Object.entries(task.formData).forEach(([key, value]) => {
+                    if (key === 'descriptors') {
+                        value.positive?.forEach(v => formData.append('descriptors', v));
+                        value.negative?.forEach(v => formData.append('negative_descriptors', v));
+                    } else if (typeof value === 'boolean') {
+                        formData.append(key, value.toString());
+                    } else if (value !== null && value !== undefined && value !== '') {
+                        formData.append(key, value);
+                    }
+                });
+
+                // Start inference
+                $.ajax({
+                    url: '/start_inference',
+                    method: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: () => {
+                        // Connect to SSE and wait for completion
+                        this.waitForTaskCompletion(resolve, reject);
+                    },
+                    error: (xhr) => {
+                        reject(new Error(xhr.responseJSON?.message || 'Failed to start task'));
+                    }
+                });
+            });
+        },
+
+        waitForTaskCompletion(resolve, reject) {
+            const evtSource = new EventSource('/stream_output');
+            let completed = false;
+            this.currentEvtSource = evtSource;
+
+            InferenceManager.resetProgress();
+            $('#progress_output').show();
+
+            // Show cancel button with appropriate text
+            $('#cancel-button').show().text(this.queueRunning ? 'Cancel Queue' : 'Cancel');
+
+            evtSource.onmessage = (e) => {
+                if ($("#init_message").is(":visible")) $("#init_message").hide();
+                InferenceManager.updateProgress(e.data);
+
+                // Update progress in queue item
+                this.updateQueueItemProgress(e.data);
+            };
+
+            evtSource.addEventListener('end', () => {
+                evtSource.close();
+                this.currentEvtSource = null;
+                completed = true;
+                $('#cancel-button').hide();
+                $("button[type='submit']").prop("disabled", false);
+
+                if (AppState.inferenceErrorOccurred) {
+                    reject(new Error('Inference failed'));
+                } else {
+                    resolve();
+                }
+            });
+
+            evtSource.addEventListener('renamed', (e) => {
+                $('#renamedFileName').text(e.data);
+                $('#renamedFileInfo').show();
+            });
+
+            evtSource.onerror = () => {
+                evtSource.close();
+                this.currentEvtSource = null;
+                if (!completed) {
+                    reject(new Error('Connection lost'));
+                }
+            };
+        },
+
+        updateQueueItemProgress(data) {
+            // Parse progress from SSE data and update the running queue item
+            if (this.currentRunningTaskId) {
+                const $item = $(`.queue-item[data-task-id="${this.currentRunningTaskId}"]`);
+                const $progressBar = $item.find('.queue-item-progress-fill');
+
+                // Try to extract percentage from progress data
+                const percentMatch = data.match(/(\d+(?:\.\d+)?)\s*%/);
+                if (percentMatch && $progressBar.length) {
+                    const percent = parseFloat(percentMatch[1]);
+                    $progressBar.css('width', `${percent}%`);
+                }
+            }
+        },
+
+        cancelQueue() {
+            $.ajax({
+                url: '/cancel_inference',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ clear_queue: true }),
+                success: (response) => {
+                    // Hide progress output completely
+                    $('#progress_output').hide();
+                    $('#cancel-button').hide();
+
+                    // Reset current running task status back to pending (not cancelled/shaded)
+                    if (this.currentRunningTaskId) {
+                        QueueManager.setTaskStatus(this.currentRunningTaskId, 'pending');
+                        this.updateUI();
+                    }
+
+                    Utils.showFlashMessage(response.message || 'Queue cancelled.', 'cancel-success');
+                },
+                error: (xhr) => {
+                    Utils.showFlashMessage(xhr.responseJSON?.message || 'Failed to cancel queue.', 'error');
+                }
+            });
+        },
+
+        skipCurrentTask() {
+            // Skip (cancel) only the current running task
+            $.ajax({
+                url: '/cancel_inference',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ clear_queue: false }),
+                success: () => {
+                    if (this.currentTaskReject) {
+                        this.currentTaskReject(new Error('Task skipped'));
+                    }
+                },
+                error: (xhr) => {
+                    Utils.showFlashMessage(xhr.responseJSON?.message || 'Failed to skip task.', 'error');
+                }
+            });
+        },
+
+        clearQueue() {
+            if (QueueManager.isEmpty()) return;
+
+            QueueManager.clearAll();
+            this.updateUI();
+
+            // Don't show or reset progress output - just clear the queue
+            Utils.showFlashMessage('Queue cleared.', 'success');
+        },
+
+        async addMapper() {
+            const mapperId = $('#add-mapper-id').val().trim();
+
+            if (!mapperId) {
+                Utils.showFlashMessage('Please enter a mapper ID.', 'error');
+                return;
+            }
+
+            // Look up mapper name
+            let mapperName = MapperLookup.cache[mapperId];
+            if (!mapperName) {
+                try {
+                    mapperName = await MapperLookup.lookup(mapperId);
+                } catch (error) {
+                    console.error('Mapper lookup failed:', error);
+                }
+            }
+
+            MapperManager.addMapper(mapperId, mapperName || 'Unknown', 1);
+            this.updateUI();
+
+            // Clear input and show success
+            $('#add-mapper-id').val('');
+            Utils.showFlashMessage(`Mapper added: ${mapperName || mapperId}`, 'success');
+        },
+
+        // Add a single mapper to queue (from the + button in mapper list)
+        addSingleMapperToQueue(mapperId, mapperName, count) {
+            // Get current form data as template
+            const templateData = {};
+            $('#inferenceForm').find('input, select, textarea').each(function () {
+                const $field = $(this);
+                const name = $field.attr('name');
+                const type = $field.attr('type');
+
+                if (name && type !== 'file') {
+                    templateData[name] = type === 'checkbox' ? $field.prop('checked') : $field.val();
+                }
+            });
+
+            // Add descriptors
+            templateData.descriptors = { positive: [], negative: [] };
+            $('input[name="descriptors"]').each(function () {
+                const $cb = $(this);
+                if ($cb.hasClass('positive-check')) {
+                    templateData.descriptors.positive.push($cb.val());
+                } else if ($cb.hasClass('negative-check')) {
+                    templateData.descriptors.negative.push($cb.val());
+                }
+            });
+
+            // Get metadata for display name
+            const artist = templateData.detected_artist || templateData.song_artist || templateData.artist || '??';
+            const title = templateData.detected_title || templateData.song_title || templateData.title || '??';
+            const model = templateData.model || 'v30';
+            const stars = parseFloat(templateData.difficulty) || 5.0;
+            const baseDiff = DifficultyNameGenerator.getDifficultyName(stars);
+
+            // Generate tasks
+            let tasksAdded = 0;
+            const existingTasks = QueueManager.getAllTasks();
+
+            for (let i = 0; i < count; i++) {
+                const taskData = { ...templateData };
+                taskData.mapper_id = mapperId;
+                taskData.mapper_name = mapperName;
+
+                // Compose difficulty name with mapper name
+                const userDiff = templateData.diff_name?.trim();
+                let diffName;
+                if (userDiff) {
+                    diffName = count > 1 ? `${mapperName}'s ${userDiff} ${i + 1}` : `${mapperName}'s ${userDiff}`;
+                } else {
+                    diffName = count > 1 ? `${mapperName}'s ${baseDiff} ${i + 1}` : `${mapperName}'s ${baseDiff}`;
+                }
+                taskData.diff_name = diffName;
+
+                // Build proper display name: Artist - Title (Mapperatorinator V##) [Mapper's Difficulty]
+                const creator = `Mapperatorinator ${model.toUpperCase()}`;
+                const baseDisplayName = `${artist} - ${title} (${creator}) [${diffName}]`;
+
+                // Check for duplicates
+                let dupCount = 0;
+                existingTasks.forEach(task => {
+                    const existingName = task.formData.display_name || '';
+                    if (existingName === baseDisplayName || existingName.match(new RegExp(`^${baseDisplayName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(\\d+\\)$`))) {
+                        dupCount++;
+                    }
+                });
+
+                taskData.display_name = dupCount > 0 ? `${baseDisplayName} (${dupCount})` : baseDisplayName;
+
+                QueueManager.addTask(taskData);
+                tasksAdded++;
+            }
+
+            this.updateUI();
+            Utils.showFlashMessage(`Added ${tasksAdded} task${tasksAdded !== 1 ? 's' : ''} for ${mapperName}`, 'success');
+        },
+
+        generateTasksFromMappers() {
+            const mappers = MapperManager.getAll();
+            if (mappers.length === 0) {
+                Utils.showFlashMessage('No mappers in list!', 'error');
+                return;
+            }
+
+            // Get current form data as template
+            const templateData = {};
+            $('#inferenceForm').find('input, select, textarea').each(function () {
+                const $field = $(this);
+                const name = $field.attr('name');
+                const type = $field.attr('type');
+
+                if (name && type !== 'file') {
+                    templateData[name] = type === 'checkbox' ? $field.prop('checked') : $field.val();
+                }
+            });
+
+            // Add descriptors
+            templateData.descriptors = { positive: [], negative: [] };
+            $('input[name="descriptors"]').each(function () {
+                const $cb = $(this);
+                if ($cb.hasClass('positive-check')) {
+                    templateData.descriptors.positive.push($cb.val());
+                } else if ($cb.hasClass('negative-check')) {
+                    templateData.descriptors.negative.push($cb.val());
+                }
+            });
+
+            // Get metadata for display name
+            const artist = templateData.detected_artist || templateData.song_artist || templateData.artist || '??';
+            const title = templateData.detected_title || templateData.song_title || templateData.title || '??';
+            const model = templateData.model || 'v30';
+            const stars = parseFloat(templateData.difficulty) || 5.0;
+            const baseDiff = DifficultyNameGenerator.getDifficultyName(stars);
+
+            // Generate tasks for each mapper
+            let totalTasks = 0;
+            const existingTasks = QueueManager.getAllTasks();
+
+            mappers.forEach(mapper => {
+                if (!mapper.checked) return; // Skip unchecked mappers
+
+                const qty = mapper.n || 1;
+                for (let i = 0; i < qty; i++) {
+                    const taskData = { ...templateData };
+                    taskData.mapper_id = mapper.id;
+                    taskData.mapper_name = mapper.name;
+
+                    // Compose difficulty name with mapper name
+                    const userDiff = templateData.diff_name?.trim();
+                    let diffName;
+                    if (userDiff) {
+                        diffName = qty > 1 ? `${mapper.name}'s ${userDiff} ${i + 1}` : `${mapper.name}'s ${userDiff}`;
+                    } else {
+                        diffName = qty > 1 ? `${mapper.name}'s ${baseDiff} ${i + 1}` : `${mapper.name}'s ${baseDiff}`;
+                    }
+                    taskData.diff_name = diffName;
+
+                    // Build proper display name: Artist - Title (Mapperatorinator V##) [Mapper's Difficulty]
+                    const creator = `Mapperatorinator ${model.toUpperCase()}`;
+                    const baseDisplayName = `${artist} - ${title} (${creator}) [${diffName}]`;
+
+                    // Check for duplicates
+                    let count = 0;
+                    existingTasks.forEach(task => {
+                        const existingName = task.formData.display_name || '';
+                        if (existingName === baseDisplayName || existingName.match(new RegExp(`^${baseDisplayName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(\\d+\\)$`))) {
+                            count++;
+                        }
+                    });
+
+                    taskData.display_name = count > 0 ? `${baseDisplayName} (${count})` : baseDisplayName;
+
+                    QueueManager.addTask(taskData);
+                    totalTasks++;
+                }
+            });
+
+            this.updateUI();
+            Utils.showFlashMessage(`Generated ${totalTasks} tasks from mapper list!`, 'success');
+        },
+
+        updateUI() {
+            this.updateQueueList();
+            this.updateMapperList();
+            this.updateButtons();
+        },
+
+        updateQueueList() {
+            const $list = $('#queue-list');
+            const tasks = QueueManager.getAllTasks();
+
+            if (tasks.length === 0) {
+                $list.html('<div class="queue-empty">No tasks in queue. Add tasks using "Add to Queue" button.</div>');
+                $('#queue-count').text('0 tasks');
+                return;
+            }
+
+            let html = '';
+            tasks.forEach((task, index) => {
+                const displayName = task.formData.display_name || 'Unnamed Task';
+                const statusClass = task.status || '';
+                // No status icons - keep it clean
+                const statusIcon = task.status === 'completed' ? '✓ ' : task.status === 'skipped' ? '⏭ ' : '';
+                const fd = task.formData;
+                const isRunning = task.status === 'running';
+
+                // Build categorized details
+                // Row 1: Basic Settings (Model, Gamemode, Difficulty)
+                const basicSettings = [];
+                if (fd.model) basicSettings.push({ label: 'Model', value: fd.model.toUpperCase() });
+                if (fd.gamemode !== undefined) basicSettings.push({ label: 'Mode', value: this.getGamemodeName(fd.gamemode) });
+                if (fd.difficulty) basicSettings.push({ label: 'Stars', value: fd.difficulty });
+
+                // Row 2: Difficulty Metadata (HP, CS, OD, AR, Slider Mult, Tick Rate)
+                const diffMetadata = [];
+                if (fd.hp_drain_rate) diffMetadata.push({ label: 'HP', value: fd.hp_drain_rate });
+                if (fd.circle_size) diffMetadata.push({ label: 'CS', value: fd.circle_size });
+                if (fd.overall_difficulty) diffMetadata.push({ label: 'OD', value: fd.overall_difficulty });
+                if (fd.approach_rate) diffMetadata.push({ label: 'AR', value: fd.approach_rate });
+                if (fd.slider_multiplier) diffMetadata.push({ label: 'SV', value: fd.slider_multiplier });
+                if (fd.slider_tick_rate) diffMetadata.push({ label: 'Tick', value: fd.slider_tick_rate });
+
+                // Row 3: Advanced Settings (Mapper ID, Year (V31+ only), CFG, Temp, Top-p, Seed)
+                const advancedSettings = [];
+                if (fd.mapper_id) advancedSettings.push({ label: 'Mapper ID', value: fd.mapper_id });
+                // Only show Year if model supports it (V31+)
+                const modelCaps = AppState.modelCapabilities[fd.model] || {};
+                if (fd.year && modelCaps.supportsYear !== false) {
+                    advancedSettings.push({ label: 'Year', value: fd.year });
+                }
+                if (fd.cfg_scale) advancedSettings.push({ label: 'CFG', value: fd.cfg_scale });
+                if (fd.temperature) advancedSettings.push({ label: 'Temp', value: fd.temperature });
+                if (fd.top_p) advancedSettings.push({ label: 'Top-p', value: fd.top_p });
+                if (fd.seed) advancedSettings.push({ label: 'Seed', value: fd.seed });
+
+                // Row 4: Generation Interval (Start, End)
+                const genInterval = [];
+                if (fd.start_time) genInterval.push({ label: 'Start', value: `${fd.start_time}ms` });
+                if (fd.end_time) genInterval.push({ label: 'End', value: `${fd.end_time}ms` });
+
+                // Row 5: Descriptors (V31+ only, if any are set)
+                const descriptorTags = [];
+                if (fd.descriptors && modelCaps.supportsDescriptors !== false) {
+                    const desc = fd.descriptors;
+                    if (desc.positive && desc.positive.length > 0) {
+                        desc.positive.forEach(d => descriptorTags.push({ label: '+', value: d }));
+                    }
+                    if (desc.negative && desc.negative.length > 0) {
+                        desc.negative.forEach(d => descriptorTags.push({ label: '−', value: d }));
+                    }
+                }
+
+                // Build HTML for each category row
+                const buildRow = (items, label) => {
+                    if (items.length === 0) return '';
+                    const cells = items.map(item =>
+                        `<div class="queue-detail-cell"><span class="detail-label">${item.label}:</span><span class="detail-value">${item.value}</span></div>`
+                    ).join('');
+                    return `<div class="queue-detail-section">
+                        <span class="queue-detail-section-label">${label}</span>
+                        <div class="queue-detail-row">${cells}</div>
+                    </div>`;
+                };
+
+                let detailsHtml = '';
+                detailsHtml += buildRow(basicSettings, 'Basic Settings');
+                detailsHtml += buildRow(diffMetadata, 'Difficulty Metadata');
+                detailsHtml += buildRow(advancedSettings, 'Advanced Settings');
+                detailsHtml += buildRow(genInterval, 'Generation Interval');
+                detailsHtml += buildRow(descriptorTags, 'Descriptors');
+
+                // Progress bar for running task
+                const progressBarHtml = isRunning ? `
+                    <div class="queue-item-progress">
+                        <div class="queue-item-progress-fill" style="width: 0%"></div>
+                    </div>
+                ` : '';
+
+                // X button title and action changes based on queue running state
+                const removeTitle = isRunning ? 'Skip this task' : (this.queueRunning ? 'Remove from queue' : 'Remove from queue');
+                const removeAction = isRunning ? `QueueUI.skipCurrentTask()` : `QueueUI.removeTask('${task.id}')`;
+
+                html += `
+                    <div class="queue-item ${statusClass}" data-task-id="${task.id}">
+                        <div class="queue-item-header">
+                            <div class="queue-item-info">
+                                <span class="queue-item-name queue-item-toggle">${statusIcon}${displayName}</span>
+                                <span class="queue-item-arrow">▼</span>
+                            </div>
+                            <div class="queue-item-actions">
+                                <button class="queue-item-btn remove" onclick="${removeAction}" title="${removeTitle}">×</button>
+                            </div>
+                        </div>
+                        ${progressBarHtml}
+                        <div class="queue-item-details" style="display:none;">
+                            ${detailsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+
+            $list.html(html);
+            $('#queue-count').text(`${tasks.length} task${tasks.length !== 1 ? 's' : ''}`);
+
+            // Attach dropdown toggle handlers
+            $list.find('.queue-item-toggle, .queue-item-arrow').off('click').on('click', function (e) {
+                e.stopPropagation();
+                const $item = $(this).closest('.queue-item');
+                const $details = $item.find('.queue-item-details');
+                const $arrow = $item.find('.queue-item-arrow');
+
+                $details.slideToggle(150);
+                $arrow.toggleClass('expanded');
+            });
+        },
+
+        updateMapperList() {
+            // MapperManager handles its own rendering via _entryTemplate
+            // We just need to update the button states
+            this.updateButtons();
+        },
+
+        updateButtons() {
+            const queueEmpty = QueueManager.isEmpty();
+            const mappersEmpty = MapperManager.getAll().length === 0;
+            const hasCheckedMappers = MapperManager.getAll().some(m => m.checked);
+            const audioPath = $('#audio_path').val().trim();
+            const hasAudio = audioPath !== '';
+            const isDetecting = SongDetection.isInProgress();
+
+            $('#run-queue-btn').prop('disabled', queueEmpty || this.queueRunning);
+
+            // Disable mapper-related buttons if no audio or detecting
+            const canUseMappers = hasAudio && !isDetecting;
+            const $genFromMappersBtn = $('#generate-from-mappers-btn');
+            $genFromMappersBtn.prop('disabled', mappersEmpty || !hasCheckedMappers || !canUseMappers);
+
+            // Set tooltip for Queue Tasks From Selected Mappers button
+            if (!hasAudio) {
+                $genFromMappersBtn.attr('title', 'Load an audio file first');
+            } else if (isDetecting) {
+                $genFromMappersBtn.attr('title', 'Waiting for song detection to complete...');
+            } else if (mappersEmpty) {
+                $genFromMappersBtn.attr('title', 'Add mappers to the list first');
+            } else if (!hasCheckedMappers) {
+                $genFromMappersBtn.attr('title', 'Check at least one mapper');
+            } else {
+                $genFromMappersBtn.attr('title', 'Generate queue tasks for all checked mappers');
+            }
+
+            // Update add-single-mapper buttons (the + buttons in mapper list)
+            $('.add-single-mapper-btn').prop('disabled', !canUseMappers);
+            if (!canUseMappers) {
+                $('.add-single-mapper-btn').attr('title', !hasAudio ? 'Load an audio file first' : 'Waiting for song detection...');
+            } else {
+                $('.add-single-mapper-btn').attr('title', 'Add this mapper to queue');
+            }
+
+            // Add to Queue button - disabled if no audio or still detecting
+            const $addBtn = $('#add-to-queue-btn');
+            if (!hasAudio) {
+                $addBtn.prop('disabled', true).removeClass('detecting').attr('title', 'Load an audio file first');
+            } else if (isDetecting) {
+                $addBtn.prop('disabled', true).addClass('detecting').attr('title', 'Waiting for song detection to complete...');
+            } else {
+                $addBtn.prop('disabled', false).removeClass('detecting').attr('title', 'Add current settings to queue');
+            }
+        },
+
+        getGamemodeName(mode) {
+            const modes = { '0': 'osu!', '1': 'Taiko', '2': 'Catch', '3': 'Mania' };
+            return modes[mode] || 'osu!';
+        },
+
+        removeTask(taskId) {
+            // Just remove task from queue (only called for non-running tasks)
+            QueueManager.removeTask(taskId);
+            this.updateUI();
+        },
+
+        removeMapper(mapperId) {
+            MapperManager.removeMapper(mapperId);
+            this.updateUI();
+        },
+
+        incrementMapperQty(mapperId) {
+            MapperManager.updateQuantity(mapperId, 1);
+            this.updateUI();
+        },
+
+        decrementMapperQty(mapperId) {
+            MapperManager.updateQuantity(mapperId, -1);
+            this.updateUI();
+        }
+    };
+
+    // Make QueueUI globally accessible for onclick handlers
+    window.QueueUI = QueueUI;
+
     // Initialize all components
     function initializeApp() {
         // Initialize Select2
@@ -964,6 +2718,13 @@ $(document).ready(function() {
         DescriptorManager.init();
         ConfigManager.init();
         InferenceManager.init();
+
+        // Initialize queue system components
+        MapperLookup.init();
+        SongDetection.init();
+        DifficultyNameGenerator.init();
+        BeatmapCustomization.init();
+        QueueUI.init();
 
         // Attach event handlers
         $("#model").on('change', () => UIManager.updateModelSettings());
