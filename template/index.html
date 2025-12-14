@@ -255,6 +255,12 @@
                 <!-- Options -->
                 <fieldset>
                     <legend>Options</legend>
+                    <div class="option-item" id="bf16-option" style="display: none;">
+                        <input type="checkbox" id="enable_bf16" name="enable_bf16" value="false" />
+                        <label for="enable_bf16" class="checkbox-label"
+                            title="Enable bfloat16 precision for ~40-60% faster generation. Requires NVIDIA RTX 30xx/40xx GPU. No quality loss.">Enable
+                            BF16 (Faster)</label>
+                    </div>
                     <div class="option-item">
                         <input type="checkbox" id="export_osz" name="export_osz" value="false" />
                         <label for="export_osz"
