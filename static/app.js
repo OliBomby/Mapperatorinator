@@ -56,7 +56,7 @@ $(document).ready(function () {
 
             // Reset checkboxes
             $('#hitsounded').prop('checked', true);
-            $('#export_osz, #add_to_beatmap, #overwrite_reference_beatmap, #super_timing').prop('checked', false);
+            $('#export_osz, #add_to_beatmap, #overwrite_reference_beatmap, #super_timing, #enable_bf16').prop('checked', false);
 
             // Clear descriptors and context options
             $('input[name="descriptors"], input[name="in_context_options"]')
@@ -1258,7 +1258,6 @@ $(document).ready(function () {
                     // Don't auto-detect if we already have saved metadata
                     if (config.songMetadata.artist || config.songMetadata.title) {
                         SongDetection.lastAudioPath = $('#audio_path').val().trim(); // Prevent re-detection
-                        $('#song-detection-status').text('✓ Song info loaded from config').addClass('success').show();
                     }
                 }
 
@@ -1481,6 +1480,20 @@ $(document).ready(function () {
                 AppState.errorLogFilePath = e.data;
             });
             AppState.evtSource.addEventListener("end", (e) => this.handleSSEEnd(e));
+            AppState.evtSource.addEventListener("file_ready", (e) => {
+                // The generated file is now ready and available at this path
+                const filePath = e.data;
+                console.log('[Inference] File ready:', filePath);
+                // Store for later reference (e.g., opening folder)
+                AppState.lastGeneratedFilePath = filePath;
+            });
+            AppState.evtSource.addEventListener("renamed", (e) => {
+                // File was renamed to a proper osu! naming convention
+                const newPath = e.data;
+                console.log('[Inference] File renamed to:', newPath);
+                // Update internal state but don't show redundant UI message
+                AppState.lastGeneratedFilePath = newPath;
+            });
         },
 
         handleSSEMessage(e) {
@@ -2047,9 +2060,23 @@ $(document).ready(function () {
                 });
             }
 
-            // Disable run button
+            // Disable run button, clear button, and compile checkbox during queue execution
             $('#run-queue-btn').prop('disabled', true);
+            $('#clear-queue-btn').prop('disabled', true).addClass('disabled');
+            $('#compile-as-beatmapset').prop('disabled', true);
+            // Add visual disabled state and tooltip to checkbox label
+            $('#compile-as-beatmapset').closest('.checkbox-label')
+                .addClass('disabled')
+                .attr('title', 'Cannot change while queue is running');
             this.queueRunning = true;
+
+            // Initialize overall queue progress
+            this.totalTasksAtStart = QueueManager.getAllTasks().length;
+            this.completedTasksForProgress = 0;
+
+            // Show the queue progress info panel
+            $('#queue_progress_info').show();
+            this.updateOverallQueueProgress(0, 0); // Reset progress
 
             const tasks = QueueManager.getAllTasks();
             let completedCount = 0;
@@ -2084,6 +2111,9 @@ $(document).ready(function () {
 
                     QueueManager.setTaskStatus(task.id, 'completed');
                     completedCount++;
+                    this.completedTasksForProgress++;
+                    // Update overall progress (task completed, 100% of this task)
+                    this.updateOverallQueueProgress(this.completedTasksForProgress, 100);
                 } catch (error) {
                     console.error('Task failed:', error);
 
@@ -2104,6 +2134,9 @@ $(document).ready(function () {
                     } else {
                         QueueManager.setTaskStatus(task.id, 'failed');
                     }
+                    // Even failed/skipped tasks count towards progress
+                    this.completedTasksForProgress++;
+                    this.updateOverallQueueProgress(this.completedTasksForProgress, 100);
                 }
 
                 this.updateUI();
@@ -2115,6 +2148,20 @@ $(document).ready(function () {
 
             // Re-enable controls
             $('#run-queue-btn').prop('disabled', false);
+            $('#clear-queue-btn').prop('disabled', false).removeClass('disabled');
+            $('#compile-as-beatmapset').prop('disabled', false);
+            // Remove visual disabled state and tooltip from checkbox label
+            $('#compile-as-beatmapset').closest('.checkbox-label')
+                .removeClass('disabled')
+                .removeAttr('title');
+
+            // Hide queue progress info after a delay (let user see final status)
+            setTimeout(() => {
+                if (!this.queueRunning) {
+                    $('#queue_progress_info').hide();
+                }
+            }, 3000);
+
             this.updateUI(); // Ensure UI is up to date
 
             if (queueCancelled) {
@@ -2195,8 +2242,12 @@ $(document).ready(function () {
                 if ($("#init_message").is(":visible")) $("#init_message").hide();
                 InferenceManager.updateProgress(e.data);
 
-                // Update progress in queue item
-                this.updateQueueItemProgress(e.data);
+                // Update overall queue progress based on current task progress
+                const percentMatch = e.data.match(/(\d+(?:\.\d+)?)\s*%/);
+                if (percentMatch) {
+                    const percent = parseFloat(percentMatch[1]);
+                    this.updateOverallQueueProgress(this.completedTasksForProgress, percent);
+                }
             };
 
             evtSource.addEventListener('end', () => {
@@ -2214,8 +2265,29 @@ $(document).ready(function () {
             });
 
             evtSource.addEventListener('renamed', (e) => {
-                $('#renamedFileName').text(e.data);
-                $('#renamedFileInfo').show();
+                // File renamed - just log it, no UI display needed
+                console.log('[Queue] File renamed:', e.data);
+            });
+
+            evtSource.addEventListener('file_ready', (e) => {
+                // The generated file is now ready and available at this path
+                const filePath = e.data;
+                console.log('[Queue] File ready:', filePath);
+
+                // Update the queue item to show the file is ready
+                if (this.currentRunningTaskId) {
+                    const $item = $(`.queue-item[data-task-id="${this.currentRunningTaskId}"]`);
+                    $item.addClass('file-ready');
+
+                    // Store the file path on the task for later reference
+                    const tasks = QueueManager.getAllTasks();
+                    const task = tasks.find(t => t.id === this.currentRunningTaskId);
+                    if (task && task.formData) {
+                        task.formData._generatedFilePath = filePath;
+                        // Note: Beatmapset tracking is handled by stream_output() in the backend
+                        // to avoid duplicate entries
+                    }
+                }
             });
 
             evtSource.onerror = () => {
@@ -2227,19 +2299,15 @@ $(document).ready(function () {
             };
         },
 
-        updateQueueItemProgress(data) {
-            // Parse progress from SSE data and update the running queue item
-            if (this.currentRunningTaskId) {
-                const $item = $(`.queue-item[data-task-id="${this.currentRunningTaskId}"]`);
-                const $progressBar = $item.find('.queue-item-progress-fill');
+        updateOverallQueueProgress(completedTasks, currentTaskProgress) {
+            // Calculate overall queue progress
+            // Each completed task = 100%, current task = currentTaskProgress%
+            // Total = (completedTasks * 100 + currentTaskProgress) / (totalTasks * 100) * 100
+            const totalTasks = this.totalTasksAtStart || 1;
+            const overallPercent = ((completedTasks * 100) + currentTaskProgress) / (totalTasks * 100) * 100;
 
-                // Try to extract percentage from progress data
-                const percentMatch = data.match(/(\d+(?:\.\d+)?)\s*%/);
-                if (percentMatch && $progressBar.length) {
-                    const percent = parseFloat(percentMatch[1]);
-                    $progressBar.css('width', `${percent}%`);
-                }
-            }
+            // Update the #queue_task_label to show overall queue progress
+            $('#queue_task_label').text(`Queue: ${completedTasks}/${totalTasks} tasks (${Math.round(overallPercent)}%)`);
         },
 
         cancelQueue() {
@@ -2252,12 +2320,19 @@ $(document).ready(function () {
                     // Hide progress output completely
                     $('#progress_output').hide();
                     $('#cancel-button').hide();
+                    $('#queue_progress_info').hide();
 
                     // Reset current running task status back to pending (not cancelled/shaded)
                     if (this.currentRunningTaskId) {
                         QueueManager.setTaskStatus(this.currentRunningTaskId, 'pending');
                         this.updateUI();
                     }
+
+                    // Re-enable checkbox and remove disabled styling
+                    $('#compile-as-beatmapset').prop('disabled', false);
+                    $('#compile-as-beatmapset').closest('.checkbox-label')
+                        .removeClass('disabled')
+                        .removeAttr('title');
 
                     Utils.showFlashMessage(response.message || 'Queue cancelled.', 'cancel-success');
                 },
@@ -2538,7 +2613,16 @@ $(document).ready(function () {
                 if (fd.start_time) genInterval.push({ label: 'Start', value: `${fd.start_time}ms` });
                 if (fd.end_time) genInterval.push({ label: 'End', value: `${fd.end_time}ms` });
 
-                // Row 5: Descriptors (V31+ only, if any are set)
+                // Row 5: Beatmap Customization (Preview Time, Background)
+                const beatmapCustom = [];
+                if (fd.preview_time) beatmapCustom.push({ label: 'Preview', value: `${fd.preview_time}ms` });
+                if (fd.background_path) {
+                    // Just show filename for display
+                    const bgFilename = fd.background_path.split(/[/\\]/).pop();
+                    beatmapCustom.push({ label: 'Background', value: bgFilename });
+                }
+
+                // Row 6: Descriptors (V31+ only, if any are set)
                 const descriptorTags = [];
                 if (fd.descriptors && modelCaps.supportsDescriptors !== false) {
                     const desc = fd.descriptors;
@@ -2562,19 +2646,24 @@ $(document).ready(function () {
                     </div>`;
                 };
 
+                // Build background preview HTML if background is set
+                let backgroundPreviewHtml = '';
+                if (fd.background_path) {
+                    backgroundPreviewHtml = `
+                        <div class="queue-item-bg-preview">
+                            <img src="/preview_background?path=${encodeURIComponent(fd.background_path)}" alt="Background" 
+                                 onerror="this.parentElement.style.display='none'">
+                        </div>
+                    `;
+                }
+
                 let detailsHtml = '';
                 detailsHtml += buildRow(basicSettings, 'Basic Settings');
                 detailsHtml += buildRow(diffMetadata, 'Difficulty Metadata');
                 detailsHtml += buildRow(advancedSettings, 'Advanced Settings');
                 detailsHtml += buildRow(genInterval, 'Generation Interval');
+                detailsHtml += buildRow(beatmapCustom, 'Beatmap Customization');
                 detailsHtml += buildRow(descriptorTags, 'Descriptors');
-
-                // Progress bar for running task
-                const progressBarHtml = isRunning ? `
-                    <div class="queue-item-progress">
-                        <div class="queue-item-progress-fill" style="width: 0%"></div>
-                    </div>
-                ` : '';
 
                 // X button title and action changes based on queue running state
                 const removeTitle = isRunning ? 'Skip this task' : (this.queueRunning ? 'Remove from queue' : 'Remove from queue');
@@ -2582,6 +2671,7 @@ $(document).ready(function () {
 
                 html += `
                     <div class="queue-item ${statusClass}" data-task-id="${task.id}">
+                        ${backgroundPreviewHtml}
                         <div class="queue-item-header">
                             <div class="queue-item-info">
                                 <span class="queue-item-name queue-item-toggle">${statusIcon}${displayName}</span>
@@ -2591,7 +2681,6 @@ $(document).ready(function () {
                                 <button class="queue-item-btn remove" onclick="${removeAction}" title="${removeTitle}">×</button>
                             </div>
                         </div>
-                        ${progressBarHtml}
                         <div class="queue-item-details" style="display:none;">
                             ${detailsHtml}
                         </div>
@@ -2697,6 +2786,39 @@ $(document).ready(function () {
     // Make QueueUI globally accessible for onclick handlers
     window.QueueUI = QueueUI;
 
+    // GPU Capability Manager
+    const GPUCapability = {
+        bf16Supported: false,
+        gpuName: null,
+
+        init() {
+            this.checkBf16Support();
+        },
+
+        async checkBf16Support() {
+            try {
+                const response = await $.ajax({
+                    url: '/check_bf16_support',
+                    method: 'GET'
+                });
+
+                this.bf16Supported = response.supported;
+                this.gpuName = response.gpu_name;
+
+                if (response.supported) {
+                    // Show the bf16 option
+                    $('#bf16-option').show();
+
+                    // Update tooltip with GPU name
+                    $('#enable_bf16').next('label').attr('title',
+                        `Enable bfloat16 precision for ~40-60% faster generation on ${response.gpu_name}. No quality loss.`);
+                }
+            } catch (error) {
+                // Keep the option hidden on error
+            }
+        }
+    };
+
     // Initialize all components
     function initializeApp() {
         // Initialize Select2
@@ -2725,6 +2847,9 @@ $(document).ready(function () {
         DifficultyNameGenerator.init();
         BeatmapCustomization.init();
         QueueUI.init();
+
+        // Check GPU capabilities for advanced options
+        GPUCapability.init();
 
         // Attach event handlers
         $("#model").on('change', () => UIManager.updateModelSettings());
