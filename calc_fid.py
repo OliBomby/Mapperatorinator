@@ -13,6 +13,7 @@ from scipy import linalg
 from slider import Beatmap, Circle, Slider, Spinner, HoldNote
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from transformers import AutoProcessor, AutoModel
 
 from classifier.classify import ExampleDataset
 from classifier.libs.model.model import OsuClassifierOutput
@@ -39,7 +40,8 @@ def get_beatmap_paths(args: FidConfig) -> list[Path]:
             end=args.dataset_end,
             gamemodes=args.gamemodes,
         )
-        beatmap_files = [dataset_path / "data" / item["BeatmapSetFolder"] / item["BeatmapFile"] for _, item in filtered_metadata.iterrows()]
+        beatmap_files = [dataset_path / "data" / item["BeatmapSetFolder"] / item["BeatmapFile"] for _, item in
+                         filtered_metadata.iterrows()]
     elif args.dataset_type == "ors":
         beatmap_files = []
         track_names = ["Track" + str(i).zfill(5) for i in range(args.dataset_start, args.dataset_end)]
@@ -81,10 +83,10 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     sigma2 = np.atleast_2d(sigma2)
 
     assert (
-        mu1.shape == mu2.shape
+            mu1.shape == mu2.shape
     ), "Training and test mean vectors have different lengths"
     assert (
-        sigma1.shape == sigma2.shape
+            sigma1.shape == sigma2.shape
     ), "Training and test covariances have different dimensions"
 
     diff = mu1 - mu2
@@ -93,9 +95,9 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     covmean, _ = linalg.sqrtm(sigma1.dot(sigma2), disp=False)
     if not np.isfinite(covmean).all():
         msg = (
-            "fid calculation produces singular product; "
-            "adding %s to diagonal of cov estimates"
-        ) % eps
+                  "fid calculation produces singular product; "
+                  "adding %s to diagonal of cov estimates"
+              ) % eps
         logger.warning(msg)
         offset = np.eye(sigma1.shape[0]) * eps
         covmean = linalg.sqrtm((sigma1 + offset).dot(sigma2 + offset))
@@ -272,6 +274,7 @@ def generate_beatmaps(beatmap_paths, fid_args: FidConfig, return_dict, idx):
             torch.cuda.empty_cache()  # Clear any cached memory
 
 
+@torch.no_grad()
 def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
     print("Calculating metrics...")
 
@@ -283,8 +286,16 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
             classifier_model.model.transformer.forward = torch.compile(classifier_model.model.transformer.forward,
                                                                        mode="reduce-overhead", fullgraph=False)
 
+    cm3p_model, cm3p_processor = None, None
+    if args.fid_cm3p:
+        cm3p_processor = AutoProcessor.from_pretrained(args.cm3p_ckpt, trust_remote_code=True, revision="main")
+        cm3p_model = AutoModel.from_pretrained(args.cm3p_ckpt, device_map=args.device, torch_dtype=torch.bfloat16,
+                                               trust_remote_code=True, revision="main")
+
     real_features = []
     generated_features = []
+    real_features_cm3p = []
+    generated_features_cm3p = []
     active_rhythm_stats = {}
     passive_rhythm_stats = {}
 
@@ -307,21 +318,33 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
             if args.fid:
                 # Calculate feature vectors for real and generated beatmaps
                 sample_rate = classifier_args.data.sample_rate
-                audio = load_audio_file(audio_path, sample_rate, normalize=args.inference.train.data.normalize_audio)
+                audio = load_audio_file(audio_path, sample_rate)
 
-                for example in DataLoader(
-                        ExampleDataset(beatmap, audio, classifier_args, classifier_tokenizer, args.device),
-                        batch_size=args.classifier_batch_size):
-                    classifier_result: OsuClassifierOutput = classifier_model(**example)
-                    features = classifier_result.feature_vector
-                    real_features.append(features.cpu().numpy())
+                def process(process_beatmap, feature_list):
+                    for example in DataLoader(
+                            ExampleDataset(process_beatmap, audio, classifier_args, classifier_tokenizer, args.device),
+                            batch_size=args.classifier_batch_size):
+                        classifier_result: OsuClassifierOutput = classifier_model(**example)
+                        features = classifier_result.feature_vector
+                        feature_list.append(features.cpu().numpy())
 
-                for example in DataLoader(
-                        ExampleDataset(generated_beatmap, audio, classifier_args, classifier_tokenizer, args.device),
-                        batch_size=args.classifier_batch_size):
-                    classifier_result: OsuClassifierOutput = classifier_model(**example)
-                    features = classifier_result.feature_vector
-                    generated_features.append(features.cpu().numpy())
+                process(beatmap, real_features)
+                process(generated_beatmap, generated_features)
+
+            if args.fid_cm3p:
+                def process(process_beatmap, feature_list):
+                    beatmap_data = cm3p_processor(beatmap=process_beatmap, audio=audio_path)
+                    beatmap_data = beatmap_data.to(args.device, dtype=torch.bfloat16)
+                    # Turn dict of tensors into list of dicts of tensors for DataLoader
+                    beatmap_data = [{key: beatmap_data[key][i] for key in beatmap_data} for i in
+                                    range(len(beatmap_data['input_ids']))]
+                    for example in DataLoader(beatmap_data, batch_size=args.cm3p_batch_size):
+                        outputs = cm3p_model(**example, return_loss=False)
+                        beatmap_embeds = outputs.beatmap_embeds
+                        feature_list.append(beatmap_embeds.float().cpu().numpy())
+
+                process(beatmap, real_features_cm3p)
+                process(generated_beatmap, generated_features_cm3p)
 
             if args.rhythm_stats:
                 # Calculate rhythm stats
@@ -338,15 +361,19 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
         finally:
             torch.cuda.empty_cache()  # Clear any cached memory
 
-    if args.fid:
-        # Calculate FID
-        real_features = np.concatenate(real_features, axis=0)
-        generated_features = np.concatenate(generated_features, axis=0)
-        m1, s1 = np.mean(real_features, axis=0), np.cov(real_features, rowvar=False)
-        m2, s2 = np.mean(generated_features, axis=0), np.cov(generated_features, rowvar=False)
+    def fid_calc(features1, features2, name):
+        features1 = np.concatenate(features1, axis=0)
+        features2 = np.concatenate(features2, axis=0)
+        m1, s1 = np.mean(features1, axis=0), np.cov(features1, rowvar=False)
+        m2, s2 = np.mean(features2, axis=0), np.cov(features2, rowvar=False)
         fid = calculate_frechet_distance(m1, s1, m2, s2)
+        logger.info(f"{name}: {fid}")
 
-        logger.info(f"FID: {fid}")
+    if args.fid:
+        fid_calc(real_features, generated_features, "FID")
+
+    if args.fid_cm3p:
+        fid_calc(real_features_cm3p, generated_features_cm3p, "FID CM3P")
 
     if args.rhythm_stats:
         # Calculate rhythm precision, recall, and F1 score
@@ -383,7 +410,8 @@ def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: 
             in_set += 1
         else:
             out_set += 1
-    logger.info(f"In training set: {in_set}, Not in training set: {out_set}, Total: {len(beatmap_paths)}, Ratio: {in_set / (in_set + out_set):.2f}")
+    logger.info(
+        f"In training set: {in_set}, Not in training set: {out_set}, Total: {len(beatmap_paths)}, Ratio: {in_set / (in_set + out_set):.2f}")
 
 
 @hydra.main(config_path="configs", config_name="calc_fid", version_base="1.1")

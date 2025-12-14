@@ -113,6 +113,7 @@ class FidConfig:
 
     skip_generation: bool = False
     fid: bool = True
+    fid_cm3p: bool = True
     rhythm_stats: bool = True
 
     dataset_type: str = 'ors'
@@ -123,6 +124,9 @@ class FidConfig:
 
     classifier_ckpt: str = 'OliBomby/osu-classifier'
     classifier_batch_size: int = 16
+
+    cm3p_ckpt: str = 'OliBomby/CM3P'
+    cm3p_batch_size: int = 16
 
     training_set_ids_path: Optional[str] = None  # Path to training set beatmap IDs
 
