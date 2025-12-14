@@ -5,6 +5,7 @@ PyYAML
 transformers==4.53.3
 hydra-core
 tensorboard
+torchaudio
 slider @ git+https://github.com/OliBomby/slider.git@gedagedigedagedaoh
 torch_tb_profiler
 wandb
@@ -19,3 +20,10 @@ flask
 audioop-lts; python_version>='3.13'
 rich
 peft
+# Queue system & audio fingerprinting dependencies
+requests>=2.32
+shazamio
+aiofiles
+pyacoustid
+musicbrainzngs
+pykakasi
