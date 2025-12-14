@@ -1,14 +1,16 @@
 import excepthook  # noqa
+import argparse
 import functools
 import os
 import platform
+import signal
 import socket
 import subprocess
 import sys
 import threading
 import time
 import datetime
-from typing import Callable, Any, Tuple, Dict
+from typing import Callable, Any, Tuple, Dict, Optional
 
 import webview
 import werkzeug.serving
@@ -16,6 +18,44 @@ from flask import Flask, render_template, request, Response, jsonify
 
 from config import InferenceConfig
 from inference import autofill_paths
+
+# Parse command line arguments
+def parse_args():
+    parser = argparse.ArgumentParser(description='Mapperatorinator Web UI')
+    device_group = parser.add_mutually_exclusive_group()
+    device_group.add_argument('--gpu', '-gpu', action='store_true',
+                              help='Force GPU/CUDA usage (default behavior)')
+    device_group.add_argument('--cpu', '-cpu', action='store_true', 
+                              help='Force CPU usage (slower, but works without CUDA)')
+    return parser.parse_args()
+
+args = parse_args()
+
+# Determine device preference: default to GPU (auto), --cpu forces CPU
+if args.cpu:
+    DEVICE_PREFERENCE = 'cpu'
+    print("Device mode: CPU (forced via --cpu flag)")
+else:
+    # Default or --gpu: use auto (will use CUDA if available)
+    DEVICE_PREFERENCE = 'auto'
+    if args.gpu:
+        print("Device mode: GPU/CUDA (forced via --gpu flag)")
+    else:
+        print("Device mode: auto (GPU/CUDA if available, otherwise CPU)")
+
+# Queue system imports
+try:
+    from mapper_api import lookup_username
+    from audio_fingerprint import identify_song
+    from filename_utils import rename_output, compose_diff_name
+    QUEUE_FEATURES_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Queue features not available: {e}")
+    QUEUE_FEATURES_AVAILABLE = False
+    def lookup_username(mapper_id): return None
+    def identify_song(path): return None, None
+    def rename_output(*args): return args[0]
+    def compose_diff_name(*args): return "Mapperatorinator"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
@@ -66,6 +106,100 @@ def parse_file_dialog_result(result):
 app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 app.secret_key = os.urandom(24)  # Set a secret key for Flask
 
+# ── osu! API credentials (for mapper lookup) ────────────────────────
+# You can override these via environment variables
+OSU_CLIENT_ID = os.getenv("OSU_CLIENT_ID", "42371")
+OSU_CLIENT_SECRET = os.getenv("OSU_CLIENT_SECRET", "wNDRUcvRGjzk39LpT9zR5LNKlA8fFRREoUo3eh8T")
+
+app.config["OSU_CLIENT_ID"] = OSU_CLIENT_ID
+app.config["OSU_CLIENT_SECRET"] = OSU_CLIENT_SECRET
+
+# Mirror to environment for helper modules
+os.environ.setdefault("OSU_CLIENT_ID", OSU_CLIENT_ID)
+os.environ.setdefault("OSU_CLIENT_SECRET", OSU_CLIENT_SECRET)
+
+# ── Shared state for inference process and queue ────────────────────
+last_form_data: dict = {}  # Remember form data for file renaming
+queue_cancelled: bool = False  # Flag to cancel queue processing
+song_detection_cache: dict = {}  # Cache for song detection results {audio_path: (artist, title)}
+
+
+def apply_beatmap_customizations(osu_path, preview_time=None, background_path=None):
+    """Apply preview time and background image to a .osu file.
+    
+    Note: This only updates the .osu file metadata to reference the background.
+    The actual background file is embedded in the .osz by inference.py's export_osz.
+    """
+    if not os.path.exists(osu_path):
+        print(f"Warning: Cannot customize .osu file - not found: {osu_path}")
+        return
+    
+    try:
+        with open(osu_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+        
+        new_lines = []
+        in_general = False
+        in_events = False
+        preview_written = False
+        bg_written = False
+        bg_name = None
+        
+        # Get the background filename for the .osu file reference
+        if background_path and os.path.exists(background_path):
+            bg_name = os.path.basename(background_path)
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # Track sections
+            if stripped == '[General]':
+                in_general = True
+                in_events = False
+                new_lines.append(line)
+                continue
+            elif stripped == '[Events]':
+                in_events = True
+                in_general = False
+                new_lines.append(line)
+                continue
+            elif stripped.startswith('[') and (in_general or in_events):
+                # Leaving section
+                if in_general and preview_time and not preview_written:
+                    new_lines.append(f"PreviewTime: {preview_time}\n")
+                if in_events and bg_name and not bg_written:
+                    new_lines.append(f'0,0,"{bg_name}",0,0\n')
+                in_general = False
+                in_events = False
+            
+            # Modify preview time in [General]
+            if in_general and stripped.startswith('PreviewTime:'):
+                if preview_time:
+                    new_lines.append(f"PreviewTime: {preview_time}\n")
+                    preview_written = True
+                else:
+                    new_lines.append(line)
+                continue
+            
+            # Modify/add background in [Events]
+            if in_events and (stripped.startswith('0,0,"') or stripped.startswith("0,0,'")):
+                if bg_name:
+                    new_lines.append(f'0,0,"{bg_name}",0,0\n')
+                    bg_written = True
+                else:
+                    new_lines.append(line)
+                continue
+            
+            new_lines.append(line)
+        
+        # Write back
+        with open(osu_path, 'w', encoding='utf-8') as f:
+            f.writelines(new_lines)
+        
+        print(f"Applied customizations to: {osu_path}")
+        
+    except Exception as e:
+        print(f"Warning: Failed to apply customizations to {osu_path}: {e}")
 
 # --- pywebview API Class ---
 class Api:
@@ -96,7 +230,7 @@ class Api:
                 file_types = tuple(file_types)
 
             result = current_window.create_file_dialog(
-                webview.OPEN_DIALOG,
+                OPEN_DIALOG,
                 file_types=file_types
             )
         except Exception:
@@ -165,13 +299,43 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/check_bf16_support', methods=['GET'])
+def check_bf16_support():
+    """Check if the GPU supports bf16 precision."""
+    try:
+        import torch
+        
+        if not torch.cuda.is_available():
+            return jsonify({"supported": False, "reason": "CUDA not available"})
+        
+        # Get GPU compute capability
+        device_props = torch.cuda.get_device_properties(0)
+        compute_capability = (device_props.major, device_props.minor)
+        gpu_name = device_props.name
+        
+        # bf16 requires compute capability 8.0+ (Ampere and newer: RTX 30xx, 40xx, A100, etc.)
+        supported = compute_capability[0] >= 8
+        
+        return jsonify({
+            "supported": supported,
+            "gpu_name": gpu_name,
+            "compute_capability": f"{compute_capability[0]}.{compute_capability[1]}",
+            "reason": "GPU supports bf16" if supported else f"GPU compute capability {compute_capability[0]}.{compute_capability[1]} < 8.0 required"
+        })
+    except Exception as e:
+        return jsonify({"supported": False, "reason": str(e)})
+
+
 @app.route('/start_inference', methods=['POST'])
 def start_inference():
     """Starts the inference process based on form data."""
-    global current_process
+    global current_process, last_form_data
     with process_lock:
         if current_process and current_process.poll() is None:
             return jsonify({"status": "error", "message": "Process already running"}), 409  # Conflict
+
+        # Save form data for file renaming after completion
+        last_form_data = request.form.to_dict(flat=True)
 
         # --- Construct Command List (shell=False) ---
         python_executable = sys.executable  # Get path to current Python interpreter
@@ -184,20 +348,21 @@ def start_inference():
 
         # Helper to quote values for Hydra's command-line parser
         def hydra_quote(value):
-            """Quotes a value for Hydra (single quotes, escapes internal)."""
+            """Quotes a value for Hydra (double quotes, escapes internal)."""
             value_str = str(value)
-            # Escape internal single quotes: ' -> '\''
-            escaped_value = value_str.replace("'", r"\'")
-            return f"'{escaped_value}'"
+            # Escape internal double quotes and backslashes
+            escaped_value = value_str.replace('\\', '\\\\').replace('"', '\\"')
+            return f'"{escaped_value}"'
 
-        # Set of keys known to be paths needing quoting for Hydra
-        path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path"}
+        # Set of keys that need quoting for Hydra (paths and string values with special chars)
+        quote_keys = {"audio_path", "output_path", "beatmap_path", "lora_path", 
+                      "artist", "title", "creator", "version", "background"}
 
         # Helper to add argument if value exists
         def add_arg(key, value):
             if value is not None and value != '':  # Ensure value is not empty
-                if key in path_keys:
-                    # Quote path values for Hydra
+                if key in quote_keys:
+                    # Quote values for Hydra
                     cmd.append(f"{key}={hydra_quote(value)}")
                 else:
                     # Other values usually don't need explicit Hydra quoting when passed via list
@@ -238,6 +403,41 @@ def start_inference():
             add_arg(param, request.form.get(param))
         # mapper_id
         add_arg("mapper_id", request.form.get('mapper_id'))
+        
+        # Precision setting (bf16 for faster inference on supported GPUs)
+        if 'enable_bf16' in request.form:
+            cmd.append("precision=bf16")
+        # else uses default fp32 from config
+        
+        # Device setting (from command line args)
+        cmd.append(f"device={DEVICE_PREFERENCE}")
+
+        # Beatmap metadata (artist, title, background, preview time)
+        # These come from detected_artist/detected_title form fields
+        add_arg("artist", request.form.get('detected_artist'))
+        add_arg("title", request.form.get('detected_title'))
+        add_arg("background", request.form.get('background_path'))
+        add_arg("preview_time", request.form.get('preview_time'))
+        
+        # Creator and version (difficulty name)
+        mapper_name = request.form.get('mapper_name')
+        mapper_id = request.form.get('mapper_id')
+        model = request.form.get('model', 'v30').upper()
+        if mapper_name:
+            add_arg("creator", mapper_name)
+        else:
+            add_arg("creator", f"Mapperatorinator {model}")
+        
+        # Generate version (difficulty name) from stars and mapper
+        difficulty = request.form.get('difficulty')
+        if difficulty:
+            stars = float(difficulty)
+            base_diff = 'Easy' if stars < 2.0 else 'Normal' if stars < 2.7 else 'Hard' if stars < 4.0 else 'Insane' if stars < 5.3 else 'Expert' if stars < 6.5 else 'Expert+'
+            if mapper_name and mapper_id:
+                version = f"{mapper_name}'s {base_diff}"
+            else:
+                version = base_diff
+            add_arg("version", version)
 
         # Timing and segmentation
         for param in ['start_time', 'end_time']:
@@ -248,11 +448,12 @@ def start_inference():
             cmd.append("export_osz=true")
         else :
             cmd.append("export_osz=false")
-        if 'add_to_beatmap' in request.form:
+        # Only enable add_to_beatmap and overwrite_reference_beatmap if beatmap_path is provided
+        if 'add_to_beatmap' in request.form and beatmap_path:
             cmd.append("add_to_beatmap=true")
         else:
             cmd.append("add_to_beatmap=false")
-        if 'overwrite_reference_beatmap' in request.form:
+        if 'overwrite_reference_beatmap' in request.form and beatmap_path:
             cmd.append("overwrite_reference_beatmap=true")
         else:
             cmd.append("overwrite_reference_beatmap=false")
@@ -308,8 +509,9 @@ def stream_output():
     """Streams the output of the running inference process using SSE."""
 
     def generate():
-        global current_process
+        global current_process, beatmapset_enabled, beatmapset_files, beatmapset_audio_path, beatmapset_output_dir
         process_to_stream = None
+        client_disconnected = False  # Track if client disconnected to avoid yielding in finally
 
         # Short lock to safely get the process object
         with process_lock:
@@ -328,13 +530,32 @@ def stream_output():
             full_output_lines = []
             error_occurred = False
             log_filepath = None
+            generated_osu_path = None  # Track the actual generated .osu file path
+            generated_osz_path = None  # Track the actual generated .osz file path
 
             try:
                 # Stream lines from stdout
                 for line in iter(process_to_stream.stdout.readline, ""):
                     full_output_lines.append(line)
-                    yield f"data: {line.rstrip()}\n\n"
+                    try:
+                        yield f"data: {line.rstrip()}\n\n"
+                    except GeneratorExit:
+                        # Client disconnected (e.g., window closed), exit gracefully
+                        print(f"Client disconnected during streaming for PID {process_to_stream.pid}")
+                        client_disconnected = True
+                        raise  # Re-raise to trigger cleanup without yielding
                     sys.stdout.flush()  # Ensure data is sent
+                    
+                    # Parse the actual generated file path from inference.py output
+                    # inference.py prints: "Generated beatmap saved to {result_path}"
+                    # and optionally: "Generated .osz saved to {osz_path}"
+                    stripped_line = line.strip()
+                    if stripped_line.startswith("Generated beatmap saved to "):
+                        generated_osu_path = stripped_line.replace("Generated beatmap saved to ", "").strip()
+                        print(f"[stream_output] Captured generated .osu path: {generated_osu_path}")
+                    elif stripped_line.startswith("Generated .osz saved to "):
+                        generated_osz_path = stripped_line.replace("Generated .osz saved to ", "").strip()
+                        print(f"[stream_output] Captured generated .osz path: {generated_osz_path}")
 
                 # --- Process finished, check status ---
                 process_to_stream.stdout.close()  # Close the pipe
@@ -344,14 +565,142 @@ def stream_output():
                 if return_code != 0:
                     error_occurred = True
                     print(f"Non-zero exit code ({return_code}) detected for PID {process_to_stream.pid}. Marking as error.")
+                else:
+                    # --- Post-process output file after successful generation ---
+                    # Use the actual generated file path instead of the output directory
+                    actual_output_file = generated_osu_path
+                    audio_path = last_form_data.get('audio_path', '') if last_form_data else ''
+                    
+                    if actual_output_file and os.path.isfile(actual_output_file):
+                        final_path = actual_output_file
+                        
+                        # --- Rename output file if QUEUE_FEATURES_AVAILABLE ---
+                        if QUEUE_FEATURES_AVAILABLE and last_form_data:
+                            try:
+                                mapper_name = last_form_data.get('mapper_name', '')
+                                mapper_id = last_form_data.get('mapper_id', '')
+                                diff_name = last_form_data.get('diff_name', '')
+                                detected_artist = last_form_data.get('detected_artist', '')
+                                detected_title = last_form_data.get('detected_title', '')
+                                
+                                # Get artist/title from the beatmap file if not in form data
+                                artist = detected_artist
+                                title = detected_title
+                                if not artist or not title:
+                                    try:
+                                        with open(actual_output_file, 'r', encoding='utf-8', errors='ignore') as f:
+                                            for bm_line in f:
+                                                if bm_line.startswith('Artist:') and not artist:
+                                                    artist = bm_line.split(':', 1)[1].strip()
+                                                elif bm_line.startswith('Title:') and not title:
+                                                    title = bm_line.split(':', 1)[1].strip()
+                                                if artist and title:
+                                                    break
+                                    except Exception as read_e:
+                                        print(f"Warning: Could not read artist/title from beatmap: {read_e}")
+                                
+                                artist = artist or "Unknown Artist"
+                                title = title or "Unknown Title"
+                                
+                                # Determine creator name
+                                creator = mapper_name
+                                if not creator and mapper_id:
+                                    # Try to get mapper name from API
+                                    try:
+                                        creator = lookup_username(mapper_id)
+                                    except Exception:
+                                        pass
+                                creator = creator or f"Mapperatorinator {last_form_data.get('model', 'V30').upper()}"
+                                
+                                # Determine difficulty name
+                                difficulty = diff_name
+                                if not difficulty:
+                                    star_rating = float(last_form_data.get('difficulty', 5.0))
+                                    if star_rating < 2.0:
+                                        base_diff = "Easy"
+                                    elif star_rating < 2.7:
+                                        base_diff = "Normal"
+                                    elif star_rating < 4.0:
+                                        base_diff = "Hard"
+                                    elif star_rating < 5.3:
+                                        base_diff = "Insane"
+                                    elif star_rating < 6.5:
+                                        base_diff = "Expert"
+                                    else:
+                                        base_diff = "Expert+"
+                                    
+                                    # Format like "mapper's Expert" if we have a mapper
+                                    if mapper_name or mapper_id:
+                                        mapper_display = mapper_name or creator
+                                        if mapper_display.endswith('s') or mapper_display.endswith('S'):
+                                            difficulty = f"{mapper_display}' {base_diff}"
+                                        else:
+                                            difficulty = f"{mapper_display}'s {base_diff}"
+                                    else:
+                                        difficulty = base_diff
+                                
+                                # Rename the file
+                                new_path = rename_output(
+                                    old_path=actual_output_file,
+                                    artist=artist,
+                                    title=title,
+                                    creator=creator,
+                                    difficulty=difficulty
+                                )
+                                
+                                if new_path != actual_output_file:
+                                    print(f"Renamed output file to: {new_path}")
+                                    try:
+                                        yield f"event: renamed\ndata: {new_path.replace(os.sep, '/')}\n\n"
+                                    except GeneratorExit:
+                                        print(f"Client disconnected during rename event")
+                                        client_disconnected = True
+                                        raise  # Re-raise to trigger cleanup without yielding
+                                    final_path = new_path
+                                    
+                            except Exception as rename_e:
+                                print(f"Warning: Could not rename output file: {rename_e}")
+                        
+                        # --- Apply preview time and background if set ---
+                        if last_form_data:
+                            preview_time = last_form_data.get('preview_time', '')
+                            background_path = last_form_data.get('background_path', '')
+                            
+                            if preview_time or background_path:
+                                apply_beatmap_customizations(final_path, preview_time, background_path)
+                        
+                        # --- Add to beatmap set if enabled (ALWAYS, even without "Compile as Beatmap Set") ---
+                        # This ensures the file is properly tracked and available immediately
+                        if beatmapset_enabled:
+                            beatmapset_files.append(final_path)
+                            if not beatmapset_audio_path and audio_path:
+                                beatmapset_audio_path = audio_path
+                            if not beatmapset_output_dir:
+                                beatmapset_output_dir = os.path.dirname(final_path)
+                            print(f"Added to beatmap set: {final_path} (total: {len(beatmapset_files)})")
+                        
+                        # Send the final file path to the frontend so it knows where the file is
+                        try:
+                            yield f"event: file_ready\ndata: {final_path.replace(os.sep, '/')}\n\n"
+                        except GeneratorExit:
+                            print(f"Client disconnected during file_ready event")
+                            client_disconnected = True
+                            raise  # Re-raise to trigger cleanup without yielding
+                    else:
+                        print(f"Warning: Generated file not found or path not captured. Path: {actual_output_file}")
 
+            except GeneratorExit:
+                # Client disconnected - do cleanup without yielding
+                print(f"Client disconnected (GeneratorExit) for PID {process_to_stream.pid}")
+                client_disconnected = True
+                # Cleanup will happen in finally block
             except Exception as e:
                 print(f"Error during streaming for PID {process_to_stream.pid}: {e}")
                 error_occurred = True
                 full_output_lines.append(f"\n--- STREAMING ERROR ---\n{e}\n")
             finally:
                 # --- Log Saving Logic (if error occurred) ---
-                if error_occurred:
+                if error_occurred and not client_disconnected:
                     try:
                         log_dir = os.path.join(script_dir, 'logs')
                         os.makedirs(log_dir, exist_ok=True)
@@ -363,17 +712,26 @@ def stream_output():
                         with open(log_filepath, 'w', encoding='utf-8') as f:
                             f.write(error_content)
                         print(f"Error log saved for PID {process_to_stream.pid} to: {log_filepath}")
-                        yield f"event: error_log\ndata: {log_filepath.replace(os.sep, '/')}\n\n"
+                        try:
+                            yield f"event: error_log\ndata: {log_filepath.replace(os.sep, '/')}\n\n"
+                        except GeneratorExit:
+                            client_disconnected = True  # Don't yield anymore
 
                     except Exception as log_e:
                         print(f"FATAL: Could not write error log for PID {process_to_stream.pid}: {log_e}")
 
-                # --- Standard End Event ---
-                completion_message = "Process completed"
-                if error_occurred:
-                    completion_message += " with errors"
-                yield f"event: end\ndata: {completion_message}\n\n"
-                print(f"Finished streaming for PID: {process_to_stream.pid}. Sent 'end' event.")
+                # --- Standard End Event (only if client still connected) ---
+                if not client_disconnected:
+                    completion_message = "Process completed"
+                    if error_occurred:
+                        completion_message += " with errors"
+                    try:
+                        yield f"event: end\ndata: {completion_message}\n\n"
+                    except GeneratorExit:
+                        client_disconnected = True  # Don't yield anymore
+                    print(f"Finished streaming for PID: {process_to_stream.pid}. Sent 'end' event.")
+                else:
+                    print(f"Finished streaming for PID: {process_to_stream.pid}. Client disconnected, skipped 'end' event.")
 
                 # --- Cleanup global process reference ---
                 with process_lock:
@@ -389,26 +747,51 @@ def stream_output():
 @app.route('/cancel_inference', methods=['POST'])
 def cancel_inference():
     """Attempts to terminate the currently running inference process."""
-    global current_process
+    global current_process, queue_cancelled
     message = ""
     success = False
     status_code = 500
+    
+    # Check if we should also cancel the queue
+    clear_queue = request.json.get('clear_queue', False) if request.is_json else False
+    if clear_queue:
+        queue_cancelled = True
 
     with process_lock:
         if current_process and current_process.poll() is None:
             try:
                 pid = current_process.pid
                 print(f"Attempting to terminate process PID: {pid}...")
-                current_process.terminate()  # Send SIGTERM
-                # Optional: Add a short wait to see if it terminates quickly
+                
+                # On Windows, use taskkill to kill the process tree
+                if sys.platform == 'win32':
+                    try:
+                        import subprocess as sp
+                        sp.run(['taskkill', '/F', '/T', '/PID', str(pid)], 
+                               capture_output=True, check=False)
+                        print(f"Process tree PID: {pid} killed with taskkill.")
+                        message = "Cancel request sent, process tree terminated."
+                    except Exception as taskkill_error:
+                        print(f"taskkill failed: {taskkill_error}, falling back to terminate()")
+                        current_process.terminate()
+                        message = "Cancel request sent. Process termination might take a moment."
+                else:
+                    # On Unix, use process group kill
+                    try:
+                        import os as os_mod
+                        os_mod.killpg(os_mod.getpgid(pid), signal.SIGTERM)
+                        print(f"Process group PID: {pid} terminated with SIGTERM.")
+                        message = "Cancel request sent, process group terminated."
+                    except Exception:
+                        current_process.terminate()
+                        message = "Cancel request sent. Process termination might take a moment."
+                
+                # Wait briefly to see if it terminates
                 try:
                     current_process.wait(timeout=1)
                     print(f"Process PID: {pid} terminated successfully after request.")
-                    message = "Cancel request sent, process terminated."
                 except subprocess.TimeoutExpired:
-                    print(f"Process PID: {pid} did not terminate immediately after SIGTERM.")
-                    message = "Cancel request sent. Process termination might take a moment."
-                    # You could consider current_process.kill() here if terminate isn't enough
+                    print(f"Process PID: {pid} did not terminate immediately.")
 
                 success = True
                 status_code = 200
@@ -420,17 +803,315 @@ def cancel_inference():
                 status_code = 500
         elif current_process:
             message = "Process already finished."
-            success = False  # Or True if you consider it 'cancelled' as it's done
-            status_code = 409
+            success = True if clear_queue else False
+            status_code = 200 if clear_queue else 409
         else:
             message = "No process is currently running."
-            success = False
-            status_code = 404
+            if clear_queue:
+                message = "Queue cancelled. No process was running."
+                success = True
+                status_code = 200
+            else:
+                success = False
+                status_code = 404
 
-    if success:
-        return jsonify({"status": "success", "message": message}), status_code
+    response_data = {"status": "success" if success else "error", "message": message}
+    if clear_queue:
+        response_data["queue_cleared"] = True
+    return jsonify(response_data), status_code
+
+
+@app.route('/queue_status', methods=['GET', 'POST'])
+def queue_status():
+    """Get or set the queue cancellation status."""
+    global queue_cancelled
+    
+    if request.method == 'POST':
+        data = request.json or {}
+        if 'cancelled' in data:
+            queue_cancelled = data['cancelled']
+            return jsonify({"status": "success", "cancelled": queue_cancelled})
+        return jsonify({"status": "error", "message": "Missing 'cancelled' field"}), 400
+    
+    # GET - return current status
+    return jsonify({
+        "cancelled": queue_cancelled,
+        "process_running": current_process is not None and current_process.poll() is None
+    })
+
+
+@app.route('/reset_queue', methods=['POST'])
+def reset_queue():
+    """Reset the queue cancellation flag (called when starting a new queue)."""
+    global queue_cancelled
+    queue_cancelled = False
+    return jsonify({"status": "success", "message": "Queue reset"})
+
+
+@app.route('/get_audio_info', methods=['POST'])
+def get_audio_info():
+    """Get audio file info and return a URL for playback."""
+    data = request.get_json() or {}
+    audio_path = data.get('path', '')
+    
+    if not audio_path or not os.path.exists(audio_path):
+        return jsonify({"success": False, "message": "Audio file not found"})
+    
+    try:
+        # Return a URL that serves the audio file
+        # We'll create a route to serve audio files
+        return jsonify({
+            "success": True,
+            "url": f"/serve_audio?path={audio_path}",
+            "duration": None  # Could add duration detection if needed
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+
+@app.route('/serve_audio', methods=['GET'])
+def serve_audio():
+    """Serve an audio file for preview playback with Range request support for seeking."""
+    audio_path = request.args.get('path', '')
+    
+    if not audio_path or not os.path.exists(audio_path):
+        return "Audio file not found", 404
+    
+    # Determine content type
+    ext = os.path.splitext(audio_path)[1].lower()
+    content_types = {
+        '.mp3': 'audio/mpeg',
+        '.ogg': 'audio/ogg',
+        '.wav': 'audio/wav',
+        '.flac': 'audio/flac',
+        '.m4a': 'audio/mp4'
+    }
+    content_type = content_types.get(ext, 'audio/mpeg')
+    
+    # Get file size
+    file_size = os.path.getsize(audio_path)
+    
+    # Check for Range header (needed for seeking)
+    range_header = request.headers.get('Range', None)
+    
+    if range_header:
+        # Parse Range header (e.g., "bytes=0-" or "bytes=1000-2000")
+        byte_start = 0
+        byte_end = file_size - 1
+        
+        range_match = range_header.replace('bytes=', '').split('-')
+        if range_match[0]:
+            byte_start = int(range_match[0])
+        if len(range_match) > 1 and range_match[1]:
+            byte_end = int(range_match[1])
+        
+        # Ensure valid range
+        byte_end = min(byte_end, file_size - 1)
+        content_length = byte_end - byte_start + 1
+        
+        def generate_range():
+            with open(audio_path, 'rb') as f:
+                f.seek(byte_start)
+                remaining = content_length
+                while remaining > 0:
+                    chunk_size = min(8192, remaining)
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+        
+        # Return 206 Partial Content
+        response = Response(
+            generate_range(),
+            status=206,
+            mimetype=content_type,
+            direct_passthrough=True
+        )
+        response.headers['Content-Range'] = f'bytes {byte_start}-{byte_end}/{file_size}'
+        response.headers['Accept-Ranges'] = 'bytes'
+        response.headers['Content-Length'] = content_length
+        return response
     else:
-        return jsonify({"status": "error", "message": message}), status_code
+        # No Range header - return full file
+        def generate():
+            with open(audio_path, 'rb') as f:
+                while chunk := f.read(8192):
+                    yield chunk
+        
+        response = Response(generate(), mimetype=content_type)
+        response.headers['Accept-Ranges'] = 'bytes'
+        response.headers['Content-Length'] = file_size
+        return response
+
+
+@app.route('/get_image_preview', methods=['POST'])
+def get_image_preview():
+    """Get base64 encoded image preview for background."""
+    import base64
+    
+    data = request.get_json() or {}
+    image_path = data.get('path', '')
+    
+    if not image_path or not os.path.exists(image_path):
+        return jsonify({"success": False, "message": "Image file not found"})
+    
+    try:
+        ext = os.path.splitext(image_path)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+            return jsonify({"success": False, "message": "Unsupported image format"})
+        
+        with open(image_path, 'rb') as f:
+            image_data = base64.b64encode(f.read()).decode('utf-8')
+        
+        type_map = {'.jpg': 'jpeg', '.jpeg': 'jpeg', '.png': 'png', '.gif': 'gif', '.bmp': 'bmp'}
+        image_type = type_map.get(ext, 'jpeg')
+        
+        return jsonify({
+            "success": True,
+            "data": image_data,
+            "type": image_type
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+
+@app.route('/preview_background', methods=['GET'])
+def preview_background():
+    """Serve background image for queue item preview."""
+    from flask import send_file
+    
+    image_path = request.args.get('path', '')
+    
+    if not image_path or not os.path.exists(image_path):
+        # Return a 1x1 transparent pixel as fallback
+        from io import BytesIO
+        transparent_pixel = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+        return send_file(BytesIO(transparent_pixel), mimetype='image/png')
+    
+    try:
+        ext = os.path.splitext(image_path)[1].lower()
+        mime_types = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.bmp': 'image/bmp'}
+        mimetype = mime_types.get(ext, 'image/jpeg')
+        
+        return send_file(image_path, mimetype=mimetype)
+    except Exception:
+        # Return transparent pixel on error
+        from io import BytesIO
+        transparent_pixel = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+        return send_file(BytesIO(transparent_pixel), mimetype='image/png')
+
+
+# Beatmap set compilation state
+beatmapset_enabled = False
+beatmapset_files = []
+beatmapset_audio_path = None
+beatmapset_background_path = None
+beatmapset_output_dir = None
+
+
+@app.route('/init_beatmapset', methods=['POST'])
+def init_beatmapset():
+    """Initialize beatmap set compilation for a queue run."""
+    global beatmapset_enabled, beatmapset_files, beatmapset_audio_path, beatmapset_background_path, beatmapset_output_dir
+    data = request.get_json() or {}
+    beatmapset_enabled = data.get('enabled', False)
+    beatmapset_files = []
+    beatmapset_audio_path = None
+    beatmapset_background_path = None
+    beatmapset_output_dir = None
+    return jsonify({"status": "success", "enabled": beatmapset_enabled})
+
+
+@app.route('/add_to_beatmapset', methods=['POST'])
+def add_to_beatmapset():
+    """Add a generated .osu file to the beatmap set."""
+    global beatmapset_files, beatmapset_audio_path, beatmapset_background_path, beatmapset_output_dir
+    if not beatmapset_enabled:
+        return jsonify({"status": "skipped", "message": "Beatmap set compilation not enabled"})
+    
+    data = request.get_json() or {}
+    osu_file = data.get('osu_file')
+    audio_path = data.get('audio_path')
+    background_path = data.get('background_path')
+    output_dir = data.get('output_dir')
+    
+    if osu_file and os.path.exists(osu_file):
+        beatmapset_files.append(osu_file)
+        if not beatmapset_audio_path and audio_path:
+            beatmapset_audio_path = audio_path
+        if not beatmapset_background_path and background_path:
+            beatmapset_background_path = background_path
+        if not beatmapset_output_dir and output_dir:
+            beatmapset_output_dir = output_dir
+    
+    return jsonify({"status": "success", "files_count": len(beatmapset_files)})
+
+
+@app.route('/finalize_beatmapset', methods=['POST'])
+def finalize_beatmapset():
+    """Compile all collected .osu files into a single .osz beatmap set."""
+    global beatmapset_enabled, beatmapset_files, beatmapset_audio_path, beatmapset_background_path, beatmapset_output_dir
+    
+    if not beatmapset_enabled or len(beatmapset_files) == 0:
+        return jsonify({"success": False, "message": "No files to compile"})
+    
+    try:
+        import zipfile
+        import shutil
+        
+        # Determine output directory
+        output_dir = beatmapset_output_dir or os.path.dirname(beatmapset_files[0])
+        
+        # Get metadata from first .osu file to name the osz
+        first_osu = beatmapset_files[0]
+        artist = "Unknown"
+        title = "Unknown"
+        
+        try:
+            with open(first_osu, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.startswith('Artist:'):
+                        artist = line.split(':', 1)[1].strip()
+                    elif line.startswith('Title:'):
+                        title = line.split(':', 1)[1].strip()
+                    if artist != "Unknown" and title != "Unknown":
+                        break
+        except Exception as e:
+            print(f"Error reading metadata from .osu file: {e}")
+        
+        # Create osz filename
+        safe_artist = "".join(c for c in artist if c.isalnum() or c in " -_").strip()
+        safe_title = "".join(c for c in title if c.isalnum() or c in " -_").strip()
+        osz_name = f"{safe_artist} - {safe_title}.osz"
+        osz_path = os.path.join(output_dir, osz_name)
+        
+        # Create the .osz (which is just a .zip)
+        with zipfile.ZipFile(osz_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # Add all .osu files
+            for osu_file in beatmapset_files:
+                zf.write(osu_file, os.path.basename(osu_file))
+            
+            # Add audio file if exists
+            if beatmapset_audio_path and os.path.exists(beatmapset_audio_path):
+                zf.write(beatmapset_audio_path, os.path.basename(beatmapset_audio_path))
+            
+            # Add background image if exists
+            if beatmapset_background_path and os.path.exists(beatmapset_background_path):
+                zf.write(beatmapset_background_path, os.path.basename(beatmapset_background_path))
+        
+        # Reset state
+        beatmapset_enabled = False
+        beatmapset_files = []
+        beatmapset_audio_path = None
+        beatmapset_background_path = None
+        beatmapset_output_dir = None
+        
+        return jsonify({"success": True, "filename": osz_name, "path": osz_path})
+        
+    except Exception as e:
+        print(f"Error creating beatmap set: {e}")
+        return jsonify({"success": False, "message": str(e)})
 
 
 @app.route('/open_folder', methods=['GET'])
@@ -534,9 +1215,38 @@ def save_config():
         })
 
 
+# ═══════════════════════════════════════════════════════════════════════
+#  QUEUE SYSTEM ROUTES
+# ═══════════════════════════════════════════════════════════════════════
+
+@app.route("/lookup_mapper_name", methods=["POST"])
+def api_lookup_mapper():
+    """Look up mapper username from osu! API."""
+    data = request.get_json() or {}
+    mapper_id = data.get("mapper_id")
+    print(f"[lookup_mapper] Received request for mapper_id: {mapper_id}")
+    
+    if not mapper_id:
+        return jsonify({"error": "mapper_id required"}), 400
+    
+    if not QUEUE_FEATURES_AVAILABLE:
+        print("[lookup_mapper] Queue features not available")
+        return jsonify({"error": "Queue features not available"}), 503
+    
+    try:
+        name = lookup_username(mapper_id)
+        print(f"[lookup_mapper] Result for {mapper_id}: {name}")
+        if not name:
+            return jsonify({"error": "User not found"}), 404
+        return jsonify({"username": name})
+    except Exception as e:
+        print(f"Mapper lookup error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/validate_paths', methods=['POST'])
 def validate_paths():
-    """Validates and autofills missing paths."""
+    """Validates paths, autofills folders, and attempts song detection."""
     try:
         # Get paths
         audio_path = request.form.get('audio_path', '').strip()
@@ -550,13 +1260,38 @@ def validate_paths():
 
         result = autofill_paths(inference_args)
 
-        # Return the results
+        # Attempt song detection only if explicitly requested (with caching)
+        detected_artist = None
+        detected_title = None
+        detect_song = request.form.get('detect_song', 'false').lower() == 'true'
+        
+        if detect_song and QUEUE_FEATURES_AVAILABLE and inference_args.audio_path:
+            actual_audio = inference_args.audio_path
+            if os.path.isfile(actual_audio):
+                # Check cache first
+                if actual_audio in song_detection_cache:
+                    detected_artist, detected_title = song_detection_cache[actual_audio]
+                else:
+                    try:
+                        detected_artist, detected_title = identify_song(actual_audio)
+                        # Cache the result (even if None)
+                        song_detection_cache[actual_audio] = (detected_artist, detected_title)
+                    except Exception as e:
+                        print(f"Song detection error: {e}")
+                        song_detection_cache[actual_audio] = (None, None)
+
+        # Build response
         response_data = {
             'success': result['success'],
             'autofilled_audio_path': inference_args.audio_path,
             'autofilled_output_path': inference_args.output_path,
             'errors': result['errors']
         }
+        
+        if detected_artist:
+            response_data['detected_artist'] = detected_artist
+        if detected_title:
+            response_data['detected_title'] = detected_title
 
         return jsonify(response_data), 200
 
@@ -647,8 +1382,30 @@ if __name__ == '__main__':
         js_api=api  # Expose Python API class here
     )
 
-    # Start the pywebview event loop (no args needed here now)
+    # Start the pywebview event loop
     webview.start()
 
     print("Pywebview window closed. Exiting application.")
+    
+    # Cleanup: terminate any running inference process
+    with process_lock:
+        if current_process and current_process.poll() is None:
+            print(f"Terminating running inference process (PID: {current_process.pid})...")
+            try:
+                if sys.platform == 'win32':
+                    # On Windows, use taskkill to kill the entire process tree
+                    import subprocess as sp
+                    sp.run(['taskkill', '/F', '/T', '/PID', str(current_process.pid)], 
+                           capture_output=True, timeout=5)
+                else:
+                    current_process.terminate()
+                    current_process.wait(timeout=3)
+            except Exception as e:
+                print(f"Warning: Could not terminate process cleanly: {e}")
+                try:
+                    current_process.kill()
+                except Exception:
+                    pass
+            print("Inference process terminated.")
+    
     # Flask thread will exit automatically as it's a daemon

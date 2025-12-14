@@ -1,3 +1,6 @@
+# Install PyTorch with CUDA support first:
+# pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Then install the rest:
 accelerate
 pydub
 nnAudio
@@ -19,3 +22,10 @@ flask
 audioop-lts; python_version>='3.13'
 rich
 peft
+# Queue system & audio fingerprinting dependencies
+requests>=2.32
+shazamio
+aiofiles
+pyacoustid
+musicbrainzngs
+pykakasi
