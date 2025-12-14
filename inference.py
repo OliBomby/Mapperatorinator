@@ -448,8 +448,13 @@ def generate(
             print(f"Generated beatmap saved to {result_path}")
 
     if args.export_osz:
-        osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
-        postprocessor.export_osz(result_path, audio_path, osz_path)
+        # Create proper .osz filename from artist and title
+        safe_artist = "".join(c for c in (beatmap_config.artist or "Unknown") if c.isalnum() or c in " -_").strip()
+        safe_title = "".join(c for c in (beatmap_config.title or "Unknown") if c.isalnum() or c in " -_").strip()
+        osz_filename = f"{safe_artist} - {safe_title}.osz"
+        osz_path = os.path.join(output_path, osz_filename)
+        # Pass background path for inclusion in .osz
+        postprocessor.export_osz(result_path, audio_path, osz_path, args.background)
         if verbose:
             print(f"Generated .osz saved to {osz_path}")
 
