@@ -511,6 +511,7 @@ def stream_output():
     def generate():
         global current_process, beatmapset_enabled, beatmapset_files, beatmapset_audio_path, beatmapset_output_dir
         process_to_stream = None
+        client_disconnected = False  # Track if client disconnected to avoid yielding in finally
 
         # Short lock to safely get the process object
         with process_lock:
@@ -541,7 +542,8 @@ def stream_output():
                     except GeneratorExit:
                         # Client disconnected (e.g., window closed), exit gracefully
                         print(f"Client disconnected during streaming for PID {process_to_stream.pid}")
-                        return
+                        client_disconnected = True
+                        raise  # Re-raise to trigger cleanup without yielding
                     sys.stdout.flush()  # Ensure data is sent
                     
                     # Parse the actual generated file path from inference.py output
@@ -652,7 +654,8 @@ def stream_output():
                                         yield f"event: renamed\ndata: {new_path.replace(os.sep, '/')}\n\n"
                                     except GeneratorExit:
                                         print(f"Client disconnected during rename event")
-                                        return
+                                        client_disconnected = True
+                                        raise  # Re-raise to trigger cleanup without yielding
                                     final_path = new_path
                                     
                             except Exception as rename_e:
@@ -681,26 +684,23 @@ def stream_output():
                             yield f"event: file_ready\ndata: {final_path.replace(os.sep, '/')}\n\n"
                         except GeneratorExit:
                             print(f"Client disconnected during file_ready event")
-                            return
+                            client_disconnected = True
+                            raise  # Re-raise to trigger cleanup without yielding
                     else:
                         print(f"Warning: Generated file not found or path not captured. Path: {actual_output_file}")
 
+            except GeneratorExit:
+                # Client disconnected - do cleanup without yielding
+                print(f"Client disconnected (GeneratorExit) for PID {process_to_stream.pid}")
+                client_disconnected = True
+                # Cleanup will happen in finally block
             except Exception as e:
                 print(f"Error during streaming for PID {process_to_stream.pid}: {e}")
                 error_occurred = True
                 full_output_lines.append(f"\n--- STREAMING ERROR ---\n{e}\n")
-            except GeneratorExit:
-                # Client disconnected during streaming
-                print(f"Client disconnected (GeneratorExit) for PID {process_to_stream.pid}")
-                # Still do cleanup but don't try to yield
-                with process_lock:
-                    if current_process == process_to_stream:
-                        current_process = None
-                        print("Cleared global current_process reference.")
-                return
             finally:
                 # --- Log Saving Logic (if error occurred) ---
-                if error_occurred:
+                if error_occurred and not client_disconnected:
                     try:
                         log_dir = os.path.join(script_dir, 'logs')
                         os.makedirs(log_dir, exist_ok=True)
@@ -715,20 +715,23 @@ def stream_output():
                         try:
                             yield f"event: error_log\ndata: {log_filepath.replace(os.sep, '/')}\n\n"
                         except GeneratorExit:
-                            pass  # Client disconnected, skip sending event
+                            client_disconnected = True  # Don't yield anymore
 
                     except Exception as log_e:
                         print(f"FATAL: Could not write error log for PID {process_to_stream.pid}: {log_e}")
 
-                # --- Standard End Event ---
-                completion_message = "Process completed"
-                if error_occurred:
-                    completion_message += " with errors"
-                try:
-                    yield f"event: end\ndata: {completion_message}\n\n"
-                except GeneratorExit:
-                    pass  # Client disconnected, skip sending event
-                print(f"Finished streaming for PID: {process_to_stream.pid}. Sent 'end' event.")
+                # --- Standard End Event (only if client still connected) ---
+                if not client_disconnected:
+                    completion_message = "Process completed"
+                    if error_occurred:
+                        completion_message += " with errors"
+                    try:
+                        yield f"event: end\ndata: {completion_message}\n\n"
+                    except GeneratorExit:
+                        client_disconnected = True  # Don't yield anymore
+                    print(f"Finished streaming for PID: {process_to_stream.pid}. Sent 'end' event.")
+                else:
+                    print(f"Finished streaming for PID: {process_to_stream.pid}. Client disconnected, skipped 'end' event.")
 
                 # --- Cleanup global process reference ---
                 with process_lock:
@@ -1383,4 +1386,26 @@ if __name__ == '__main__':
     webview.start()
 
     print("Pywebview window closed. Exiting application.")
+    
+    # Cleanup: terminate any running inference process
+    with process_lock:
+        if current_process and current_process.poll() is None:
+            print(f"Terminating running inference process (PID: {current_process.pid})...")
+            try:
+                if sys.platform == 'win32':
+                    # On Windows, use taskkill to kill the entire process tree
+                    import subprocess as sp
+                    sp.run(['taskkill', '/F', '/T', '/PID', str(current_process.pid)], 
+                           capture_output=True, timeout=5)
+                else:
+                    current_process.terminate()
+                    current_process.wait(timeout=3)
+            except Exception as e:
+                print(f"Warning: Could not terminate process cleanly: {e}")
+                try:
+                    current_process.kill()
+                except Exception:
+                    pass
+            print("Inference process terminated.")
+    
     # Flask thread will exit automatically as it's a daemon

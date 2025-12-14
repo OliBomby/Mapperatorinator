@@ -3,20 +3,20 @@
 **Author:** rosacry  
 **Fork Repository:** [rosacry/Mapperatorinator](https://github.com/rosacry/Mapperatorinator)  
 **Original Repository:** [OliBomby/Mapperatorinator](https://github.com/OliBomby/Mapperatorinator)  
-**Date:** December 2024
+**Date:** December 2025
 
 ---
 
 ## Overview
 
-This fork extends Mapperatorinator with a comprehensive queue-based workflow system, enabling batch beatmap generation with enhanced customization options. The total codebase increased by approximately **177%** (from ~2,742 lines to ~7,597 lines) with all changes being additive—no original functionality was removed.
+This fork extends Mapperatorinator with a comprehensive queue-based workflow system, enabling batch beatmap generation with enhanced customization options. The total codebase increased significantly with all changes being additive—no original functionality was removed.
 
 ---
 
-## 🚀 New Features
+## New Features
 
 ### 1. Multi-Map Queue System
-**Files:** `static/queue_manager.js` (new, 671 lines), `static/app.js`, `template/index.html`, `static/style.css`
+**Files:** `static/queue_manager.js` (new, 670 lines), `static/app.js`, `template/index.html`, `static/style.css`
 
 A complete queue management system for batch beatmap generation:
 
@@ -32,7 +32,7 @@ A complete queue management system for batch beatmap generation:
   - Descriptors (positive/negative)
 
 ### 2. Mapper List & Style Sampling
-**Files:** `static/queue_manager.js`, `static/app.js`, `template/index.html`, `mapper_api.py` (new)
+**Files:** `static/queue_manager.js`, `static/app.js`, `template/index.html`, `mapper_api.py` (new, 119 lines)
 
 Generate beatmaps in multiple mapper styles:
 
@@ -42,7 +42,7 @@ Generate beatmaps in multiple mapper styles:
 - **osu! API Integration**: Thread-safe token handling with automatic refresh
 
 ### 3. Audio Fingerprinting & Song Detection
-**Files:** `audio_fingerprint.py` (rewritten, 227 lines), `static/app.js`, `web-ui.py`
+**Files:** `audio_fingerprint.py` (new, 227 lines), `static/app.js`, `web-ui.py`
 
 Automatic song identification:
 
@@ -70,27 +70,27 @@ Interactive audio preview system:
 - **Apply**: Set the preview time which embeds into generated .osu files
 
 ### 5. Background Image Support
-**Files:** `static/app.js`, `web-ui.py`, `template/index.html`, `static/style.css`
+**Files:** `static/app.js`, `web-ui.py`, `inference.py`, `osuT5/osuT5/inference/postprocessor.py`, `template/index.html`, `static/style.css`
 
 Custom background images for generated beatmaps:
 
 - **Image Selection**: Browse for background image files
 - **Preview Thumbnail**: Small preview of selected image
-- **Auto-Copy**: Background image automatically copied to output directory
 - **Embedding**: Background reference added to .osu [Events] section
+- **.osz Integration**: Background image included when exporting as .osz (modified `postprocessor.export_osz()`)
 
 ### 6. Beatmap Set Compilation
-**Files:** `web-ui.py`, `static/queue_manager.js`, `static/app.js`
+**Files:** `web-ui.py`, `static/queue_manager.js`, `static/app.js`, `inference.py`
 
 Compile multiple difficulties into a single .osz:
 
 - **Toggle Option**: "Compile as Beatmap Set" checkbox
 - **Automatic Assembly**: After queue completes, all .osu files are packaged
 - **Audio Inclusion**: Audio file included in the .osz package
-- **Standard Structure**: Creates properly formatted osu! beatmap package
+- **Proper Naming**: .osz files named as `Artist - Title.osz` instead of random UUID
 
 ### 7. Smart File Renaming
-**Files:** `filename_utils.py` (new, ~150 lines), `web-ui.py`
+**Files:** `filename_utils.py` (new, 197 lines), `web-ui.py`
 
 Automatic output file renaming:
 
@@ -115,108 +115,134 @@ Improved config export/import:
 - **Custom Confirm Dialog**: Styled modal for reset confirmation (replaces native `confirm()`)
 
 ### 9. BF16 Precision Mode
-**Files:** `inference.py`, `web-ui.py`, `template/index.html`, `osuT5/osuT5/inference/postprocessor.py`
+**Files:** `web-ui.py`, `inference.py`, `template/index.html`, `osuT5/osuT5/inference/postprocessor.py`
 
 Faster inference on modern GPUs:
 
-- **Auto-Detection**: Automatically checks if GPU supports bf16 (Ampere+: RTX 30xx, 40xx)
+- **Auto-Detection**: Automatically checks if GPU supports bf16 (Ampere+: RTX 30xx, 40xx, compute capability 8.0+)
 - **~40-60% Faster**: Significant speed improvement with no quality loss
 - **Optional Toggle**: Checkbox appears only on supported hardware
+- **New route**: `/check_bf16_support` endpoint for GPU capability detection
 
 ### 10. Command-Line Device Selection
 **Files:** `web-ui.py`
 
-Flexible device control:
+Flexible device control via CLI arguments:
 
 - **`--gpu` flag**: Force GPU/CUDA usage (default behavior)
 - **`--cpu` flag**: Force CPU-only mode for systems without CUDA
 - **Auto mode**: Defaults to GPU if available, falls back to CPU
 
+### 11. Song Metadata Section
+**Files:** `template/index.html`, `static/app.js`, `web-ui.py`
+
+New UI section for beatmap metadata:
+
+- **Artist/Title Fields**: Editable fields populated by song detection
+- **Auto-Detect Toggle**: Option to automatically detect song metadata
+- **Difficulty Name Field**: Manual or auto-generated difficulty names
+- **Integration**: Metadata passed to inference for proper .osu file generation
+
 ---
 
-## 🐛 Bug Fixes
+## Bug Fixes
 
 ### 1. FileDialog Constant Fix
 **File:** `web-ui.py`  
 **Issue:** The original code used `OPEN_DIALOG` which doesn't exist in newer pywebview versions.  
 **Fix:** Updated to use the correct `FileDialog.OPEN` constant for pywebview 6.0+ compatibility.
 
-### 2. Missing torchaudio Dependency
-**File:** `requirements.txt`  
-**Issue:** `torchaudio` was not listed in requirements but is required for audio processing.  
-**Fix:** Added `torchaudio` to requirements.txt.  
-*(Note: This was later also fixed in upstream)*
-
-### 3. Descriptor Dropdown Form Submission
+### 2. Descriptor Dropdown Form Submission
 **File:** `template/index.html`  
 **Issue:** Clicking the descriptors dropdown button submitted the form.  
 **Fix:** Added `type="button"` to prevent form submission.
 
-### 4. Process Termination on Windows
+### 3. Process Termination on Windows
 **File:** `web-ui.py`  
 **Issue:** Cancelling inference on Windows didn't properly kill child processes.  
 **Fix:** Implemented proper process tree termination using `taskkill /F /T /PID`.
 
-### 5. Global Variable Scope
-**File:** `web-ui.py`  
-**Issue:** Beatmapset variables modified inside generator function without `global` declaration.  
-**Fix:** Added proper `global` declarations for `beatmapset_enabled`, `beatmapset_files`, `beatmapset_audio_path`, `beatmapset_output_dir`.
-
-### 6. Element ID Mismatch
-**File:** `static/queue_manager.js`  
-**Issue:** JavaScript referenced `new_mapper_id` but HTML has `add-mapper-id`.  
-**Fix:** Updated JavaScript to use correct element ID.
-
-### 7. PyWebView Null Checks
+### 4. PyWebView Null Checks
 **File:** `static/app.js`  
 **Issue:** Browse buttons crashed when running in browser mode without pywebview.  
 **Fix:** Added null checks for `window.pywebview?.api` with user-friendly error message.
 
-### 8. Preview Slider Reset Bug
-**File:** `static/app.js`  
-**Issue:** Timeline slider would reset to start position when clicked or dragged.  
-**Fix:** Rewrote slider handling with `preventDefault()`, manual position calculation, and document-level mouse tracking.
-
-### 9. Hydra Command Quoting
+### 5. Hydra Command Quoting
 **File:** `web-ui.py`  
-**Issue:** Paths with special characters could break Hydra command parsing.  
-**Fix:** Improved escaping for paths and metadata strings containing quotes or backslashes.
+**Issue:** Paths and metadata with special characters (quotes, backslashes) could break Hydra command parsing.  
+**Fix:** Improved escaping using double quotes and proper backslash/quote escaping. Extended quoting to cover artist, title, creator, version, and background fields.
+
+### 6. Add to Beatmap Validation
+**File:** `web-ui.py`  
+**Issue:** "Add to beatmap" and "Overwrite reference beatmap" options could be enabled without a beatmap path.  
+**Fix:** Options now only activate when a beatmap path is actually provided.
+
+### 7. GeneratorExit Handling on Window Close
+**File:** `web-ui.py`  
+**Issue:** Closing the application mid-generation caused `RuntimeError: generator ignored GeneratorExit` because the SSE generator tried to yield after catching GeneratorExit.  
+**Fix:** Added `client_disconnected` flag to track connection state and skip all `yield` calls in the finally block when the client has disconnected. Also added cleanup to terminate any running inference process when the pywebview window closes.
 
 ---
 
-## 📖 Documentation Improvements
+## Documentation Improvements
 
-- **CUDA Installation**: Added clear instructions in `requirements.txt` for installing PyTorch with CUDA support
-- **Device Options**: Documented `--cpu` and `--gpu` command-line flags
+### CUDA Installation Instructions
+**File:** `requirements.txt`  
+Added clear instructions at the top of requirements.txt for installing PyTorch with CUDA support:
+```
+# Install PyTorch with CUDA support first:
+# pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Then install the rest:
+```
 
----
-
-## 📁 New Files
-
-| File | Description |
-|------|-------------|
-| `static/queue_manager.js` | Queue management classes (QueueManager, QueueUI, InferenceRunner) |
-| `audio_fingerprint.py` | Audio fingerprinting with AcoustID/Shazam |
-| `filename_utils.py` | Smart file naming utilities |
-| `mapper_api.py` | osu! API v2 integration for mapper lookup |
+This ensures users install PyTorch with GPU support before other dependencies, and removes torchaudio from the regular dependency list since it must be installed with the CUDA index URL.
 
 ---
 
-## 📊 Statistics
+## New Files
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| `web-ui.py` | 655 lines | 1,250+ lines | +91% |
-| `static/app.js` | 979 lines | 2,800+ lines | +186% |
-| `template/index.html` | 347 lines | 509 lines | +47% |
-| `static/style.css` | 739 lines | 1,876 lines | +154% |
-| `requirements.txt` | 22 entries | 28 entries | +6 |
-| **New Files** | 0 | ~1,300 lines | — |
-| **Total** | ~2,742 lines | ~7,597 lines | **+177%** |
+| File | Lines | Description |
+|------|-------|-------------|
+| `static/queue_manager.js` | 670 | Queue management classes (QueueManager, QueueUI, InferenceRunner, MapperManager) |
+| `audio_fingerprint.py` | 227 | Audio fingerprinting with AcoustID/Shazam and romaji conversion |
+| `filename_utils.py` | 197 | Smart file naming utilities following osu! conventions |
+| `mapper_api.py` | 119 | osu! API v2 integration for mapper username lookup |
 
 ---
 
-## 🔧 Dependencies Added
+## Modified Files
+
+| File | Original | Fork | Change |
+|------|----------|------|--------|
+| `web-ui.py` | 654 lines | 1,386 lines | +112% |
+| `static/app.js` | 978 lines | 2,864 lines | +193% |
+| `template/index.html` | 346 lines | 514 lines | +49% |
+| `static/style.css` | 739 lines | 1,935 lines | +162% |
+| `inference.py` | Modified | Modified | .osz naming, background support, precision param |
+| `osuT5/.../postprocessor.py` | Modified | Modified | Background image in .osz export, bf16 tensor handling |
+| `requirements.txt` | 22 deps | 28 deps | +6 deps, CUDA instructions |
+
+---
+
+## New Routes Added
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/check_bf16_support` | GET | Check if GPU supports bf16 precision |
+| `/queue_status` | GET/POST | Get or set queue cancellation status |
+| `/reset_queue` | POST | Reset queue cancellation flag |
+| `/get_audio_info` | POST | Get audio file duration and metadata |
+| `/serve_audio` | GET | Stream audio files with Range request support |
+| `/get_image_preview` | POST | Get base64 encoded image thumbnail |
+| `/preview_background` | GET | Serve background image files |
+| `/init_beatmapset` | POST | Initialize beatmap set compilation |
+| `/add_to_beatmapset` | POST | Add .osu file to current beatmap set |
+| `/finalize_beatmapset` | POST | Compile all .osu files into .osz |
+| `/lookup_mapper_name` | POST | Look up mapper username from osu! API |
+
+---
+
+## Dependencies Added
 
 ```
 # Queue system & audio fingerprinting
@@ -230,7 +256,7 @@ pykakasi
 
 ---
 
-## 🎯 Architecture Changes
+## Architecture Changes
 
 The fork transforms the single-inference workflow into a queue-based batch system:
 
@@ -252,7 +278,7 @@ Fork Flow:
 
 ---
 
-## 🧪 Testing Notes
+## Testing Notes
 
 All features have been tested on Windows with:
 - Python 3.10+
@@ -260,12 +286,13 @@ All features have been tested on Windows with:
 - Flask backend
 - Various audio formats (MP3, WAV, OGG, FLAC, M4A)
 - BF16 precision tested on RTX 30/40 series GPUs
+- CPU-only mode tested with `--cpu` flag
 
 ---
 
-## 📝 Compatibility
+## Compatibility
 
 - Fully backward compatible with original Mapperatorinator
 - All original features remain functional
 - Configuration files from v1.0 can still be imported
-- Merged with latest upstream changes (as of December 2024)
+- Merged with latest upstream changes (as of December 2025)
