@@ -48,6 +48,7 @@ def parse_log_files(root_dir):
     results = []
     dir_pattern = re.compile(r"inference=(inference_)?([a-zA-Z0-9_-]+)")
     metric_patterns = {
+        'FCD': re.compile(r"FID CM3P: ([\d.]+)"),
         'FID': re.compile(r"FID: ([\d.]+)"),
         'AR Pr.': re.compile(r"Active Rhythm Precision: ([\d.]+)"),
         'AR Re.': re.compile(r"Active Rhythm Recall: ([\d.]+)"),
@@ -91,7 +92,7 @@ def parse_log_files(root_dir):
         return "<p>No results found. Check if <code>root_dir</code> is correct and log files exist.</p>"
 
     # --- Pre-calculate Min/Max for coloring ---
-    headers = ["Model name", "FID", "AR Pr.", "AR Re.", "AR F1", "PR Pr.", "PR Re.", "PR F1"]
+    headers = ["Model name", "FCD", "FID", "AR Pr.", "AR Re.", "AR F1", "PR Pr.", "PR Re.", "PR F1"]
     min_max_vals = {}
     for header in headers:
         if header == "Model name":
@@ -124,8 +125,8 @@ def parse_log_files(root_dir):
                 continue
 
             # Formatting
-            if header == 'FID':
-                formatted_value = f"{value:.2f}"
+            if 'FID' in header or 'FCD' in header:
+                formatted_value = f"{value:.3f}"
                 lower_is_better = True
             else:
                 formatted_value = f"{value:.3f}"
@@ -151,7 +152,7 @@ if __name__ == '__main__':
     # --- IMPORTANT ---
     # Change this to the path of your main results folder.
     # You can use "." if the script is in the same parent folder as the "inference=..." folders.
-    logs_directory = './logs_fid/sweeps/test_3'
+    logs_directory = './logs_fid/sweeps/test_2-5'
 
     markdown_table = parse_log_files(logs_directory)
     print(markdown_table)

@@ -8,11 +8,15 @@ num_processes: 32
 seed: 0
 
 skip_generation: true
-fid: true
-rhythm_stats: true
+fid: false
+fid_cm3p: true
+rhythm_stats: false
 
 classifier_ckpt: 'OliBomby/osu-classifier'
 classifier_batch_size: 32
+
+cm3p_ckpt: 'OliBomby/CM3P'
+cm3p_batch_size: 32
 
 training_set_ids_path: null
 
@@ -35,9 +39,10 @@ inference:
 hydra:
   job:
     chdir: True
+    name: calc_fid
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/sweeps/test_1/inference=tiny_dist17
+    dir: ./logs_fid/sweeps/test_1/inference=inference_v30
   sweep:
     dir: ./logs_fid/sweeps/test_3
     subdir: ${hydra.job.override_dirname}
