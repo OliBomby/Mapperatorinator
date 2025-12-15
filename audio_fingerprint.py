@@ -1,8 +1,8 @@
 """
 audio_fingerprint.py – Audio recognition for song identification
 
-Provides Shazam-style audio fingerprinting to identify songs from audio files.
-Uses AcoustID (offline) as primary method with Shazam API fallback.
+Provides audio fingerprinting to identify songs from audio files.
+Uses Shazam as primary method with AcoustID fallback (if API key provided).
 Automatically converts Japanese/Chinese characters to romaji.
 """
 from __future__ import annotations
@@ -12,20 +12,20 @@ import subprocess
 import tempfile
 from typing import Optional, Tuple
 
-# AcoustID for offline fingerprinting
+# Shazam for online identification (no API key needed)
+try:
+    from shazamio import Shazam
+    SHAZAM_AVAILABLE = True
+except ImportError:
+    SHAZAM_AVAILABLE = False
+
+# AcoustID for fallback (requires user to provide API key via environment variable)
 try:
     import acoustid
     import musicbrainzngs
     ACOUSTID_AVAILABLE = True
 except ImportError:
     ACOUSTID_AVAILABLE = False
-
-# Shazam for online fallback
-try:
-    from shazamio import Shazam
-    SHAZAM_AVAILABLE = True
-except ImportError:
-    SHAZAM_AVAILABLE = False
 
 # Japanese/Korean romanization
 try:
@@ -39,8 +39,9 @@ except ImportError:
     _kks = None
     KAKASI_AVAILABLE = False
 
-# Configuration
-ACOUSTID_KEY = os.getenv("ACOUSTID_KEY", "UT7pFXWpWG")  # Free key from acoustid.org
+# Configuration - AcoustID key must be provided via environment variable
+# Get a free key at: https://acoustid.org/new-application
+ACOUSTID_KEY = os.getenv("ACOUSTID_KEY")
 
 if ACOUSTID_AVAILABLE:
     musicbrainzngs.set_useragent("Mapperatorinator", "1.0", "https://github.com/OliBomby/Mapperatorinator")
@@ -176,7 +177,8 @@ def identify_song(path: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Identify a song from an audio file.
     
-    Tries AcoustID (offline) first, then Shazam (online) as fallback.
+    Tries Shazam first (no API key needed), then AcoustID as fallback
+    (requires ACOUSTID_KEY environment variable).
     Automatically converts Japanese/Chinese artist/title to romaji.
     
     Args:
@@ -191,21 +193,24 @@ def identify_song(path: str) -> Tuple[Optional[str], Optional[str]]:
     
     artist, title = None, None
     
-    # Try AcoustID first (offline/faster than Shazam)
-    if ACOUSTID_AVAILABLE:
-        artist, title = _acoustid_identify(path)
-        if artist and title:
-            print(f"[audio_fingerprint] AcoustID match: {artist} - {title}")
-    
-    # Fallback to Shazam if needed (slowest, network-dependent)
-    if not (artist and title) and SHAZAM_AVAILABLE:
-        print(f"[audio_fingerprint] Trying Shazam (this may take a moment)...")
+    # Try Shazam first (no API key needed, good for mainstream music)
+    if SHAZAM_AVAILABLE:
+        print(f"[audio_fingerprint] Trying Shazam...")
         try:
             artist, title = asyncio.run(_shazam_identify(path))
             if artist and title:
                 print(f"[audio_fingerprint] Shazam match: {artist} - {title}")
         except Exception as e:
-            print(f"[audio_fingerprint] Shazam async error: {e}")
+            print(f"[audio_fingerprint] Shazam error: {e}")
+    
+    # Fallback to AcoustID if Shazam didn't find it (requires API key)
+    if not (artist and title) and ACOUSTID_AVAILABLE and ACOUSTID_KEY:
+        print(f"[audio_fingerprint] Trying AcoustID...")
+        artist, title = _acoustid_identify(path)
+        if artist and title:
+            print(f"[audio_fingerprint] AcoustID match: {artist} - {title}")
+    elif not (artist and title) and ACOUSTID_AVAILABLE and not ACOUSTID_KEY:
+        print(f"[audio_fingerprint] AcoustID skipped (no ACOUSTID_KEY environment variable set)")
     
     # Convert to romaji if needed
     if artist and title:
@@ -214,8 +219,6 @@ def identify_song(path: str) -> Tuple[Optional[str], Optional[str]]:
             artist = _to_romaji(artist)
             title = _to_romaji(title)
             print(f"[audio_fingerprint] Romanized: {artist} - {title}")
-    
-    return artist, title
     
     return artist, title
 
