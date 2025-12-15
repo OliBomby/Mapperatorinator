@@ -106,18 +106,6 @@ def parse_file_dialog_result(result):
 app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 app.secret_key = os.urandom(24)  # Set a secret key for Flask
 
-# ── osu! API credentials (for mapper lookup) ────────────────────────
-# You can override these via environment variables
-OSU_CLIENT_ID = os.getenv("OSU_CLIENT_ID", "42371")
-OSU_CLIENT_SECRET = os.getenv("OSU_CLIENT_SECRET", "wNDRUcvRGjzk39LpT9zR5LNKlA8fFRREoUo3eh8T")
-
-app.config["OSU_CLIENT_ID"] = OSU_CLIENT_ID
-app.config["OSU_CLIENT_SECRET"] = OSU_CLIENT_SECRET
-
-# Mirror to environment for helper modules
-os.environ.setdefault("OSU_CLIENT_ID", OSU_CLIENT_ID)
-os.environ.setdefault("OSU_CLIENT_SECRET", OSU_CLIENT_SECRET)
-
 # ── Shared state for inference process and queue ────────────────────
 last_form_data: dict = {}  # Remember form data for file renaming
 queue_cancelled: bool = False  # Flag to cancel queue processing
@@ -1221,9 +1209,7 @@ def save_config():
 
 @app.route("/lookup_mapper_name", methods=["POST"])
 def api_lookup_mapper():
-    """Look up mapper username from osu! API."""
-    data = request.get_json() or {}
-    mapper_id = data.get("mapper_id")
+    """Look up mapper username by scraping public osu! profile page."""
     print(f"[lookup_mapper] Received request for mapper_id: {mapper_id}")
     
     if not mapper_id:
