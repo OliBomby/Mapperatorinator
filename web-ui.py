@@ -96,7 +96,7 @@ class Api:
                 file_types = tuple(file_types)
 
             result = current_window.create_file_dialog(
-                webview.OPEN_DIALOG,
+                OPEN_DIALOG,
                 file_types=file_types
             )
         except Exception:
@@ -399,16 +399,29 @@ def cancel_inference():
             try:
                 pid = current_process.pid
                 print(f"Attempting to terminate process PID: {pid}...")
-                current_process.terminate()  # Send SIGTERM
-                # Optional: Add a short wait to see if it terminates quickly
-                try:
-                    current_process.wait(timeout=1)
-                    print(f"Process PID: {pid} terminated successfully after request.")
-                    message = "Cancel request sent, process terminated."
-                except subprocess.TimeoutExpired:
-                    print(f"Process PID: {pid} did not terminate immediately after SIGTERM.")
-                    message = "Cancel request sent. Process termination might take a moment."
-                    # You could consider current_process.kill() here if terminate isn't enough
+                
+                # On Windows, use taskkill to properly terminate the entire process tree
+                # This ensures child processes (like inference workers) are also killed
+                if sys.platform == 'win32':
+                    try:
+                        import subprocess as sp
+                        sp.run(['taskkill', '/F', '/T', '/PID', str(pid)], 
+                               capture_output=True, timeout=5)
+                        print(f"Process PID: {pid} and children terminated via taskkill.")
+                        message = "Cancel request sent, process terminated."
+                    except Exception as taskkill_error:
+                        print(f"taskkill failed: {taskkill_error}, falling back to terminate()")
+                        current_process.terminate()
+                        message = "Cancel request sent. Process termination might take a moment."
+                else:
+                    current_process.terminate()  # Send SIGTERM on Unix
+                    try:
+                        current_process.wait(timeout=1)
+                        print(f"Process PID: {pid} terminated successfully after request.")
+                        message = "Cancel request sent, process terminated."
+                    except subprocess.TimeoutExpired:
+                        print(f"Process PID: {pid} did not terminate immediately after SIGTERM.")
+                        message = "Cancel request sent. Process termination might take a moment."
 
                 success = True
                 status_code = 200
