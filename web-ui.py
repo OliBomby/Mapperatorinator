@@ -1210,9 +1210,8 @@ def save_config():
 @app.route("/lookup_mapper_name", methods=["POST"])
 def api_lookup_mapper():
     """Look up mapper username by scraping public osu! profile page."""
-    print(f"[lookup_mapper] Received request for mapper_id: {mapper_id}")
-    
-    if not mapper_id:
+    data = request.get_json() or {}
+    mapper_id = data.get("mapper_id")
         return jsonify({"error": "mapper_id required"}), 400
     
     if not QUEUE_FEATURES_AVAILABLE:
