@@ -2396,13 +2396,20 @@ $(document).ready(function () {
                         mapperName = await MapperLookup.lookup(mapperId);
                     } catch (error) {
                         console.error('Mapper lookup failed:', error);
+                        Utils.showFlashMessage('User not found.', 'error');
+                        return;
                     }
                 }
 
-                // Use "ID {mapperId}" as fallback to avoid duplicate lookup in MapperManager
-                MapperManager.addMapper(mapperId, mapperName || `ID ${mapperId}`, 1);
+                // Only add if we got a valid name
+                if (!mapperName) {
+                    Utils.showFlashMessage('User not found.', 'error');
+                    return;
+                }
+
+                MapperManager.addMapper(mapperId, mapperName, 1);
                 this.updateUI();
-                Utils.showFlashMessage(`Mapper added: ${mapperName || mapperId}`, 'success');
+                Utils.showFlashMessage(`Mapper added: ${mapperName}`, 'success');
             } finally {
                 this._addingMapper = false;
             }
