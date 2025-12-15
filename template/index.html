@@ -150,6 +150,33 @@
                 <input type="text" id="seed" name="seed" />
             </fieldset>
 
+            <!-- Beatmap Customization -->
+            <fieldset>
+                <legend>Beatmap Customization</legend>
+                <div class="form-group">
+                    <label for="preview_time" title="Preview time in milliseconds (the point in the song that plays during beatmap selection)">Preview Time (ms):</label>
+                    <div class="preview-input-group">
+                        <input type="number" id="preview_time" name="preview_time" min="0" placeholder="Auto" />
+                        <button type="button" id="pick-preview-btn" class="browse-button" title="Pick preview point from audio">Pick...</button>
+                    </div>
+                    <span id="preview-time-display" class="preview-time-display"></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="background_path" title="Background image for the beatmap">Background Image:</label>
+                    <div class="path-input-group" style="margin-bottom: 0;">
+                        <div class="input-with-clear">
+                            <input type="text" id="background_path" name="background_path" placeholder="None" />
+                            <button type="button" class="clear-input-btn" data-target="background_path" style="display: none;">×</button>
+                        </div>
+                        <button type="button" class="browse-button" data-browse-type="file" data-target="background_path">Browse...</button>
+                    </div>
+                </div>
+                <div id="background-preview" class="background-preview" style="display: none;">
+                    <img id="background-preview-img" src="" alt="Background preview" />
+                </div>
+            </fieldset>
+
             <!-- Generation Interval -->
             <fieldset>
                 <legend>Generation Interval</legend>

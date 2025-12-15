@@ -964,6 +964,7 @@ $(document).ready(function() {
         DescriptorManager.init();
         ConfigManager.init();
         InferenceManager.init();
+        CustomizationManager.init();
 
         // Attach event handlers
         $("#model").on('change', () => UIManager.updateModelSettings());
@@ -972,6 +973,188 @@ $(document).ready(function() {
         // Initial UI updates
         UIManager.updateModelSettings();
     }
+
+    // Customization Manager for preview time and background
+    const CustomizationManager = {
+        audio: null,
+        lastPickerPosition: 0,
+
+        init() {
+            this.attachEventHandlers();
+            this.updatePreviewDisplay();
+        },
+
+        attachEventHandlers() {
+            $('#pick-preview-btn').on('click', () => this.openPreviewPicker());
+            $('#preview_time').on('input', () => this.updatePreviewDisplay());
+            $('#background_path').on('input blur', () => this.updateBackgroundPreview());
+        },
+
+        updatePreviewDisplay() {
+            const ms = parseInt($('#preview_time').val());
+            const $display = $('#preview-time-display');
+
+            if (!isNaN(ms) && ms >= 0) {
+                const seconds = ms / 1000;
+                const minutes = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                $display.text(`(${minutes}:${secs.toString().padStart(2, '0')})`).addClass('has-value');
+            } else {
+                $display.text('').removeClass('has-value');
+            }
+        },
+
+        updateBackgroundPreview() {
+            const bgPath = $('#background_path').val().trim();
+            const $preview = $('#background-preview');
+            const $img = $('#background-preview-img');
+
+            if (!bgPath) {
+                $preview.hide();
+                return;
+            }
+
+            $.ajax({
+                url: '/get_image_preview',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ path: bgPath }),
+                success: (response) => {
+                    if (response.success && response.data) {
+                        $img.attr('src', 'data:image/' + response.type + ';base64,' + response.data);
+                        $preview.show();
+                    } else {
+                        $preview.hide();
+                    }
+                },
+                error: () => $preview.hide()
+            });
+        },
+
+        openPreviewPicker() {
+            const audioPath = $('#audio_path').val().trim();
+
+            if (!audioPath) {
+                Utils.showFlashMessage('Please select an audio file first.', 'error');
+                return;
+            }
+
+            this.createPreviewModal(audioPath);
+        },
+
+        createPreviewModal(audioPath) {
+            $('#preview-picker-modal').remove();
+
+            const modalHtml = `
+                <div id="preview-picker-modal" class="preview-modal-overlay">
+                    <div class="preview-modal">
+                        <div class="preview-modal-header">
+                            <h3>Pick Preview Point</h3>
+                            <button type="button" class="preview-modal-close">×</button>
+                        </div>
+                        <div class="preview-modal-body">
+                            <audio id="preview-audio" controls style="width: 100%; margin-bottom: 15px;"></audio>
+                            <div class="preview-time-labels">
+                                <span id="preview-current-time">0:00</span>
+                            </div>
+                            <div class="preview-input-row">
+                                <label>Milliseconds:</label>
+                                <input type="number" id="preview-ms-input" min="0" value="${this.lastPickerPosition}" />
+                            </div>
+                            <div class="preview-buttons-row">
+                                <button type="button" id="preview-goto-btn" class="browse-button">Go to Time</button>
+                                <button type="button" id="preview-setcurrent-btn" class="browse-button">Use Current</button>
+                                <button type="button" id="preview-set-btn" class="browse-button accent">Use This Point</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('body').append(modalHtml);
+            this.setupPreviewAudio(audioPath);
+        },
+
+        setupPreviewAudio(audioPath) {
+            $.ajax({
+                url: '/get_audio_info',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ path: audioPath }),
+                success: (response) => {
+                    if (response.success) {
+                        this.initializeAudioPlayer(response.url);
+                    } else {
+                        Utils.showFlashMessage('Failed to load audio: ' + (response.message || 'Unknown error'), 'error');
+                        $('#preview-picker-modal').remove();
+                    }
+                },
+                error: () => {
+                    Utils.showFlashMessage('Failed to load audio file', 'error');
+                    $('#preview-picker-modal').remove();
+                }
+            });
+
+            $('.preview-modal-close, .preview-modal-overlay').on('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    this.closePreviewModal();
+                }
+            });
+        },
+
+        initializeAudioPlayer(audioUrl) {
+            const $audio = $('#preview-audio');
+            $audio.attr('src', audioUrl);
+
+            const audio = $audio[0];
+            this.audio = audio;
+
+            // Seek to last position
+            audio.addEventListener('loadedmetadata', () => {
+                if (this.lastPickerPosition > 0) {
+                    audio.currentTime = this.lastPickerPosition / 1000;
+                }
+            });
+
+            // Update time display
+            audio.addEventListener('timeupdate', () => {
+                const ms = Math.floor(audio.currentTime * 1000);
+                const minutes = Math.floor(audio.currentTime / 60);
+                const secs = Math.floor(audio.currentTime % 60);
+                $('#preview-current-time').text(`${minutes}:${secs.toString().padStart(2, '0')} (${ms}ms)`);
+            });
+
+            // Go to time button
+            $('#preview-goto-btn').on('click', () => {
+                const ms = parseInt($('#preview-ms-input').val()) || 0;
+                audio.currentTime = ms / 1000;
+            });
+
+            // Use current button
+            $('#preview-setcurrent-btn').on('click', () => {
+                const ms = Math.floor(audio.currentTime * 1000);
+                $('#preview-ms-input').val(ms);
+            });
+
+            // Set button
+            $('#preview-set-btn').on('click', () => {
+                const ms = parseInt($('#preview-ms-input').val()) || 0;
+                $('#preview_time').val(ms);
+                this.lastPickerPosition = ms;
+                this.updatePreviewDisplay();
+                this.closePreviewModal();
+                Utils.showFlashMessage(`Preview time set to ${ms}ms`, 'success');
+            });
+        },
+
+        closePreviewModal() {
+            if (this.audio) {
+                this.audio.pause();
+                this.audio = null;
+            }
+            $('#preview-picker-modal').remove();
+        }
+    };
 
     // Start the application
     initializeApp();
