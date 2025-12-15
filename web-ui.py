@@ -17,6 +17,15 @@ from flask import Flask, render_template, request, Response, jsonify
 from config import InferenceConfig
 from inference import autofill_paths
 
+# osu! mapper username lookup via web scraping (no API keys required)
+try:
+    from mapper_scrape import lookup_username
+    MAPPER_SCRAPE_AVAILABLE = True
+except ImportError:
+    MAPPER_SCRAPE_AVAILABLE = False
+    def lookup_username(mapper_id):
+        return None
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
 static_folder = os.path.join(script_dir, 'static')
@@ -165,8 +174,31 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/start_inference', methods=['POST'])
-def start_inference():
+@app.route('/lookup_mapper_name', methods=['POST'])
+def lookup_mapper_name_route():
+    """Look up a mapper's username from their osu! user ID.
+    
+    Scrapes the public osu! profile page - no API keys required.
+    """
+    if not MAPPER_SCRAPE_AVAILABLE:
+        return jsonify({
+            "error": "Mapper scrape not available. Ensure mapper_scrape.py exists and requests is installed."
+        }), 501
+
+    data = request.get_json()
+    mapper_id = data.get('mapper_id', '')
+
+    if not mapper_id:
+        return jsonify({"error": "mapper_id is required"}), 400
+
+    try:
+        username = lookup_username(mapper_id)
+        if username:
+            return jsonify({"username": username})
+        else:
+            return jsonify({"error": "User not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     """Starts the inference process based on form data."""
     global current_process
     with process_lock:

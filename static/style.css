@@ -737,3 +737,21 @@ input[type="number"]:hover::-webkit-outer-spin-button {
 .clear-input-btn:active {
     transform: translateY(-50%) scale(0.95);
 }
+
+
+/* Helper text for mapper lookup */
+.helper-text {
+    font-size: 0.85em;
+    margin-top: 4px;
+    display: block;
+}
+
+.input-with-button {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.input-with-button input {
+    flex: 1;
+}
