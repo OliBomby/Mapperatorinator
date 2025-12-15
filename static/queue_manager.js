@@ -540,25 +540,8 @@ const InferenceRunner = {
 /* ================================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Add mapper button
-    const addMapperBtn = document.getElementById("add-mapper-btn");
-    const mapperInput = document.getElementById("add-mapper-id");
-
-    if (addMapperBtn && mapperInput) {
-        addMapperBtn.onclick = () => {
-            const id = mapperInput.value.trim();
-            mapperInput.value = "";
-            MapperManager.addMapper(id);
-        };
-
-        // Allow Enter key to add mapper
-        mapperInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                addMapperBtn.click();
-            }
-        });
-    }
+    // NOTE: Add mapper button handlers are in app.js (QueueUI.initBindings)
+    // Do not add duplicate handlers here
 
     // Add to queue button
     const addToQueueBtn = document.getElementById("addToQueueBtn");
