@@ -152,7 +152,7 @@ if __name__ == '__main__':
     # --- IMPORTANT ---
     # Change this to the path of your main results folder.
     # You can use "." if the script is in the same parent folder as the "inference=..." folders.
-    logs_directory = './logs_fid/sweeps/test_2-5'
+    logs_directory = './logs_fid/sweeps/test_1'
 
     markdown_table = parse_log_files(logs_directory)
     print(markdown_table)
