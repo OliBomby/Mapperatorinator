@@ -364,14 +364,15 @@ const MapperManager = (() => {
             return;
         }
 
-        // If name provided, use it directly
-        if (name && name !== 'Unknown') {
+        // If name provided (any truthy value), use it directly - don't do another lookup
+        // The caller (app.js QueueUI.addMapper) is responsible for the lookup
+        if (name) {
             listEl.insertAdjacentHTML("beforeend", _entryTemplate(id, name, count));
             _updateEmptyState();
             return;
         }
 
-        // Show loading state and fetch name
+        // Only fetch if no name was provided at all (called directly without lookup)
         listEl.insertAdjacentHTML("beforeend", _entryTemplate(id, "Loading…", count));
         const newItem = listEl.lastElementChild;
 
