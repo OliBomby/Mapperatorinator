@@ -969,6 +969,41 @@ $(document).ready(function() {
         $("#model").on('change', () => UIManager.updateModelSettings());
         $("#gamemode").on('change', () => UIManager.updateConditionalFields());
 
+        // Song identification button
+        $("#identify-song-btn").on('click', function() {
+            const audioPath = $("#audio_path").val().trim();
+            if (!audioPath) {
+                Utils.showFlashMessage("Please enter an audio path first", "error");
+                return;
+            }
+            
+            const $btn = $(this);
+            $btn.prop('disabled', true).text('Identifying...');
+            
+            $.ajax({
+                url: '/identify_song',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ audio_path: audioPath }),
+                success: function(data) {
+                    if (data.success) {
+                        if (data.artist) $("#artist").val(data.artist);
+                        if (data.title) $("#title").val(data.title);
+                        Utils.showFlashMessage(`Found: ${data.artist} - ${data.title}`, "success");
+                    } else {
+                        Utils.showFlashMessage(data.error || "Could not identify song", "error");
+                    }
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.error || "Song identification failed";
+                    Utils.showFlashMessage(msg, "error");
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).text('🎵 Identify');
+                }
+            });
+        });
+
         // Initial UI updates
         UIManager.updateModelSettings();
     }

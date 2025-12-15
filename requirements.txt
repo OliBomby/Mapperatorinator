@@ -19,3 +19,6 @@ flask
 audioop-lts; python_version>='3.13'
 rich
 peft
+
+# Audio fingerprinting (optional - for song identification)
+shazamio

@@ -17,6 +17,15 @@ from flask import Flask, render_template, request, Response, jsonify
 from config import InferenceConfig
 from inference import autofill_paths
 
+# Audio fingerprinting for song identification (optional feature)
+try:
+    from audio_fingerprint import identify_song
+    AUDIO_FINGERPRINT_AVAILABLE = True
+except ImportError:
+    AUDIO_FINGERPRINT_AVAILABLE = False
+    def identify_song(path):
+        return None, None
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
 static_folder = os.path.join(script_dir, 'static')
@@ -163,6 +172,46 @@ def index():
     """Renders the main HTML page."""
     # Jinja rendering is now handled by Flask's render_template
     return render_template('index.html')
+
+
+@app.route('/identify_song', methods=['POST'])
+def identify_song_route():
+    """Identify a song from an audio file using audio fingerprinting.
+    
+    Uses Shazam as primary method (no API key needed).
+    Falls back to AcoustID if ACOUSTID_KEY environment variable is set.
+    """
+    if not AUDIO_FINGERPRINT_AVAILABLE:
+        return jsonify({
+            "success": False,
+            "error": "Audio fingerprinting not available. Install shazamio: pip install shazamio"
+        }), 501
+    
+    audio_path = request.json.get('audio_path', '')
+    if not audio_path or not os.path.exists(audio_path):
+        return jsonify({
+            "success": False,
+            "error": "Audio file not found"
+        }), 400
+    
+    try:
+        artist, title = identify_song(audio_path)
+        if artist or title:
+            return jsonify({
+                "success": True,
+                "artist": artist or "",
+                "title": title or ""
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Could not identify song"
+            })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
 @app.route('/start_inference', methods=['POST'])
