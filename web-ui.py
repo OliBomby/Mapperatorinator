@@ -17,13 +17,12 @@ from flask import Flask, render_template, request, Response, jsonify
 from config import InferenceConfig
 from inference import autofill_paths
 
-# osu! API for mapper username lookup (optional feature)
-# Get your credentials at: https://osu.ppy.sh/home/account/edit#oauth
+# osu! mapper username lookup via web scraping (no API keys required)
 try:
-    from mapper_api import lookup_username
-    MAPPER_API_AVAILABLE = True
+    from mapper_scrape import lookup_username
+    MAPPER_SCRAPE_AVAILABLE = True
 except ImportError:
-    MAPPER_API_AVAILABLE = False
+    MAPPER_SCRAPE_AVAILABLE = False
     def lookup_username(mapper_id):
         return None
 
@@ -181,9 +180,9 @@ def lookup_mapper_name_route():
     
     Scrapes the public osu! profile page - no API keys required.
     """
-    if not MAPPER_API_AVAILABLE:
+    if not MAPPER_SCRAPE_AVAILABLE:
         return jsonify({
-            "error": "Mapper API not available. Ensure mapper_api.py exists and requests is installed."
+            "error": "Mapper scrape not available. Ensure mapper_scrape.py exists and requests is installed."
         }), 501
 
     data = request.get_json()

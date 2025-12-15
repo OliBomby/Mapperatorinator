@@ -1,5 +1,5 @@
 """
-mapper_api.py – helper for osu! username lookup
+mapper_scrape.py – osu! username lookup via web scraping
 
 Provides functionality to look up osu! mapper usernames from their user IDs
 by scraping public profile pages. No API keys required.
