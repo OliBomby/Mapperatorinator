@@ -1212,8 +1212,11 @@ def api_lookup_mapper():
     """Look up mapper username by scraping public osu! profile page."""
     data = request.get_json() or {}
     mapper_id = data.get("mapper_id")
+    print(f"[lookup_mapper] Received request for mapper_id: {mapper_id}")
+
+    if not mapper_id:
         return jsonify({"error": "mapper_id required"}), 400
-    
+
     if not QUEUE_FEATURES_AVAILABLE:
         print("[lookup_mapper] Queue features not available")
         return jsonify({"error": "Queue features not available"}), 503
