@@ -316,11 +316,31 @@
             </fieldset>
 
             <button type="submit">Run Inference</button>
+            <button type="button" id="add-to-queue-btn" class="queue-button" disabled title="Load an audio file first">Add to Queue</button>
+
+            <!-- Generation Queue Section -->
+            <fieldset id="queue_panel">
+                <legend>Generation Queue</legend>
+                <div class="queue-inline-controls">
+                    <button type="button" id="run-queue-btn" class="browse-button" disabled>Run Queue</button>
+                    <button type="button" id="clear-queue-btn" class="browse-button danger">Clear Queue</button>
+                </div>
+                <div id="queue-list" class="queue-list">
+                    <div class="queue-empty">No tasks in queue. Add tasks using "Add to Queue" button.</div>
+                </div>
+                <div class="queue-status">
+                    <span id="queue-count">0 tasks</span>
+                    <span id="queue-progress" style="display:none;"></span>
+                </div>
+            </fieldset>
         </form>
 
         <!-- Progress Output -->
         <div id="progress_output" class="card" style="margin-top:20px; display:none;">
             <h3>Progress</h3>
+            <div id="queue_progress_info" style="display:none; margin-bottom:10px; padding:8px; background:#2a2a3a; border-radius:4px;">
+                <span id="queue_task_label">Task 1 of 1</span>
+            </div>
             <div id="init_message">Initializing process... This may take a moment.</div>
             <div id="progressTitle" style="font-weight:bold; padding-bottom:5px;"></div>
             <div id="progressBarContainer">
@@ -341,6 +361,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+<script src="{{ url_for('static', filename='queue_manager.js') }}"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

@@ -737,3 +737,94 @@ input[type="number"]:hover::-webkit-outer-spin-button {
 .clear-input-btn:active {
     transform: translateY(-50%) scale(0.95);
 }
+
+/* Queue System Styles */
+.queue-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-left: 10px;
+}
+
+.queue-button:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+
+.queue-button:hover:not(:disabled) {
+    background-color: #45a049;
+}
+
+.queue-inline-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.queue-list {
+    min-height: 50px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.queue-empty {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 20px;
+}
+
+.queue-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    background: var(--input-bg);
+    border-radius: 4px;
+}
+
+.queue-item:last-child {
+    margin-bottom: 0;
+}
+
+.queue-item .delete-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 8px;
+    cursor: pointer;
+}
+
+.queue-item .delete-btn:hover {
+    background: #d32f2f;
+}
+
+.queue-status {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
+.status-running {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.status-pending {
+    color: var(--text-secondary);
+}
+
+.danger {
+    background-color: #f44336 !important;
+}
+
+.danger:hover {
+    background-color: #d32f2f !important;
+}

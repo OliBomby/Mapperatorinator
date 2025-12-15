@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 import datetime
-from typing import Callable, Any, Tuple, Dict
+from typing import Callable, Any, Tuple, Dict, Optional
 
 import webview
 import werkzeug.serving
@@ -16,6 +16,16 @@ from flask import Flask, render_template, request, Response, jsonify
 
 from config import InferenceConfig
 from inference import autofill_paths
+
+# Queue system imports (optional - graceful fallback if not available)
+try:
+    from filename_utils import rename_output, compose_diff_name
+    QUEUE_FEATURES_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Queue features limited: {e}")
+    QUEUE_FEATURES_AVAILABLE = False
+    def rename_output(*args): return args[0] if args else None
+    def compose_diff_name(*args): return "Mapperatorinator"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
@@ -156,6 +166,11 @@ def format_list_arg(items):
     return "[" + ",".join("'" + str(d) + "'" for d in items) + "]"
 
 
+# Queue state
+queue_cancelled: bool = False
+last_form_data: dict = {}  # Store form data for file renaming
+
+
 # --- Flask Routes ---
 
 @app.route('/')
@@ -163,6 +178,29 @@ def index():
     """Renders the main HTML page."""
     # Jinja rendering is now handled by Flask's render_template
     return render_template('index.html')
+
+
+@app.route('/queue_status', methods=['GET', 'POST'])
+def queue_status():
+    """Get or update queue status."""
+    global queue_cancelled
+    if request.method == 'POST':
+        action = request.json.get('action')
+        if action == 'cancel':
+            queue_cancelled = True
+            return jsonify({"status": "cancelled"})
+        elif action == 'reset':
+            queue_cancelled = False
+            return jsonify({"status": "reset"})
+    return jsonify({"cancelled": queue_cancelled})
+
+
+@app.route('/reset_queue', methods=['POST'])
+def reset_queue():
+    """Reset queue state."""
+    global queue_cancelled
+    queue_cancelled = False
+    return jsonify({"status": "ok"})
 
 
 @app.route('/start_inference', methods=['POST'])
