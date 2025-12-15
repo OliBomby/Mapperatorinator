@@ -1,4 +1,5 @@
 import excepthook  # noqa
+import argparse
 import functools
 import os
 import platform
@@ -16,6 +17,33 @@ from flask import Flask, render_template, request, Response, jsonify
 
 from config import InferenceConfig
 from inference import autofill_paths
+
+
+# Parse command line arguments for device preference
+def parse_args():
+    parser = argparse.ArgumentParser(description='Mapperatorinator Web UI')
+    device_group = parser.add_mutually_exclusive_group()
+    device_group.add_argument('--gpu', '-gpu', action='store_true',
+                              help='Force GPU/CUDA usage (default behavior)')
+    device_group.add_argument('--cpu', '-cpu', action='store_true',
+                              help='Force CPU usage (slower, but works without CUDA)')
+    return parser.parse_args()
+
+
+args = parse_args()
+
+# Determine device preference: default to GPU (auto), --cpu forces CPU
+if args.cpu:
+    DEVICE_PREFERENCE = 'cpu'
+    print("Device mode: CPU (forced via --cpu flag)")
+else:
+    # Default or --gpu: use auto (will use CUDA if available)
+    DEVICE_PREFERENCE = 'auto'
+    if args.gpu:
+        print("Device mode: GPU/CUDA (forced via --gpu flag)")
+    else:
+        print("Device mode: auto (GPU/CUDA if available, otherwise CPU)")
+
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
@@ -264,6 +292,10 @@ def start_inference():
             cmd.append("super_timing=true")
         else:
             cmd.append("super_timing=false")
+
+        # Device preference (CPU/GPU)
+        if DEVICE_PREFERENCE == 'cpu':
+            cmd.append("device=cpu")
 
         # Descriptors
         descriptors = request.form.getlist('descriptors')
