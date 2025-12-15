@@ -179,38 +179,27 @@ def index():
 def lookup_mapper_name_route():
     """Look up a mapper's username from their osu! user ID.
     
-    Requires OSU_CLIENT_ID and OSU_CLIENT_SECRET environment variables.
-    Get your credentials at: https://osu.ppy.sh/home/account/edit#oauth
+    Scrapes the public osu! profile page - no API keys required.
     """
     if not MAPPER_API_AVAILABLE:
         return jsonify({
             "error": "Mapper API not available. Ensure mapper_api.py exists and requests is installed."
         }), 501
-    
+
     data = request.get_json()
     mapper_id = data.get('mapper_id', '')
-    
+
     if not mapper_id:
         return jsonify({"error": "mapper_id is required"}), 400
-    
+
     try:
         username = lookup_username(mapper_id)
         if username:
             return jsonify({"username": username})
         else:
-            return jsonify({"error": "User not found or API error"}), 404
+            return jsonify({"error": "User not found"}), 404
     except Exception as e:
-        error_msg = str(e)
-        # Check for missing credentials
-        if "credentials not set" in error_msg.lower():
-            return jsonify({
-                "error": "osu! API credentials not configured. Set OSU_CLIENT_ID and OSU_CLIENT_SECRET environment variables."
-            }), 503
-        return jsonify({"error": error_msg}), 500
-
-
-@app.route('/start_inference', methods=['POST'])
-def start_inference():
+        return jsonify({"error": str(e)}), 500
     """Starts the inference process based on form data."""
     global current_process
     with process_lock:
