@@ -1954,18 +1954,18 @@ $(document).ready(function () {
             // Cancel Queue button
             $('#cancel-queue-button').on('click', () => this.cancelQueue());
 
-            // Mapper panel handlers
-            $('#add-mapper-btn').on('click', () => this.addMapper());
-            $('#generate-from-mappers-btn').on('click', () => this.generateTasksFromMappers());
+            // Mapper panel handlers - use .off().on() to prevent duplicate bindings
+            $('#add-mapper-btn').off('click').on('click', () => this.addMapper());
+            $('#generate-from-mappers-btn').off('click').on('click', () => this.generateTasksFromMappers());
 
             // Listen for queue state changes from QueueManager
             window.addEventListener('queueStateChanged', () => this.updateUI());
 
             // Listen for audio path changes to update Add to Queue button state
-            $('#audio_path').on('input blur change', () => this.updateButtons());
+            $('#audio_path').off('input blur change').on('input blur change', () => this.updateButtons());
 
-            // Enter key for adding mapper
-            $('#add-mapper-id').on('keypress', (e) => {
+            // Enter key for adding mapper - use .off().on() to prevent duplicate bindings
+            $('#add-mapper-id').off('keypress').on('keypress', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     this.addMapper();
@@ -2375,7 +2375,8 @@ $(document).ready(function () {
             $('#add-mapper-id').val('');  // Clear immediately
 
             if (!mapperId) {
-                return;  // Silently ignore empty input
+                Utils.showFlashMessage('Please enter a mapper ID.', 'error');
+                return;
             }
 
             // Look up mapper name
