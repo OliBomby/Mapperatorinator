@@ -17,6 +17,16 @@ from flask import Flask, render_template, request, Response, jsonify
 from config import InferenceConfig
 from inference import autofill_paths
 
+# osu! API for mapper username lookup (optional feature)
+# Get your credentials at: https://osu.ppy.sh/home/account/edit#oauth
+try:
+    from mapper_api import lookup_username
+    MAPPER_API_AVAILABLE = True
+except ImportError:
+    MAPPER_API_AVAILABLE = False
+    def lookup_username(mapper_id):
+        return None
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
 static_folder = os.path.join(script_dir, 'static')
@@ -163,6 +173,40 @@ def index():
     """Renders the main HTML page."""
     # Jinja rendering is now handled by Flask's render_template
     return render_template('index.html')
+
+
+@app.route('/lookup_mapper_name', methods=['POST'])
+def lookup_mapper_name_route():
+    """Look up a mapper's username from their osu! user ID.
+    
+    Requires OSU_CLIENT_ID and OSU_CLIENT_SECRET environment variables.
+    Get your credentials at: https://osu.ppy.sh/home/account/edit#oauth
+    """
+    if not MAPPER_API_AVAILABLE:
+        return jsonify({
+            "error": "Mapper API not available. Ensure mapper_api.py exists and requests is installed."
+        }), 501
+    
+    data = request.get_json()
+    mapper_id = data.get('mapper_id', '')
+    
+    if not mapper_id:
+        return jsonify({"error": "mapper_id is required"}), 400
+    
+    try:
+        username = lookup_username(mapper_id)
+        if username:
+            return jsonify({"username": username})
+        else:
+            return jsonify({"error": "User not found or API error"}), 404
+    except Exception as e:
+        error_msg = str(e)
+        # Check for missing credentials
+        if "credentials not set" in error_msg.lower():
+            return jsonify({
+                "error": "osu! API credentials not configured. Set OSU_CLIENT_ID and OSU_CLIENT_SECRET environment variables."
+            }), 503
+        return jsonify({"error": error_msg}), 500
 
 
 @app.route('/start_inference', methods=['POST'])

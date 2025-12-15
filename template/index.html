@@ -119,8 +119,14 @@
                     <button type="button" class="browse-button" data-browse-type="folder" data-target="lora_path">Browse...</button>
                 </div>
 
-                <label for="mapper_id" title="Mapper user ID for style">Mapper ID:</label>
-                <input type="text" id="mapper_id" name="mapper_id" />
+                <div class="form-group">
+                    <label for="mapper_id" title="Mapper user ID for style sampling. Enter an osu! user ID to generate maps in their style.">Mapper ID:</label>
+                    <div class="input-with-button">
+                        <input type="text" id="mapper_id" name="mapper_id" placeholder="e.g. 124493" />
+                        <button type="button" id="lookup-mapper-btn" class="browse-button" title="Look up mapper name from ID">Lookup</button>
+                    </div>
+                    <span id="mapper-name-display" class="helper-text"></span>
+                </div>
 
                 <div class="form-group conditional-field" id="group-year" data-hide-for-model="v30">
                     <label for="year" title="Year of the song (2007-2023)">Year (2007-2023):</label>

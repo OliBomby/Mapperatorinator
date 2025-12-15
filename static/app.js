@@ -969,6 +969,43 @@ $(document).ready(function() {
         $("#model").on('change', () => UIManager.updateModelSettings());
         $("#gamemode").on('change', () => UIManager.updateConditionalFields());
 
+        // Mapper ID lookup button
+        $("#lookup-mapper-btn").on('click', function() {
+            const mapperId = $("#mapper_id").val().trim();
+            if (!mapperId) {
+                Utils.showFlashMessage("Please enter a mapper ID first", "error");
+                return;
+            }
+            
+            const $btn = $(this);
+            const $display = $("#mapper-name-display");
+            $btn.prop('disabled', true).text('Looking up...');
+            $display.text('');
+            
+            $.ajax({
+                url: '/lookup_mapper_name',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ mapper_id: mapperId }),
+                success: function(data) {
+                    if (data.username) {
+                        $display.text('✓ ' + data.username).css('color', '#4CAF50');
+                        Utils.showFlashMessage(`Found mapper: ${data.username}`, "success");
+                    } else {
+                        $display.text('User not found').css('color', '#f44336');
+                    }
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.error || "Lookup failed";
+                    $display.text(msg).css('color', '#f44336');
+                    Utils.showFlashMessage(msg, "error");
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).text('Lookup');
+                }
+            });
+        });
+
         // Initial UI updates
         UIManager.updateModelSettings();
     }
