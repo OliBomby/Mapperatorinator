@@ -2399,7 +2399,8 @@ $(document).ready(function () {
                     }
                 }
 
-                MapperManager.addMapper(mapperId, mapperName || 'Unknown', 1);
+                // Use "ID {mapperId}" as fallback to avoid duplicate lookup in MapperManager
+                MapperManager.addMapper(mapperId, mapperName || `ID ${mapperId}`, 1);
                 this.updateUI();
                 Utils.showFlashMessage(`Mapper added: ${mapperName || mapperId}`, 'success');
             } finally {
