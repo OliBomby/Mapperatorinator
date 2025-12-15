@@ -165,6 +165,33 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/check_bf16_support', methods=['GET'])
+def check_bf16_support():
+    """Check if the GPU supports bf16 precision for faster inference."""
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return jsonify({"supported": False, "reason": "CUDA not available"})
+
+        # Get GPU compute capability
+        device_props = torch.cuda.get_device_properties(0)
+        compute_capability = (device_props.major, device_props.minor)
+        gpu_name = device_props.name
+
+        # bf16 requires compute capability 8.0+ (Ampere and newer: RTX 30xx, 40xx, A100, etc.)
+        supported = compute_capability[0] >= 8
+
+        return jsonify({
+            "supported": supported,
+            "gpu_name": gpu_name,
+            "compute_capability": f"{compute_capability[0]}.{compute_capability[1]}",
+            "reason": "GPU supports bf16" if supported else f"GPU compute capability {compute_capability[0]}.{compute_capability[1]} < 8.0 required"
+        })
+    except Exception as e:
+        return jsonify({"supported": False, "reason": str(e)})
+
+
 @app.route('/start_inference', methods=['POST'])
 def start_inference():
     """Starts the inference process based on form data."""
@@ -264,6 +291,10 @@ def start_inference():
             cmd.append("super_timing=true")
         else:
             cmd.append("super_timing=false")
+
+        # BF16 precision for faster inference on supported GPUs (Ampere+)
+        if 'enable_bf16' in request.form:
+            cmd.append("precision=bf16")
 
         # Descriptors
         descriptors = request.form.getlist('descriptors')
