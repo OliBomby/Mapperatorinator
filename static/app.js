@@ -2370,7 +2370,11 @@ $(document).ready(function () {
             Utils.showFlashMessage('Queue cleared.', 'success');
         },
 
+        _addingMapper: false,  // Guard against double-execution
         async addMapper() {
+            // Prevent double-execution while async lookup is in progress
+            if (this._addingMapper) return;
+
             const mapperId = $('#add-mapper-id').val().trim();
 
             if (!mapperId) {
@@ -2378,22 +2382,27 @@ $(document).ready(function () {
                 return;
             }
 
-            // Look up mapper name
-            let mapperName = MapperLookup.cache[mapperId];
-            if (!mapperName) {
-                try {
-                    mapperName = await MapperLookup.lookup(mapperId);
-                } catch (error) {
-                    console.error('Mapper lookup failed:', error);
-                }
-            }
-
-            MapperManager.addMapper(mapperId, mapperName || 'Unknown', 1);
-            this.updateUI();
-
-            // Clear input and show success
+            // Clear input immediately and set guard
             $('#add-mapper-id').val('');
-            Utils.showFlashMessage(`Mapper added: ${mapperName || mapperId}`, 'success');
+            this._addingMapper = true;
+
+            try {
+                // Look up mapper name
+                let mapperName = MapperLookup.cache[mapperId];
+                if (!mapperName) {
+                    try {
+                        mapperName = await MapperLookup.lookup(mapperId);
+                    } catch (error) {
+                        console.error('Mapper lookup failed:', error);
+                    }
+                }
+
+                MapperManager.addMapper(mapperId, mapperName || 'Unknown', 1);
+                this.updateUI();
+                Utils.showFlashMessage(`Mapper added: ${mapperName || mapperId}`, 'success');
+            } finally {
+                this._addingMapper = false;
+            }
         },
 
         // Add a single mapper to queue (from the + button in mapper list)
