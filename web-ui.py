@@ -1,4 +1,5 @@
 import excepthook  # noqa
+import base64
 import functools
 import os
 import platform
@@ -12,7 +13,7 @@ from typing import Callable, Any, Tuple, Dict
 
 import webview
 import werkzeug.serving
-from flask import Flask, render_template, request, Response, jsonify
+from flask import Flask, render_template, request, Response, jsonify, send_file
 
 from config import InferenceConfig
 from inference import autofill_paths
@@ -163,6 +164,95 @@ def index():
     """Renders the main HTML page."""
     # Jinja rendering is now handled by Flask's render_template
     return render_template('index.html')
+
+
+@app.route('/get_audio_info', methods=['POST'])
+def get_audio_info():
+    """Get audio file info and return a URL for playback."""
+    data = request.get_json() or {}
+    audio_path = data.get('path', '')
+
+    if not audio_path or not os.path.exists(audio_path):
+        return jsonify({"success": False, "message": "Audio file not found"})
+
+    try:
+        return jsonify({
+            "success": True,
+            "url": f"/serve_audio?path={audio_path}",
+            "duration": None
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+
+@app.route('/serve_audio', methods=['GET'])
+def serve_audio():
+    """Serve an audio file for preview playback with Range request support."""
+    audio_path = request.args.get('path', '')
+
+    if not audio_path or not os.path.exists(audio_path):
+        return "Audio file not found", 404
+
+    ext = os.path.splitext(audio_path)[1].lower()
+    content_types = {
+        '.mp3': 'audio/mpeg',
+        '.ogg': 'audio/ogg',
+        '.wav': 'audio/wav',
+        '.flac': 'audio/flac',
+        '.m4a': 'audio/mp4',
+    }
+    content_type = content_types.get(ext, 'audio/mpeg')
+
+    file_size = os.path.getsize(audio_path)
+    range_header = request.headers.get('Range', None)
+
+    if range_header:
+        # Parse Range header for seeking support
+        byte_range = range_header.replace('bytes=', '').split('-')
+        start = int(byte_range[0]) if byte_range[0] else 0
+        end = int(byte_range[1]) if byte_range[1] else file_size - 1
+        length = end - start + 1
+
+        with open(audio_path, 'rb') as f:
+            f.seek(start)
+            data = f.read(length)
+
+        response = Response(data, 206, mimetype=content_type)
+        response.headers['Content-Range'] = f'bytes {start}-{end}/{file_size}'
+        response.headers['Accept-Ranges'] = 'bytes'
+        response.headers['Content-Length'] = length
+        return response
+    else:
+        return send_file(audio_path, mimetype=content_type)
+
+
+@app.route('/get_image_preview', methods=['POST'])
+def get_image_preview():
+    """Get base64 encoded image preview for background."""
+    data = request.get_json() or {}
+    image_path = data.get('path', '')
+
+    if not image_path or not os.path.exists(image_path):
+        return jsonify({"success": False, "message": "Image file not found"})
+
+    try:
+        ext = os.path.splitext(image_path)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+            return jsonify({"success": False, "message": "Unsupported image format"})
+
+        with open(image_path, 'rb') as f:
+            image_data = base64.b64encode(f.read()).decode('utf-8')
+
+        type_map = {'.jpg': 'jpeg', '.jpeg': 'jpeg', '.png': 'png', '.gif': 'gif', '.bmp': 'bmp'}
+        image_type = type_map.get(ext, 'jpeg')
+
+        return jsonify({
+            "success": True,
+            "data": image_data,
+            "type": image_type
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
 
 
 @app.route('/start_inference', methods=['POST'])
