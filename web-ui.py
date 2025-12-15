@@ -45,7 +45,7 @@ else:
 
 # Queue system imports
 try:
-    from mapper_api import lookup_username
+    from mapper_scrape import lookup_username
     from audio_fingerprint import identify_song
     from filename_utils import rename_output, compose_diff_name
     QUEUE_FEATURES_AVAILABLE = True
