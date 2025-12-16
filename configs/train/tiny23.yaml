@@ -25,7 +25,7 @@ data:                  # Data settings
   test_dataset_end: 36664  # End of ORS test dataset
   num_classes: 152680
   # All Special Prefix Tokens
-  add_out_context_types: false  # Add tokens indicating types of the out context
+  add_out_context_types: true  # Add tokens indicating types of the out context
   add_gamemode_token: false
   add_style_token: false
   add_diff_token: true
