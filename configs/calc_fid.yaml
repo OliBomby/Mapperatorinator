@@ -1,6 +1,6 @@
 defaults:
   - base_fid
-  - inference: tiny_dist7
+  - inference: tiny23
   - _self_
 
 compile: false
@@ -41,8 +41,8 @@ hydra:
     chdir: True
     name: calc_fid
   run:
-    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-#    dir: ./logs_fid/sweeps/test_1/inference=inference_v30
+#    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ./logs_fid/sweeps/test_1/inference=tiny23
   sweep:
     dir: ./logs_fid/sweeps/test_1
     subdir: ${hydra.job.override_dirname}
