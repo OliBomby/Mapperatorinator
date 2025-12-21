@@ -9,10 +9,14 @@ seed: 0
 
 skip_generation: false
 fid: true
+fid_cm3p: true
 rhythm_stats: true
 
 classifier_ckpt: 'OliBomby/osu-classifier'
 classifier_batch_size: 32
+
+cm3p_ckpt: 'OliBomby/CM3P'
+cm3p_batch_size: 32
 
 training_set_ids_path: null
 
@@ -29,15 +33,16 @@ inference:
   lookback: 0.5             # Fraction of audio sequence to fill with tokens from previous inference window
   lookahead: 0.4            # Fraction of audio sequence to skip at the end of the audio window
   year: 2023
-  resnap_events: false
-  use_server: false
+  resnap_events: true
+  use_server: true
 
 hydra:
   job:
     chdir: True
+    name: calc_fid
   run:
-#    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/test
+    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
+#    dir: ./logs_fid/sweeps/test_1/inference=inference_v30
   sweep:
-    dir: ./logs_fid/sweeps/test_3
+    dir: ./logs_fid/sweeps/test_1
     subdir: ${hydra.job.override_dirname}
