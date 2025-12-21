@@ -968,6 +968,10 @@ $(document).ready(function() {
         // Attach event handlers
         $("#model").on('change', () => UIManager.updateModelSettings());
         $("#gamemode").on('change', () => UIManager.updateConditionalFields());
+        $("#export_osz").on('change', () => {
+            const isChecked = $("#export_osz").is(':checked');
+            $("#normalize-audio-option").toggle(isChecked);
+        });
 
         // Initial UI updates
         UIManager.updateModelSettings();

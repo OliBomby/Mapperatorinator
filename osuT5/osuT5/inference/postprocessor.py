@@ -9,6 +9,7 @@ from typing import Optional
 
 import numpy as np
 from slider import TimingPoint, Beatmap
+from pydub import AudioSegment
 
 from config import InferenceConfig
 from .slider_path import SliderPath
@@ -479,12 +480,104 @@ class Postprocessor(object):
         with open(output_path, "w", encoding='utf-8-sig') as osu_file:
             osu_file.write(result)
 
-    def export_osz(self, osu_path: str, audio_path: str, output_path: str):
+    def normalize_audio_if_quiet(
+        self,
+        audio_path: str,
+        target_dbfs: float = -14.0,  # More aggressive target for osu!
+        safety_margin: float = 1.0   # Safety margin to prevent clipping
+    ) -> str:
+        """
+        Safe audio normalization using pydub.
+        Prevents clipping and uses appropriate gain limiting.
+        Returns the path to the normalized audio file.
+        """
+        try:
+            # Load audio
+            sound = AudioSegment.from_file(audio_path)
+
+            # Get current volume information
+            current_dbfs = sound.dBFS
+            current_max_dbfs = sound.max_dBFS
+            print(f"Audio normalization: Current avg={current_dbfs:.2f}dBFS, max={current_max_dbfs:.2f}dBFS")
+
+            # Calculate required gain to reach target
+            gain_needed = target_dbfs - current_dbfs
+            print(f"Audio normalization: Required gain={gain_needed:.2f}dB")
+
+            # Maximum safe gain to prevent clipping (with safety margin)
+            max_safe_gain = -current_max_dbfs - safety_margin
+            print(f"Audio normalization: Max safe gain={max_safe_gain:.2f}dB (with {safety_margin}dB margin)")
+
+            # Actual gain to apply (limited by safety)
+            actual_gain = min(gain_needed, max_safe_gain)
+
+            # Only apply meaningful gain
+            if actual_gain <= 0:
+                print(f"Audio normalization: No gain needed or would decrease volume")
+                return audio_path
+
+            if actual_gain < 1.0:  # Less than 1dB gain is not meaningful
+                print(f"Audio normalization: Gain too small ({actual_gain:.2f}dB), skipping")
+                return audio_path
+
+            print(f"Audio normalization: Applying gain={actual_gain:.2f}dB")
+
+            # Apply gain
+            normalized = sound.apply_gain(actual_gain)
+
+            # Verify no clipping occurred
+            new_max_dbfs = normalized.max_dBFS
+            if new_max_dbfs >= -0.1:
+                print(f"Audio normalization: WARNING - Potential clipping detected! Peak: {new_max_dbfs:.2f}dBFS")
+                # Emergency reduction
+                emergency_reduction = new_max_dbfs + 0.5
+                normalized = normalized.apply_gain(-emergency_reduction)
+                print(f"Audio normalization: Applied emergency reduction: {-emergency_reduction:.2f}dB")
+
+            # Create temporary file for normalized audio
+            temp_path = audio_path.replace('.', '_normalized.')
+            if '.' in audio_path:
+                # Keep the original extension
+                parts = audio_path.rsplit('.', 1)
+                temp_path = f"{parts[0]}_normalized.{parts[1]}"
+            else:
+                temp_path = f"{audio_path}_normalized.wav"
+
+            # Export normalized audio
+            normalized.export(temp_path, format=os.path.splitext(audio_path)[1][1:] or 'wav')
+
+            new_avg_dbfs = normalized.dBFS
+            new_max_dbfs = normalized.max_dBFS
+            print(f"Audio normalization: Complete. New avg={new_avg_dbfs:.2f}dBFS, max={new_max_dbfs:.2f}dBFS")
+
+            return temp_path
+
+        except Exception as e:
+            print(f"Warning: Audio normalization failed: {e}")
+            return audio_path
+
+    def export_osz(self, osu_path: str, audio_path: str, output_path: str, config: InferenceConfig = None):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Normalize audio if requested and config is provided
+        processed_audio_path = audio_path
+        if config and config.normalize_audio:
+            processed_audio_path = self.normalize_audio_if_quiet(
+                audio_path,
+                -14.0,  # Fixed target dBFS for osu!
+                1.0     # Fixed safety margin
+            )
 
         with zipfile.ZipFile(output_path, 'w') as zipf:
             zipf.write(osu_path, os.path.basename(osu_path))
-            zipf.write(audio_path, os.path.basename(audio_path))
+            zipf.write(processed_audio_path, os.path.basename(audio_path))
+
+        # Clean up temporary normalized file if created
+        if processed_audio_path != audio_path and os.path.exists(processed_audio_path):
+            try:
+                os.remove(processed_audio_path)
+            except Exception as e:
+                print(f"Warning: Could not remove temporary normalized file: {e}")
 
     @staticmethod
     def set_volume(time: timedelta, volume: int, timing: list[TimingPoint]) -> list[TimingPoint]:

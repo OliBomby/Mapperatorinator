@@ -168,6 +168,13 @@
                     <label for="export_osz" title="Whether to export a .osz file containing the generated beatmap and audio file">Export .osz</label>
                 </div>
 
+                <div class="option-item conditional-field" id="normalize-audio-option">
+                    <input type="checkbox" id="normalize_audio" name="normalize_audio" value="false" />
+                    <label for="normalize_audio" title="Normalize audio volume if it's too quiet when exporting to .osz">Normalize Audio</label>
+                    <input type="hidden" id="normalize_target_dbfs" name="normalize_target_dbfs" value="-20.0" />
+                    <input type="hidden" id="normalize_min_dbfs" name="normalize_min_dbfs" value="-35.0" />
+                </div>
+
                 <div class="option-item conditional-field" id="add-to-beatmap-option" style="display: none;">
                     <input type="checkbox" id="add_to_beatmap" name="add_to_beatmap" value="false" />
                     <label for="add_to_beatmap" title="Whether to merge the generated content with the reference beatmap">Add to Beatmap</label>

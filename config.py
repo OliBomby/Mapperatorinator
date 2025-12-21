@@ -47,6 +47,7 @@ class InferenceConfig:
     add_to_beatmap: bool = False  # Add generated content to the reference beatmap
     overwrite_reference_beatmap: bool = False  # Overwrite the reference beatmap instead of creating a new one
     export_osz: bool = False  # Export beatmap as .osz file
+    normalize_audio: bool = False  # Normalize audio volume in OSZ export
     start_time: Optional[int] = None  # Start time of audio to generate beatmap for
     end_time: Optional[int] = None  # End time of audio to generate beatmap for
     lookback: float = 0.5  # Fraction of audio sequence to fill with tokens from previous inference window

@@ -34,6 +34,7 @@ precision: 'fp32'         # Lower precision for speed (fp32/bf16/amp)
 add_to_beatmap: false     # Add generated content to the reference beatmap
 overwrite_reference_beatmap: false # Overwrite the reference beatmap instead of creating a new one
 export_osz: false         # Export beatmap as .osz file
+normalize_audio: false     # Normalize audio volume in OSZ export
 start_time: null          # Start time of audio to generate beatmap for
 end_time: null            # End time of audio to generate beatmap for
 lookback: 0.5             # Fraction of audio sequence to fill with tokens from previous inference window
