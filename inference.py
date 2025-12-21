@@ -273,13 +273,17 @@ def get_tags_dict(args: DictConfig | InferenceConfig):
 
 
 def get_config(args: InferenceConfig):
-    # Create tags that describes args
-    tags = get_tags_dict(args)
-    # Filter to all non-default values
-    defaults = get_tags_dict(OmegaConf.load("configs/inference/default.yaml"))
-    tags = {k: v for k, v in tags.items() if v != defaults[k]}
-    # To string separated by spaces
-    tags = " ".join(f"{k}={v}" for k, v in tags.items())
+    # Use user-provided tags when present; otherwise auto-generate from args.
+    if args.tags:
+        tags = args.tags
+    else:
+        # Create tags that describes args
+        tags = get_tags_dict(args)
+        # Filter to all non-default values
+        defaults = get_tags_dict(OmegaConf.load("configs/inference/default.yaml"))
+        tags = {k: v for k, v in tags.items() if v != defaults[k]}
+        # To string separated by spaces
+        tags = " ".join(f"{k}={v}" for k, v in tags.items())
 
     # Set defaults for generation config that does not allow an unknown value
     return GenerationConfig(
