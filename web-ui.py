@@ -404,15 +404,19 @@ def cancel_inference():
                 # This ensures child processes (like inference workers) are also killed
                 if sys.platform == 'win32':
                     try:
-                        import subprocess as sp
-                        sp.run(['taskkill', '/F', '/T', '/PID', str(pid)], 
-                               capture_output=True, timeout=5)
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], 
+                                       capture_output=True, timeout=5)
                         print(f"Process PID: {pid} and children terminated via taskkill.")
                         message = "Cancel request sent, process terminated."
                     except Exception as taskkill_error:
                         print(f"taskkill failed: {taskkill_error}, falling back to terminate()")
-                        current_process.terminate()
-                        message = "Cancel request sent. Process termination might take a moment."
+                        # Only terminate if process is still running
+                        if current_process.poll() is None:
+                            current_process.terminate()
+                            message = "Cancel request sent. Process termination might take a moment."
+                        else:
+                            print(f"Process PID: {pid} is no longer running after failed taskkill.")
+                            message = "Process was already terminated."
                 else:
                     current_process.terminate()  # Send SIGTERM on Unix
                     try:
