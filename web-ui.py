@@ -120,6 +120,8 @@ class Api:
 # --- Shared State for Inference Process ---
 current_process: subprocess.Popen | None = None
 process_lock = threading.Lock()  # Lock for accessing current_process safely
+# Track PIDs for which a cancellation was requested, so their non-zero exit codes are expected and not logged
+cancelled_pids: set[int] = set()
 
 
 # --- Helper Function (same as original Flask) ---
@@ -172,6 +174,8 @@ def start_inference():
     with process_lock:
         if current_process and current_process.poll() is None:
             return jsonify({"status": "error", "message": "Process already running"}), 409  # Conflict
+        # When starting a new process, clear any previous cancellation flags
+        cancelled_pids.clear()
 
         # --- Construct Command List (shell=False) ---
         python_executable = sys.executable  # Get path to current Python interpreter
@@ -342,8 +346,17 @@ def stream_output():
                 print(f"Process {process_to_stream.pid} finished streaming with exit code: {return_code}")
 
                 if return_code != 0:
-                    error_occurred = True
-                    print(f"Non-zero exit code ({return_code}) detected for PID {process_to_stream.pid}. Marking as error.")
+                    # If a cancellation was requested for this PID, treat non-zero exit as expected and do not log an error
+                    with process_lock:
+                        was_cancelled = process_to_stream.pid in cancelled_pids
+                        if was_cancelled:
+                            cancelled_pids.discard(process_to_stream.pid)
+                    if was_cancelled:
+                        print(f"Non-zero exit code ({return_code}) for PID {process_to_stream.pid} was due to cancellation. Suppressing error logging.")
+                        error_occurred = False
+                    else:
+                        error_occurred = True
+                        print(f"Non-zero exit code ({return_code}) detected for PID {process_to_stream.pid}. Marking as error.")
 
             except Exception as e:
                 print(f"Error during streaming for PID {process_to_stream.pid}: {e}")
@@ -399,7 +412,9 @@ def cancel_inference():
             try:
                 pid = current_process.pid
                 print(f"Attempting to terminate process PID: {pid}...")
-                
+                # Mark this PID as cancelled so a subsequent non-zero exit is expected and not logged
+                cancelled_pids.add(pid)
+
                 # On Windows, use taskkill to properly terminate the entire process tree
                 # This ensures child processes (like inference workers) are also killed
                 if sys.platform == 'win32':
