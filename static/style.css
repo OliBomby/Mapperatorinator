@@ -464,7 +464,6 @@ input[type="number"]:hover::-webkit-outer-spin-button {
     transition: max-height 0.5s ease;
     background-color: var(--input-bg);
     padding: 0 20px;
-    inert;
 }
 
 .custom-dropdown-descriptors.open .dropdown-content {
