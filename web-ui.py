@@ -96,7 +96,7 @@ class Api:
                 file_types = tuple(file_types)
 
             result = current_window.create_file_dialog(
-                webview.OPEN_DIALOG,
+                OPEN_DIALOG,
                 file_types=file_types
             )
         except Exception:
@@ -120,6 +120,8 @@ class Api:
 # --- Shared State for Inference Process ---
 current_process: subprocess.Popen | None = None
 process_lock = threading.Lock()  # Lock for accessing current_process safely
+# Track PIDs for which a cancellation was requested, so their non-zero exit codes are expected and not logged
+cancelled_pids: set[int] = set()
 
 
 # --- Helper Function (same as original Flask) ---
@@ -199,6 +201,8 @@ def start_inference():
     with process_lock:
         if current_process and current_process.poll() is None:
             return jsonify({"status": "error", "message": "Process already running"}), 409  # Conflict
+        # When starting a new process, clear any previous cancellation flags
+        cancelled_pids.clear()
 
         # --- Construct Command List (shell=False) ---
         python_executable = sys.executable  # Get path to current Python interpreter
@@ -373,8 +377,17 @@ def stream_output():
                 print(f"Process {process_to_stream.pid} finished streaming with exit code: {return_code}")
 
                 if return_code != 0:
-                    error_occurred = True
-                    print(f"Non-zero exit code ({return_code}) detected for PID {process_to_stream.pid}. Marking as error.")
+                    # If a cancellation was requested for this PID, treat non-zero exit as expected and do not log an error
+                    with process_lock:
+                        was_cancelled = process_to_stream.pid in cancelled_pids
+                        if was_cancelled:
+                            cancelled_pids.discard(process_to_stream.pid)
+                    if was_cancelled:
+                        print(f"Non-zero exit code ({return_code}) for PID {process_to_stream.pid} was due to cancellation. Suppressing error logging.")
+                        error_occurred = False
+                    else:
+                        error_occurred = True
+                        print(f"Non-zero exit code ({return_code}) detected for PID {process_to_stream.pid}. Marking as error.")
 
             except Exception as e:
                 print(f"Error during streaming for PID {process_to_stream.pid}: {e}")
@@ -430,16 +443,35 @@ def cancel_inference():
             try:
                 pid = current_process.pid
                 print(f"Attempting to terminate process PID: {pid}...")
-                current_process.terminate()  # Send SIGTERM
-                # Optional: Add a short wait to see if it terminates quickly
-                try:
-                    current_process.wait(timeout=1)
-                    print(f"Process PID: {pid} terminated successfully after request.")
-                    message = "Cancel request sent, process terminated."
-                except subprocess.TimeoutExpired:
-                    print(f"Process PID: {pid} did not terminate immediately after SIGTERM.")
-                    message = "Cancel request sent. Process termination might take a moment."
-                    # You could consider current_process.kill() here if terminate isn't enough
+                # Mark this PID as cancelled so a subsequent non-zero exit is expected and not logged
+                cancelled_pids.add(pid)
+
+                # On Windows, use taskkill to properly terminate the entire process tree
+                # This ensures child processes (like inference workers) are also killed
+                if sys.platform == 'win32':
+                    try:
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], 
+                                       capture_output=True, timeout=5)
+                        print(f"Process PID: {pid} and children terminated via taskkill.")
+                        message = "Cancel request sent, process terminated."
+                    except Exception as taskkill_error:
+                        print(f"taskkill failed: {taskkill_error}, falling back to terminate()")
+                        # Only terminate if process is still running
+                        if current_process.poll() is None:
+                            current_process.terminate()
+                            message = "Cancel request sent. Process termination might take a moment."
+                        else:
+                            print(f"Process PID: {pid} is no longer running after failed taskkill.")
+                            message = "Process was already terminated."
+                else:
+                    current_process.terminate()  # Send SIGTERM on Unix
+                    try:
+                        current_process.wait(timeout=1)
+                        print(f"Process PID: {pid} terminated successfully after request.")
+                        message = "Cancel request sent, process terminated."
+                    except subprocess.TimeoutExpired:
+                        print(f"Process PID: {pid} did not terminate immediately after SIGTERM.")
+                        message = "Cancel request sent. Process termination might take a moment."
 
                 success = True
                 status_code = 200
