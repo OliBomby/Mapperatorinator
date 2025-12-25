@@ -273,13 +273,17 @@ def get_tags_dict(args: DictConfig | InferenceConfig):
 
 
 def get_config(args: InferenceConfig):
-    # Create tags that describes args
-    tags = get_tags_dict(args)
-    # Filter to all non-default values
-    defaults = get_tags_dict(OmegaConf.load("configs/inference/default.yaml"))
-    tags = {k: v for k, v in tags.items() if v != defaults[k]}
-    # To string separated by spaces
-    tags = " ".join(f"{k}={v}" for k, v in tags.items())
+    # Use user-provided tags when present; otherwise auto-generate from args.
+    if args.tags:
+        tags = args.tags
+    else:
+        # Create tags that describes args
+        tags = get_tags_dict(args)
+        # Filter to all non-default values
+        defaults = get_tags_dict(OmegaConf.load("configs/inference/default.yaml"))
+        tags = {k: v for k, v in tags.items() if v != defaults[k]}
+        # To string separated by spaces
+        tags = " ".join(f"{k}={v}" for k, v in tags.items())
 
     # Set defaults for generation config that does not allow an unknown value
     return GenerationConfig(
@@ -302,9 +306,9 @@ def get_config(args: InferenceConfig):
         negative_descriptors=args.negative_descriptors,
     ), BeatmapConfig(
         title=args.title,
+        title_unicode=args.title_unicode if args.title_unicode else args.title,
         artist=args.artist,
-        title_unicode=args.title,
-        artist_unicode=args.artist,
+        artist_unicode=args.artist_unicode if args.artist_unicode else args.artist,
         audio_filename=Path(args.audio_path).name,
         hp_drain_rate=args.hp_drain_rate or 5,
         circle_size=(args.keycount if args.gamemode == 3 else args.circle_size) or 4,
@@ -314,6 +318,7 @@ def get_config(args: InferenceConfig):
         slider_tick_rate=args.slider_tick_rate or 1,
         creator=args.creator,
         version=args.version,
+        source=args.source,
         tags=tags,
         background_line=background_line(args.background),
         preview_time=args.preview_time,
@@ -449,7 +454,9 @@ def generate(
 
     if args.export_osz:
         osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
-        postprocessor.export_osz(result_path, audio_path, osz_path)
+        # Pass background image path if available
+        background_path = args.background_image_path if hasattr(args, 'background_image_path') and args.background_image_path else None
+        postprocessor.export_osz(result_path, audio_path, osz_path, background_path)
         if verbose:
             print(f"Generated .osz saved to {osz_path}")
 
