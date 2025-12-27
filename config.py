@@ -85,8 +85,7 @@ class InferenceConfig:
     version: str = ''  # Beatmap version
     source: str = ''  # Source (anime, game, etc.)
     tags: str = ''  # Tags for searching and categorizing
-    background: Optional[str] = None  # File name of background image
-    background_image_path: Optional[str] = None  # Full path to background image file
+    background: Optional[str] = None  # Full path to background image
     preview_time: int = -1  # Time in milliseconds to start previewing the song
 
     # Diffusion settings

@@ -225,7 +225,7 @@ def get_args_from_beatmap(args: InferenceConfig, tokenizer: Tokenizer):
     args.artist = beatmap_config.artist
     args.bpm = beatmap_config.bpm
     args.offset = beatmap_config.offset
-    args.background = beatmap.background
+    args.background = str(beatmap_path.parent / beatmap.background)
     args.preview_time = beatmap_config.preview_time
 
 
@@ -454,9 +454,7 @@ def generate(
 
     if args.export_osz:
         osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
-        # Pass background image path if available
-        background_path = args.background_image_path if hasattr(args, 'background_image_path') and args.background_image_path else None
-        postprocessor.export_osz(result_path, audio_path, osz_path, background_path)
+        postprocessor.export_osz(result_path, audio_path, osz_path, args.background)
         if verbose:
             print(f"Generated .osz saved to {osz_path}")
 

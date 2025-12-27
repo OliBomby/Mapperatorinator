@@ -68,7 +68,7 @@ title: ''               # Song title
 artist: ''              # Song artist
 creator: 'Mapperatorinator'        # Beatmap creator
 version: 'Mapperatorinator'        # Beatmap version
-background: null          # File name of background image
+background: null          # Full path to background image
 preview_time: -1        # Time in milliseconds to start previewing the song
 
 # Diffusion settings

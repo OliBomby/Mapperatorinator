@@ -54,7 +54,7 @@ class BeatmapConfig:
 
 
 def background_line(background: str) -> str:
-    return f"0,0,\"{background}\",0,0\n" if background else ""
+    return f"0,0,\"{os.path.basename(background)}\",0,0\n" if background else ""
 
 
 def beatmap_config_from_beatmap(beatmap: Beatmap) -> BeatmapConfig:
