@@ -332,7 +332,7 @@ def start_inference():
         add_arg("mapper_id", request.form.get('mapper_id'))
 
         # Song Metadata
-        for param in ['title', 'title_unicode', 'artist', 'artist_unicode', 'creator', 'version', 'source', 'tags', 'bpm', 'offset', 'preview_time']:
+        for param in ['title', 'title_unicode', 'artist', 'artist_unicode', 'creator', 'version', 'source', 'tags', 'preview_time']:
             add_arg(param, request.form.get(param))
 
         # Background image
