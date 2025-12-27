@@ -481,9 +481,9 @@ button[type="submit"]:hover {
 .select2-container--dark .select2-selection--single,
 .select2-container--dark .select2-selection--single:hover,
 .select2-container--dark .select2-selection--single:focus {
-    background-color: var(--input-bg) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-color) !important;
+    background-color: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
 }
 
 input[type="number"]::-webkit-inner-spin-button,
@@ -494,7 +494,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"]:hover::-webkit-inner-spin-button,
 input[type="number"]:hover::-webkit-outer-spin-button {
-    background-color: var(--input-bg) !important;
+    background-color: var(--input-bg);
 }
 
 .styled-select {
