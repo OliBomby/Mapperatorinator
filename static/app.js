@@ -951,6 +951,17 @@ $(document).ready(function() {
 
     // Initialize all components
     function initializeApp() {
+        // Check BF16 support on page load
+        $.get("/check_bf16_support", function(data) {
+            if (data.supported) {
+                $("#bf16-option").show();
+                $("#enable_bf16").prop("checked", true);
+                if (data.gpu_name) {
+                    $("#bf16-gpu-info").text("(" + data.gpu_name + ")");
+                }
+            }
+        });
+
         // Initialize Select2
         $('.select2').select2({
             placeholder: "Select options",
