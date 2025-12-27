@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 import excepthook  # noqa
 import functools
 import os
@@ -15,7 +17,7 @@ import werkzeug.serving
 from flask import Flask, render_template, request, Response, jsonify
 
 from config import InferenceConfig
-from inference import compile_paths
+from inference import compile_args
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
@@ -685,13 +687,24 @@ def validate_paths():
         inference_args.beatmap_path = beatmap_path
         inference_args.output_path = output_path
 
-        compile_paths(inference_args)
+        try:
+            compile_args(inference_args, verbose=False)
+        except ValueError as v:
+            return jsonify({
+                'success': False,
+                'autofilled_args': None,
+                'errors': [str(v)]
+            }), 200
+
+        autofilled_args = asdict(inference_args)
+        del autofilled_args['in_context']
+        del autofilled_args['output_type']
+        del autofilled_args['train']
 
         # Return the results
         response_data = {
             'success': True,
-            'autofilled_audio_path': inference_args.audio_path,
-            'autofilled_output_path': inference_args.output_path,
+            'autofilled_args': autofilled_args,
             'errors': []
         }
 
@@ -699,12 +712,11 @@ def validate_paths():
 
     except Exception as e:
         error_msg = f"Error during path validation: {str(e)}"
-        print(f"Path validation error: {error_msg}")
+        print(error_msg)
         return jsonify({
             'success': False,
-            'errors': [error_msg],
-            'autofilled_audio_path': None,
-            'autofilled_output_path': None
+            'autofilled_args': None,
+            'errors': [error_msg]
         }), 500
 
 

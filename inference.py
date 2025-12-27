@@ -35,35 +35,38 @@ def setup_inference_environment(seed: int):
     set_seed(seed)
 
 
-def compile_device_and_seed(args: InferenceConfig | FidConfig):
+def compile_device_and_seed(args: InferenceConfig | FidConfig, verbose=True):
+    message = None
     if args.device == "auto":
         if torch.cuda.is_available():
-            print("Using CUDA for inference (auto-selected).")
+            message = "Using CUDA for inference (auto-selected)."
             args.device = "cuda"
         elif torch.mps.is_available():
-            print("Using MPS for inference (auto-selected).")
+            message = "Using MPS for inference (auto-selected)."
             args.device = "mps"
         else:
-            print("Using CPU for inference (auto-selected fallback).")
+            message = "Using CPU for inference (auto-selected fallback)."
             args.device = "cpu"
     elif args.device != "cpu":
         if args.device == "cuda":
             if not torch.cuda.is_available():
-                print("CUDA is not available. Falling back to CPU.")
+                message = "CUDA is not available. Falling back to CPU."
                 args.device = "cpu"
         elif args.device == "mps":
             if not torch.mps.is_available():
-                print("MPS is not available. Falling back to CPU.")
+                message = "MPS is not available. Falling back to CPU."
                 args.device = "cpu"
         else:
-            print(
-                f"Requested device '{args.device}' not available. Falling back to CPU."
-            )
+            message = f"Requested device '{args.device}' not available. Falling back to CPU."
             args.device = "cpu"
+
+    if verbose and message is not None:
+        print(message)
 
     if args.seed is None:
         args.seed = random.randint(0, 2 ** 16)
-        print(f"Random seed: {args.seed}")
+        if verbose:
+            print(f"Random seed: {args.seed}")
 
 
 def compile_paths(args: InferenceConfig):
@@ -113,7 +116,7 @@ def compile_paths(args: InferenceConfig):
     args.beatmap_path = str(beatmap_path) if beatmap_path else ""
 
 
-def compile_args_from_beatmap(args: InferenceConfig):
+def compile_args_from_beatmap(args: InferenceConfig, verbose=True):
     beatmap_path = Path(args.beatmap_path)
     beatmap = Beatmap.from_path(beatmap_path)
 
@@ -122,7 +125,8 @@ def compile_args_from_beatmap(args: InferenceConfig):
         raise ValueError(
             f"Reference beatmap mode {beatmap.mode} is not supported by the model. Supported modes: {args.train.data.gamemodes}")
 
-    print(f"Using metadata from beatmap: {beatmap.display_name}")
+    if verbose:
+        print(f"Using metadata from beatmap: {beatmap.display_name}")
     generation_config = generation_config_from_beatmap(beatmap)
     beatmap_config = beatmap_config_from_beatmap(beatmap)
 
@@ -158,10 +162,11 @@ def compile_args_from_beatmap(args: InferenceConfig):
     for key, value in beatmap_args.items():
         if getattr(args, key) is None and value is not None:
             setattr(args, key, value)
-            print(f"Using beatmap {key} {value}")
+            if verbose:
+                print(f"Using beatmap {key} {value}")
 
 
-def compile_default_args(args: InferenceConfig):
+def compile_default_args(args: InferenceConfig, verbose=True):
     # Populate fair defaults for any inherited args that need to be filled
     default_args = {
         "gamemode": 0,
@@ -186,7 +191,8 @@ def compile_default_args(args: InferenceConfig):
     for key, value in default_args.items():
         if getattr(args, key) is None:
             setattr(args, key, value)
-            print(f"Using default {key} {value}")
+            if verbose:
+                print(f"Using default {key} {value}")
 
 
 def get_tags_dict(args: DictConfig | InferenceConfig):
@@ -253,15 +259,15 @@ def compile_derived_args(args: InferenceConfig):
         args.tags = " ".join(f"{k}={v}" for k, v in tags.items())
 
 
-def compile_args(args: InferenceConfig):
+def compile_args(args: InferenceConfig, verbose=True):
     """Validates and populates missing args."""
-    compile_device_and_seed(args)
+    compile_device_and_seed(args, verbose=verbose)
     compile_paths(args)
 
     if args.beatmap_path:
-        compile_args_from_beatmap(args)
+        compile_args_from_beatmap(args, verbose=verbose)
     else:
-        compile_default_args(args)
+        compile_default_args(args, verbose=verbose)
 
     compile_derived_args(args)
 
