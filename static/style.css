@@ -106,19 +106,19 @@ fieldset {
     border: none;
     padding: 10px;
     animation: slideIn 0.6s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 legend {
     font-size: 1.2em;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
+    padding-bottom: 2px;
     border-bottom: 2px solid var(--accent-color);
 }
 
 label {
     display: block;
-    margin-bottom: 2px;
-    margin-top: 5px;
     transition: color var(--transition-speed);
 }
 
@@ -126,6 +126,7 @@ input[type="text"],
 input[type="number"],
 select {
     width: 100%;
+    height: 35px;
     padding: 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -202,7 +203,6 @@ input[type="checkbox"].negative-check::after {
 .descriptor-item {
     display: flex;
     align-items: center;
-    margin-bottom: 10px;
 }
 
 button[type="submit"] {
@@ -225,13 +225,12 @@ button[type="submit"]:hover {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 15px;
 }
 
 .path-input-group label {
     flex-shrink: 0;
     margin-bottom: 0;
-    width: 100px;
+    width: 140px;
 }
 
 .path-input-group input[type="text"] {
@@ -244,6 +243,7 @@ button[type="submit"]:hover {
     display: flex;
     gap: 20px;
     flex-wrap: wrap;
+    margin-top: 2px;
 }
 
 .metadata-group {
@@ -253,7 +253,6 @@ button[type="submit"]:hover {
 
 .metadata-group label {
     display: block;
-    margin-bottom: 5px;
     font-weight: 500;
     color: var(--text-color);
 }
@@ -282,25 +281,6 @@ button[type="submit"]:hover {
     opacity: 0.8;
 }
 
-/* Metadata group with browse button styling */
-.metadata-row .metadata-group .input-with-clear {
-    display: flex;
-    align-items: center;
-    position: relative;
-    margin-bottom: 0;
-}
-
-.metadata-row .metadata-group .input-with-clear input[type="text"] {
-    flex: 1;
-    padding: 8px 12px;
-    background-color: var(--input-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 14px;
-    transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
-}
-
 .metadata-row .metadata-group .input-with-clear input[type="text"]:focus {
     outline: none;
     border-color: var(--accent-color);
@@ -309,39 +289,12 @@ button[type="submit"]:hover {
 
 .metadata-row .metadata-group .browse-button {
     flex-shrink: 0;
-    margin-left: 10px;
     margin-bottom: 0;
 }
 
-.metadata-browse-button {
-    padding: 8px 12px!important;
-}
-
-.metadata-row .metadata-group .clear-input-btn {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--text-color);
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0.6;
-}
-
-.metadata-row .metadata-group .clear-input-btn:hover {
-    opacity: 1;
-}
-
 .browse-button {
-    padding: 10px 15px;
+    height: 35px;
+    padding: 0 15px;
     background-color: var(--input-bg);
     color: var(--text-color);
     border: 1px solid var(--border-color);
@@ -499,7 +452,7 @@ input[type="number"]:hover::-webkit-outer-spin-button {
     background-color: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 10px 40px 10px 10px;
+    padding: 9px 40px 8px 10px;
     color: var(--text-color);
     width: 100%;
     appearance: none;
@@ -524,7 +477,6 @@ input[type="number"]:hover::-webkit-outer-spin-button {
 }
 
 .custom-dropdown-descriptors {
-    margin-bottom: 20px;
     transition: transform var(--transition-speed), border-color var(--transition-speed);
     border: 1px solid var(--border-color);
     border-radius: 8px;

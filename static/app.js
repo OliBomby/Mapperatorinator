@@ -228,22 +228,24 @@ $(document).ready(function() {
         }
     };
 
+    const clearable_inputs = '#audio_path, #beatmap_path, #output_path, #lora_path, #background_image';
+
     // Path Manager for autofill, validation and clear button support
     const PathManager = {
         init() {
             this.attachPathChangeHandlers();
             this.attachClearButtonHandlers();
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').trigger('blur');
+            $(clearable_inputs).trigger('blur');
         },
 
         attachPathChangeHandlers() {
             // Listen for input events (typing)
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('input', (e) => {
+            $(clearable_inputs).on('input', (e) => {
                 this.updateClearButtonVisibility(e.target);
             });
 
             // Listen for blur events (leaving field) - immediate validation
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('blur', (e) => {
+            $(clearable_inputs).on('blur', (e) => {
                 this.updateClearButtonVisibility(e.target);
                 this.validateAndAutofillPaths(false);
             });
@@ -262,7 +264,7 @@ $(document).ready(function() {
             });
 
             // Initial visibility check for all fields
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').each((index, element) => {
+            $(clearable_inputs).each((index, element) => {
                 this.updateClearButtonVisibility(element);
             });
         },
