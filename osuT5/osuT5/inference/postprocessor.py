@@ -59,23 +59,25 @@ def background_line(background: str) -> str:
 
 def beatmap_config_from_beatmap(beatmap: Beatmap) -> BeatmapConfig:
     return BeatmapConfig(
-        title=beatmap.title,
-        artist=beatmap.artist,
-        title_unicode=beatmap.title,
-        artist_unicode=beatmap.artist,
+        bpm=beatmap.bpm_max(),
+        offset=int(round((min(tp.offset.total_seconds() * 1000 for tp in beatmap.timing_points)))),
         audio_filename=beatmap.audio_filename,
+        title=beatmap.title,
+        title_unicode=beatmap.title_unicode,
+        artist=beatmap.artist,
+        artist_unicode=beatmap.artist_unicode,
+        creator=beatmap.creator,
+        version=beatmap.version,
+        source=beatmap.source,
+        tags=" ".join(beatmap.tags),
+        background_line=background_line(beatmap.background),
+        preview_time=int(beatmap.preview_time.total_seconds() * 1000 + 1e-5),
         hp_drain_rate=beatmap.hp_drain_rate,
         circle_size=beatmap.circle_size,
         overall_difficulty=beatmap.overall_difficulty,
         approach_rate=beatmap.approach_rate,
         slider_multiplier=beatmap.slider_multiplier,
         slider_tick_rate=beatmap.slider_tick_rate,
-        creator=beatmap.creator,
-        version=beatmap.version,
-        background_line=background_line(beatmap.background),
-        preview_time=int(beatmap.preview_time.total_seconds() * 1000 + 1e-5),
-        bpm=beatmap.bpm_max(),
-        offset=int(round((min(tp.offset.total_seconds() * 1000 for tp in beatmap.timing_points)))),
     )
 
 

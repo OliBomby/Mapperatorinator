@@ -44,7 +44,7 @@ class GenerationConfig:
 
 
 # noinspection PyProtectedMember
-def generation_config_from_beatmap(beatmap: Beatmap, tokenizer: Tokenizer) -> GenerationConfig:
+def generation_config_from_beatmap(beatmap: Beatmap, tokenizer: Optional[Tokenizer] = None) -> GenerationConfig:
     gamemode = int(beatmap.mode)
     difficulty = None
     if gamemode == 0 and len(beatmap._hit_objects) > 0:  # We don't have diffcalc for other gamemodes
@@ -56,7 +56,7 @@ def generation_config_from_beatmap(beatmap: Beatmap, tokenizer: Tokenizer) -> Ge
         gamemode=gamemode,
         beatmap_id=beatmap.beatmap_id,
         difficulty=difficulty,
-        mapper_id=tokenizer.beatmap_mapper.get(beatmap.beatmap_id, None),
+        mapper_id=tokenizer.beatmap_mapper.get(beatmap.beatmap_id, None) if tokenizer else None,
         hp_drain_rate=beatmap.hp_drain_rate,
         circle_size=beatmap.circle_size,
         overall_difficulty=beatmap.overall_difficulty,
@@ -67,7 +67,7 @@ def generation_config_from_beatmap(beatmap: Beatmap, tokenizer: Tokenizer) -> Ge
         keycount=int(beatmap.circle_size) if gamemode == 3 else 4,
         hold_note_ratio=get_hold_note_ratio(beatmap) if gamemode == 3 else None,
         scroll_speed_ratio=get_scroll_speed_ratio(beatmap) if gamemode in [1, 3] else None,
-        descriptors=[tokenizer.descriptor_name(idx) for idx in tokenizer.beatmap_descriptors.get(beatmap.beatmap_id, [])] if beatmap.beatmap_id in tokenizer.beatmap_descriptors else None,
+        descriptors=[tokenizer.descriptor_name(idx) for idx in tokenizer.beatmap_descriptors.get(beatmap.beatmap_id, [])] if tokenizer and beatmap.beatmap_id in tokenizer.beatmap_descriptors else None,
     )
 
 
