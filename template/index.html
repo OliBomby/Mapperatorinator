@@ -15,7 +15,7 @@
         <form id="inferenceForm" method="POST" class="card form-card">
 
             <!-- Paths Section -->
-            <fieldset>
+            <fieldset style="gap: 10px">
                 <legend>Paths</legend>
                 <div class="path-input-group">
                     <label for="audio_path" title="Path to audio file">Audio Path:</label>
@@ -67,97 +67,209 @@
                     <option value="v31">Mapperatorinator V31 (Slightly more accurate than V29)</option>
                 </select>
 
-                <label for="gamemode">Gamemode:</label>
-                <select id="gamemode" name="gamemode" class="styled-select">
-                    {% for mode in [('0', 'Standard'), ('1', 'Taiko'), ('2', 'Catch the Beat'), ('3', 'Mania')] %}
-                    <option value="{{ mode[0] }}">{{ mode[1] }}</option>
-                    {% endfor %}
-                </select>
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="gamemode">Gamemode:</label>
+                        <select id="gamemode" name="gamemode" class="styled-select">
+                            {% for mode in [('0', 'Standard'), ('1', 'Taiko'), ('2', 'Catch the Beat'), ('3', 'Mania')] %}
+                            <option value="{{ mode[0] }}">{{ mode[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="metadata-group">
+                        <label for="difficulty" title="Difficulty rating (star rating)">Difficulty (star rating):</label>
+                        <input type="number" step="0.1" id="difficulty" name="difficulty" min="0" value="5" />
+                    </div>
+                </div>
+            </fieldset>
 
-                <label for="difficulty" title="Difficulty rating (star rating)">Difficulty (star rating):</label>
-                <input type="number" step="0.1" id="difficulty" name="difficulty" min="0" value="5" />
+            <!-- Song Metadata -->
+            <fieldset>
+                <legend>Song Metadata</legend>
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="title" title="Song title">Title:</label>
+                        <input type="text" id="title" name="title" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="title_unicode" title="Song title in Unicode/Japanese">Title (Unicode):</label>
+                        <input type="text" id="title_unicode" name="title_unicode" />
+                    </div>
+                </div>
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="artist" title="Song artist">Artist:</label>
+                        <input type="text" id="artist" name="artist" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="artist_unicode" title="Artist name in Unicode/Japanese">Artist (Unicode):</label>
+                        <input type="text" id="artist_unicode" name="artist_unicode" />
+                    </div>
+                </div>
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="creator" title="Beatmap creator/mapper name">Creator:</label>
+                        <input type="text" id="creator" name="creator" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="version" title="Beatmap version/difficulty name">Version:</label>
+                        <input type="text" id="version" name="version" />
+                    </div>
+                </div>
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="preview_time" title="Preview time in milliseconds">Preview Time (ms):</label>
+                        <input type="number" id="preview_time" name="preview_time" min="-1" max="600000" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="background_image" title="Background image file">Background Image:</label>
+                        <div class="path-input-group">
+                            <div class="input-with-clear">
+                                <input type="text" id="background_image" name="background_image" />
+                                <button type="button" class="clear-input-btn" data-target="background_image" style="display: none;">×</button>
+                            </div>
+                            <button type="button" class="browse-button" data-browse-type="image" data-target="background_image">Browse...</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="source" title="Sourcename (e.g., album, anime, game)">Source:</label>
+                        <input type="text" id="source" name="source" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="tags" title="Tags for searching and categorizing, separated by spaces">Tags:</label>
+                        <input type="text" id="tags" name="tags" />
+                    </div>
+                </div>
             </fieldset>
 
             <!-- Difficulty Metadata -->
             <fieldset>
                 <legend>Difficulty Metadata</legend>
-                <label for="hp_drain_rate" title="HP drain rate (HP)">HP Drain Rate (HP):</label>
-                <input type="number" step="0.1" id="hp_drain_rate" name="hp_drain_rate" min="0" max="10" value="5" />
 
-                <div class="form-group conditional-field" id="group-circle_size" data-show-for-gamemode="0" style="display: none;">
-                    <label for="circle_size" title="Circle size (CS)">Circle Size (CS):</label>
-                    <input type="number" step="0.1" id="circle_size" name="circle_size" min="0" max="10" value="4" />
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="hp_drain_rate" title="HP drain rate (HP)">HP Drain Rate (HP):</label>
+                        <input type="number" step="0.1" id="hp_drain_rate" name="hp_drain_rate" min="0" max="10" value="5" />
+                    </div>
+                    <div class="metadata-group">
+                        <div class="form-group conditional-field" id="group-circle_size" data-show-for-gamemode="0" style="display: none;">
+                            <label for="circle_size" title="Circle size (CS)">Circle Size (CS):</label>
+                            <input type="number" step="0.1" id="circle_size" name="circle_size" min="0" max="10" value="4" />
+                        </div>
+                        <div class="form-group conditional-field" id="group-keycount" data-show-for-gamemode="3" style="display: none;">
+                            <label for="keycount" title="Number of keys for mania">Key Count:</label>
+                            <input type="number" id="keycount" name="keycount" min="0" max="18" value="4" />
+                        </div>
+                    </div>
                 </div>
 
-                <div class="form-group conditional-field" id="group-keycount" data-show-for-gamemode="3" style="display: none;">
-                    <label for="keycount" title="Number of keys for mania">Key Count:</label>
-                    <input type="number" id="keycount" name="keycount" min="0" max="18" value="4" />
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="overall_difficulty" title="Overall difficulty (OD)">Overall Difficulty (OD):</label>
+                        <input type="number" step="0.1" id="overall_difficulty" name="overall_difficulty" min="0" max="10" value="8" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="approach_rate" title="Approach rate (AR)">Approach Rate (AR):</label>
+                        <input type="number" step="0.1" id="approach_rate" name="approach_rate" min="0" max="10" value="9" />
+                    </div>
                 </div>
 
-                <label for="overall_difficulty" title="Overall difficulty (OD)">Overall Difficulty (OD):</label>
-                <input type="number" step="0.1" id="overall_difficulty" name="overall_difficulty" min="0" max="10" value="8" />
-
-                <label for="approach_rate" title="Approach rate (AR)">Approach Rate (AR):</label>
-                <input type="number" step="0.1" id="approach_rate" name="approach_rate" min="0" max="10" value="9" />
-
-                <label for="slider_multiplier" title="Slider velocity multiplier">Slider Multiplier:</label>
-                <input type="number" step="0.1" id="slider_multiplier" name="slider_multiplier" min="0" max="3.6" value="1.4" />
-
-                <label for="slider_tick_rate" title="Slider tick rate">Slider Tick Rate:</label>
-                <input type="number" step="0.5" id="slider_tick_rate" name="slider_tick_rate" min="0.5" max="4.0" value="1" />
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="slider_multiplier" title="Slider velocity multiplier">Slider Multiplier:</label>
+                        <input type="number" step="0.1" id="slider_multiplier" name="slider_multiplier" min="0" max="3.6" value="1.4" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="slider_tick_rate" title="Slider tick rate">Slider Tick Rate:</label>
+                        <input type="number" step="0.5" id="slider_tick_rate" name="slider_tick_rate" min="0.5" max="4.0" value="1" />
+                    </div>
+                </div>
             </fieldset>
 
             <!-- Advanced Settings -->
             <fieldset>
                 <legend>Advanced Settings</legend>
-                <label for="lora_path" title="Path to folder or HuggingFace repository with LoRA weights and config. This can be used to tweak the style of the model beyond its usual capabilities.">LoRA Path or ID:</label>
-                <div class="path-input-group" style="margin-bottom: 0;">
-                    <div class="input-with-clear">
-                        <input type="text" id="lora_path" name="lora_path" />
-                        <button type="button" class="clear-input-btn" data-target="lora_path" style="display: none;">×</button>
+
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="lora_path" title="Path to folder or HuggingFace repository with LoRA weights and config. This can be used to tweak the style of the model beyond its usual capabilities.">LoRA Path or ID:</label>
+                        <div class="path-input-group">
+                            <div class="input-with-clear">
+                                <input type="text" id="lora_path" name="lora_path" />
+                                <button type="button" class="clear-input-btn" data-target="lora_path" style="display: none;">×</button>
+                            </div>
+                            <button type="button" class="browse-button" data-browse-type="folder" data-target="lora_path">Browse...</button>
+                        </div>
                     </div>
-                    <button type="button" class="browse-button" data-browse-type="folder" data-target="lora_path">Browse...</button>
+                    <div class="metadata-group">
+                        <label for="seed" title="Random seed for generation">Random Seed:</label>
+                        <input type="text" id="seed" name="seed" />
+                    </div>
                 </div>
 
-                <label for="mapper_id" title="Mapper user ID for style">Mapper ID:</label>
-                <input type="text" id="mapper_id" name="mapper_id" />
-
-                <div class="form-group conditional-field" id="group-year" data-hide-for-model="v30">
-                    <label for="year" title="Year of the song (2007-2023)">Year (2007-2023):</label>
-                    <input type="number" id="year" name="year" min="2007" max="2023" value="2023" />
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <div class="form-group conditional-field" id="group-hold_note_ratio" data-show-for-gamemode="3" style="display: none;">
+                            <label for="hold_note_ratio" title="Hold note ratio for mania 0-1">Hold Note Ratio:</label>
+                            <input type="number" step="0.01" id="hold_note_ratio" name="hold_note_ratio" min="0" max="1" />
+                        </div>
+                    </div>
+                    <div class="metadata-group">
+                        <div class="form-group conditional-field" id="group-scroll_speed_ratio" data-show-for-gamemode="2,3" style="display: none;">
+                            <label for="scroll_speed_ratio" title="Scroll speed ratio for mania and ctb 0-1">Scroll Speed Ratio:</label>
+                            <input type="number" step="0.01" id="scroll_speed_ratio" name="scroll_speed_ratio" min="0" max="1" />
+                        </div>
+                    </div>
                 </div>
 
-                <div class="form-group conditional-field" id="group-hold_note_ratio" data-show-for-gamemode="3" style="display: none;">
-                    <label for="hold_note_ratio" title="Hold note ratio for mania 0-1">Hold Note Ratio:</label>
-                    <input type="number" step="0.01" id="hold_note_ratio" name="hold_note_ratio" min="0" max="1" />
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="mapper_id" title="Mapper user ID for style">Mapper ID:</label>
+                        <input type="text" id="mapper_id" name="mapper_id" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="cfg_scale" title="Scale of the classifier-free guidance">CFG Scale:</label>
+                        <input type="number" step="0.1" id="cfg_scale" name="cfg_scale" min="0" value="1.0"/>
+                    </div>
                 </div>
 
-                <div class="form-group conditional-field" id="group-scroll_speed_ratio" data-show-for-gamemode="2,3" style="display: none;">
-                    <label for="scroll_speed_ratio" title="Scroll speed ratio for mania and ctb 0-1">Scroll Speed Ratio:</label>
-                    <input type="number" step="0.01" id="scroll_speed_ratio" name="scroll_speed_ratio" min="0" max="1" />
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="temperature">Temperature:</label>
+                        <input type="number" id="temperature" name="temperature" step="0.01" min="0" max="1" value="0.9">
+                    </div>
+                    <div class="metadata-group">
+                        <label for="top_p">Top-p:</label>
+                        <input type="number" id="top_p" name="top_p" step="0.01" min="0" max="1" value="0.9">
+                    </div>
                 </div>
 
-                <label for="cfg_scale" title="Scale of the classifier-free guidance">CFG Scale:</label>
-                <input type="number" step="0.1" id="cfg_scale" name="cfg_scale" min="0" value="1.0"/>
-
-                <label for="temperature">Temperature:</label>
-                <input type="number" id="temperature" name="temperature" step="0.01" min="0" max="1" value="0.9">
-
-                <label for="top_p">Top-p:</label>
-                <input type="number" id="top_p" name="top_p" step="0.01" min="0" max="1" value="0.9">
-
-                <label for="seed" title="Random seed for generation">Random Seed:</label>
-                <input type="text" id="seed" name="seed" />
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <div class="form-group conditional-field" id="group-year" data-hide-for-model="v30">
+                            <label for="year" title="Year of the song (2007-2023)">Year (2007-2023):</label>
+                            <input type="number" id="year" name="year" min="2007" max="2023" value="2023" />
+                        </div>
+                    </div>
+                </div>
             </fieldset>
 
             <!-- Generation Interval -->
             <fieldset>
                 <legend>Generation Interval</legend>
-                <label for="start_time" title="Generation start time in milliseconds">Start Time (ms):</label>
-                <input type="number" id="start_time" name="start_time" min="0" />
 
-                <label for="end_time" title="Generation end time in milliseconds">End Time (ms):</label>
-                <input type="number" id="end_time" name="end_time" min="0" />
+                <div class="metadata-row">
+                    <div class="metadata-group">
+                        <label for="start_time" title="Generation start time in milliseconds">Start Time (ms):</label>
+                        <input type="number" id="start_time" name="start_time" min="0" />
+                    </div>
+                    <div class="metadata-group">
+                        <label for="end_time" title="Generation end time in milliseconds">End Time (ms):</label>
+                        <input type="number" id="end_time" name="end_time" min="0" />
+                    </div>
+                </div>
             </fieldset>
 
             <!-- Options -->
@@ -189,7 +301,7 @@
                 </div>
 
                 <div class="option-item" id="bf16-option" style="display: none;">
-                    <input type="checkbox" id="enable_bf16" name="enable_bf16" value="true" />
+                    <input type="checkbox" id="enable_bf16" name="enable_bf16" value="true" checked />
                     <label for="enable_bf16" title="Use BF16 precision for ~15% faster inference on Ampere+ GPUs (RTX 30xx/40xx)">
                         BF16 Precision <span id="bf16-gpu-info" style="font-size: 0.85em; color: var(--text-secondary);"></span>
                     </label>
@@ -302,6 +414,82 @@
                             <div class="descriptor-item">
                                 {% set item_id = "desc-" ~ item.value|replace(" ", "-") %}
                                 <input type="checkbox" id="{{ item_id }}" name="descriptors" value="{{ item.value }}" />
+                                <label for="{{ item_id }}" title="{{ item.title }}">{{ item.value }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Negative Descriptors -->
+            <div class="custom-dropdown-descriptors conditional-field" data-hide-for-model="v30">
+                <button class="dropdown-header">
+                    <span class="dropdown-title" title="List of negative descriptors for style to avoid (1 click = include, 2 clicks = exclude)">Negative Descriptors</span>
+                    <span class="dropdown-arrow">&#9660;</span>
+                </button>
+                <div class="dropdown-content" inert>
+                    <div class="descriptors-container">
+                        {% set negative_descriptor_groups = [
+                        { "title": "General", "items": [
+                        { "value": "gimmick", "title": "Focused on a single unique design or gameplay idea." },
+                        { "value": "2B", "title": "Includes gameplay elements with two or more objects placed simultaneously." },
+                        { "value": "slider only", "title": "Restricts object choice to sliders only." },
+                        { "value": "circle only", "title": "Restricts object choice to circles only." },
+                        { "value": "swing", "title": "Uses 1/3, 1/6, and 1/12 snap divisors for most/all objects." }
+                        ]},
+                        { "title": "Style", "items": [
+                        { "value": "messy", "title": "Visually chaotic and disorganised patterns." },
+                        { "value": "geometric", "title": "Incorporates geometric shapes within the design." },
+                        { "value": "grid snap", "title": "Objects are placed along a square grid." },
+                        { "value": "hexgrid", "title": "Objects are placed along a hexagonal grid." },
+                        { "value": "freeform", "title": "A loose approach to visual structure." },
+                        { "value": "symmetrical", "title": "Employs symmetry within the design." },
+                        { "value": "old-style revival", "title": "Emulates a style from early mapping." },
+                        { "value": "clean", "title": "Visually uncluttered and organised patterns." },
+                        { "value": "slidershapes", "title": "Uses a variety of slider designs." },
+                        { "value": "distance snapped", "title": "Uses osu's built-in distance snap feature." },
+                        { "value": "iNiS-style", "title": "Originates from the original DS games." },
+                        { "value": "avant-garde", "title": "Experimental design philosophies." },
+                        { "value": "perfect stacks", "title": "Features perfectly overlapped stacked notes." },
+                        { "value": "ninja spinners", "title": "Features very short spinners." }
+                        ]},
+                        { "title": "Skillsets", "items": [
+                        { "value": "tech", "title": "Tests uncommon skills." },
+                        { "value": "slider tech", "title": "Tests skills involving complex sliders." },
+                        { "value": "complex sv", "title": "Large changes in slider velocity to test reading." },
+                        { "value": "reading", "title": "Tests a player's reading skill." },
+                        { "value": "visually dense", "title": "Patterns with many visible notes that make reading hard." },
+                        { "value": "overlap reading", "title": "Overlapped objects obscure note order." }
+                        ]},
+                        { "title": "Aim", "items": [
+                        { "value": "jump aim", "title": "Focuses heavily on jumps." },
+                        { "value": "sharp aim", "title": "Heavy use of sharp angle movement." },
+                        { "value": "wide aim", "title": "Uses wide angle movement patterns." },
+                        { "value": "linear aim", "title": "Requires continuous straight movement." },
+                        { "value": "aim control", "title": "Features abrupt velocity or direction changes." },
+                        { "value": "flow aim", "title": "Encourages fully continuous cursor movement." },
+                        { "value": "precision", "title": "Requires fine, precise cursor movement." }
+                        ]},
+                        { "title": "Tap", "items": [
+                        { "value": "finger control", "title": "Tests complex tapping ability." },
+                        { "value": "complex snap divisors", "title": "Uses unusual snap divisors." },
+                        { "value": "bursts", "title": "Continuous alternating patterns, typically 9 notes or less." },
+                        { "value": "streams", "title": "Continuous alternating patterns, typically more than 9 notes." },
+                        { "value": "spaced streams", "title": "Streams with large spacing between notes." },
+                        { "value": "cutstreams", "title": "Streams with very uneven spacing." },
+                        { "value": "stamina", "title": "Tests endurance over long periods." }
+                        ]}
+                        ] %}
+
+                        {% for group in negative_descriptor_groups %}
+                        <div class="descriptor-group">
+                            <h3>{{ group.title }} (Negative)</h3>
+                            {% for item in group["items"] %}
+                            <div class="descriptor-item">
+                                {% set item_id = "neg-desc-" ~ item.value|replace(" ", "-") %}
+                                <input type="checkbox" id="{{ item_id }}" name="negative_descriptors" value="{{ item.value }}" />
                                 <label for="{{ item_id }}" title="{{ item.title }}">{{ item.value }}</label>
                             </div>
                             {% endfor %}

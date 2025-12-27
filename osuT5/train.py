@@ -29,6 +29,8 @@ def print_model_parameters(model):
 
 @hydra.main(config_path="../configs/train", config_name="v29", version_base="1.1")
 def main(args: TrainConfig):
+    args = OmegaConf.to_object(args)
+
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(
         cpu=args.device == "cpu",

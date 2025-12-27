@@ -104,22 +104,21 @@ form {
 
 fieldset {
     border: none;
-    margin-bottom: 15px;
     padding: 10px;
     animation: slideIn 0.6s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 legend {
     font-size: 1.2em;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
+    padding-bottom: 2px;
     border-bottom: 2px solid var(--accent-color);
 }
 
 label {
     display: block;
-    margin-bottom: 2px;
-    margin-top: 5px;
     transition: color var(--transition-speed);
 }
 
@@ -127,6 +126,7 @@ input[type="text"],
 input[type="number"],
 select {
     width: 100%;
+    height: 35px;
     padding: 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -203,7 +203,6 @@ input[type="checkbox"].negative-check::after {
 .descriptor-item {
     display: flex;
     align-items: center;
-    margin-bottom: 10px;
 }
 
 button[type="submit"] {
@@ -226,13 +225,12 @@ button[type="submit"]:hover {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 15px;
 }
 
 .path-input-group label {
     flex-shrink: 0;
     margin-bottom: 0;
-    width: 100px;
+    width: 140px;
 }
 
 .path-input-group input[type="text"] {
@@ -240,8 +238,63 @@ button[type="submit"]:hover {
     width: auto;
 }
 
+/* Metadata row styling */
+.metadata-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+}
+
+.metadata-group {
+    flex: 1;
+    min-width: 250px;
+}
+
+.metadata-group label {
+    display: block;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.metadata-group input[type="text"],
+.metadata-group input[type="number"] {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+}
+
+.metadata-group input[type="text"]:focus,
+.metadata-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 5px rgba(255, 59, 63, 0.3);
+}
+
+.metadata-group input::placeholder {
+    color: #888;
+    opacity: 0.8;
+}
+
+.metadata-row .metadata-group .input-with-clear input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 5px rgba(255, 59, 63, 0.3);
+}
+
+.metadata-row .metadata-group .browse-button {
+    flex-shrink: 0;
+    margin-bottom: 0;
+}
+
 .browse-button {
-    padding: 10px 15px;
+    height: 35px;
+    padding: 0 15px;
     background-color: var(--input-bg);
     color: var(--text-color);
     border: 1px solid var(--border-color);
@@ -379,9 +432,9 @@ button[type="submit"]:hover {
 .select2-container--dark .select2-selection--single,
 .select2-container--dark .select2-selection--single:hover,
 .select2-container--dark .select2-selection--single:focus {
-    background-color: var(--input-bg) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-color) !important;
+    background-color: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
 }
 
 input[type="number"]::-webkit-inner-spin-button,
@@ -392,14 +445,14 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"]:hover::-webkit-inner-spin-button,
 input[type="number"]:hover::-webkit-outer-spin-button {
-    background-color: var(--input-bg) !important;
+    background-color: var(--input-bg);
 }
 
 .styled-select {
     background-color: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 10px 40px 10px 10px;
+    padding: 9px 40px 8px 10px;
     color: var(--text-color);
     width: 100%;
     appearance: none;
@@ -424,7 +477,6 @@ input[type="number"]:hover::-webkit-outer-spin-button {
 }
 
 .custom-dropdown-descriptors {
-    margin-bottom: 20px;
     transition: transform var(--transition-speed), border-color var(--transition-speed);
     border: 1px solid var(--border-color);
     border-radius: 8px;

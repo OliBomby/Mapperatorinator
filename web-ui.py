@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 import excepthook  # noqa
 import functools
 import os
@@ -15,7 +17,7 @@ import werkzeug.serving
 from flask import Flask, render_template, request, Response, jsonify
 
 from config import InferenceConfig
-from inference import autofill_paths
+from inference import compile_args
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
@@ -98,6 +100,37 @@ class Api:
             result = current_window.create_file_dialog(
                 OPEN_DIALOG,
                 file_types=file_types
+            )
+        except Exception:
+            result = current_window.create_file_dialog(OPEN_DIALOG)
+
+        return parse_file_dialog_result(result)
+
+    def browse_image(self):
+        """Opens a file dialog specifically for image files and returns the selected file path."""
+        # Get the window dynamically from the global list
+        if not webview.windows:
+            print("Error: No pywebview window found.")
+            return None
+
+        current_window = webview.windows[0]
+
+        # Image file type filter
+        image_file_types = (
+            'Image Files (*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.webp)',
+            '*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.webp',
+            'JPEG Files (*.jpg;*.jpeg)',
+            '*.jpg;*.jpeg',
+            'PNG Files (*.png)',
+            '*.png',
+            'All Files (*.*)',
+            '*.*'
+        )
+
+        try:
+            result = current_window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                file_types=image_file_types
             )
         except Exception:
             result = current_window.create_file_dialog(OPEN_DIALOG)
@@ -215,20 +248,50 @@ def start_inference():
 
         # Helper to quote values for Hydra's command-line parser
         def hydra_quote(value):
-            """Quotes a value for Hydra (single quotes, escapes internal)."""
-            value_str = str(value)
-            # Escape internal single quotes: ' -> '\''
-            escaped_value = value_str.replace("'", r"\'")
-            return f"'{escaped_value}'"
+            """Quotes a value for Hydra (handles Japanese characters and special chars).
+
+            Args:
+                value: The value to quote (can contain Japanese characters)
+
+            Returns:
+                str: Properly quoted and escaped value for Hydra
+            """
+            if value is None:
+                return ""
+
+            value_str = str(value).strip()
+            if not value_str:
+                return '""'
+
+            # Check if value needs quoting (spaces, special chars, or non-ASCII characters)
+            needs_quoting = (
+                any(c in value_str for c in [' ', '!', '#', '$', '&', '*', '(', ')', '[', ']',
+                                             '{', '}', '|', '\\', ';', '"', "'", '<', '>', '?', '`', '\n', '\r', '\t']) or
+                not value_str.isascii() or
+                value_str.startswith('"') or value_str.startswith("'")
+            )
+
+            if not needs_quoting:
+                return value_str
+
+            # Escape backslashes first, then double quotes
+            escaped_value = value_str.replace('\\', '\\\\').replace('"', '\\"')
+            return f'"{escaped_value}"'
 
         # Set of keys known to be paths needing quoting for Hydra
-        path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path"}
+        path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path", "background_image_path"}
+
+        # Set of keys that might contain Japanese characters
+        text_keys = {"title", "title_unicode", "artist", "artist_unicode", "creator", "version", "source", "tags", "background"}
 
         # Helper to add argument if value exists
         def add_arg(key, value):
             if value is not None and value != '':  # Ensure value is not empty
                 if key in path_keys:
                     # Quote path values for Hydra
+                    cmd.append(f"{key}={hydra_quote(value)}")
+                elif key in text_keys:
+                    # Quote text values that might contain Japanese characters
                     cmd.append(f"{key}={hydra_quote(value)}")
                 else:
                     # Other values usually don't need explicit Hydra quoting when passed via list
@@ -269,6 +332,19 @@ def start_inference():
             add_arg(param, request.form.get(param))
         # mapper_id
         add_arg("mapper_id", request.form.get('mapper_id'))
+
+        # Song Metadata
+        for param in ['title', 'title_unicode', 'artist', 'artist_unicode', 'creator', 'version', 'source', 'tags', 'preview_time']:
+            add_arg(param, request.form.get(param))
+
+        # Background image
+        background_image = request.form.get('background_image')
+        if background_image:
+            # Extract just the filename from the full path for the background parameter
+            background_filename = os.path.basename(background_image)
+            add_arg("background", background_filename)
+            # Also pass the full path for processing
+            add_arg("background_image_path", background_image)
 
         # Timing and segmentation
         for param in ['start_time', 'end_time']:
@@ -611,26 +687,36 @@ def validate_paths():
         inference_args.beatmap_path = beatmap_path
         inference_args.output_path = output_path
 
-        result = autofill_paths(inference_args)
+        try:
+            compile_args(inference_args, verbose=False)
+        except ValueError as v:
+            return jsonify({
+                'success': False,
+                'autofilled_args': None,
+                'errors': [str(v)]
+            }), 200
+
+        autofilled_args = asdict(inference_args)
+        del autofilled_args['in_context']
+        del autofilled_args['output_type']
+        del autofilled_args['train']
 
         # Return the results
         response_data = {
-            'success': result['success'],
-            'autofilled_audio_path': inference_args.audio_path,
-            'autofilled_output_path': inference_args.output_path,
-            'errors': result['errors']
+            'success': True,
+            'autofilled_args': autofilled_args,
+            'errors': []
         }
 
         return jsonify(response_data), 200
 
     except Exception as e:
         error_msg = f"Error during path validation: {str(e)}"
-        print(f"Path validation error: {error_msg}")
+        print(error_msg)
         return jsonify({
             'success': False,
-            'errors': [error_msg],
-            'autofilled_audio_path': None,
-            'autofilled_output_path': None
+            'autofilled_args': None,
+            'errors': [error_msg]
         }), 500
 
 

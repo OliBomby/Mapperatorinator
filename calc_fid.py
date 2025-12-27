@@ -9,6 +9,7 @@ from typing import Optional
 import hydra
 import numpy as np
 import torch
+from omegaconf import OmegaConf
 from scipy import linalg
 from slider import Beatmap, Circle, Slider, Spinner, HoldNote
 from torch.utils.data import DataLoader
@@ -19,7 +20,8 @@ from classifier.classify import ExampleDataset
 from classifier.libs.model.model import OsuClassifierOutput
 from classifier.libs.utils import load_ckpt
 from config import FidConfig
-from inference import prepare_args, load_diff_model, generate, load_model_with_server
+from inference import load_diff_model, generate, load_model_with_server, compile_device_and_seed, \
+    setup_inference_environment
 from osuT5.osuT5.dataset.data_utils import load_audio_file, load_mmrs_metadata, filter_mmrs_metadata
 from osuT5.osuT5.inference import generation_config_from_beatmap, beatmap_config_from_beatmap
 from osuT5.osuT5.tokenizer import ContextType
@@ -416,7 +418,10 @@ def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: 
 
 @hydra.main(config_path="configs", config_name="calc_fid", version_base="1.1")
 def main(args: FidConfig):
-    prepare_args(args)
+    args = OmegaConf.to_object(args)
+    compile_device_and_seed(args)
+    setup_inference_environment(args)
+
     print(f"Logging to directory: {os.getcwd()}")
 
     # Fix inference model path
