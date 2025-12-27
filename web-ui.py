@@ -339,7 +339,6 @@ def start_inference():
         background_image = request.form.get('background_image')
         if background_image:
             # Extract just the filename from the full path for the background parameter
-            import os
             background_filename = os.path.basename(background_image)
             add_arg("background", background_filename)
             # Also pass the full path for processing
