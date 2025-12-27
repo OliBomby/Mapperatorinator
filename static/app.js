@@ -42,32 +42,10 @@ $(document).ready(function() {
         resetFormToDefaults() {
             $('#inferenceForm')[0].reset();
 
-            // Set specific defaults
-            const defaults = {
-                model: 'v30', gamemode: '0', difficulty: '5', hp_drain_rate: '5',
-                circle_size: '4', keycount: '4', overall_difficulty: '8',
-                approach_rate: '9', slider_multiplier: '1.4', slider_tick_rate: '1',
-                year: '2023', cfg_scale: '1.0', temperature: '0.9', top_p: '0.9',
-                // Song metadata defaults
-                title: '', title_unicode: '', artist: '', artist_unicode: '',
-                creator: '', version: '', source: '', tags: '', bpm: '120',
-                offset: '0', preview_time: '-1', background_image: ''
-            };
-
-            Object.entries(defaults).forEach(([id, value]) => {
-                $(`#${id}`).val(value);
-            });
-
-            // Reset checkboxes
-            $('#hitsounded').prop('checked', true);
-            $('#export_osz, #add_to_beatmap, #overwrite_reference_beatmap, #super_timing').prop('checked', false);
-
-            // Clear descriptors and context options
+            // Clear descriptors
             $('input[name="descriptors"], input[name="in_context_options"]')
                 .removeClass('positive-check negative-check').prop('checked', false);
 
-            // Clear paths and optional fields
-            $('#audio_path, #output_path, #beatmap_path, #lora_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
             PathManager.clearPlaceholders();
             PathManager.validateAndAutofillPaths(false);
         }
@@ -553,7 +531,7 @@ $(document).ready(function() {
             if (confirm("Are you sure you want to reset all settings to default values? This cannot be undone.")) {
                 Utils.resetFormToDefaults();
                 $("#model, #gamemode, #beatmap_path").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
+                $(clearable_inputs).trigger('blur');
                 this.showConfigStatus("All settings reset to default values", "success");
             }
         },
@@ -615,8 +593,8 @@ $(document).ready(function() {
 
                 // Trigger updates
                 $("#model, #gamemode").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
-                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('input');
+                $(clearable_inputs).trigger('blur');
+                $(clearable_inputs).trigger('input');
 
                 this.showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
 
