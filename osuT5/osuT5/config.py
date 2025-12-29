@@ -140,6 +140,7 @@ class DataConfig:
     frame_offset_augment_prob: float = 1.0  # Probability of augmenting beatmap sequences with frame offset
     normalize_audio: bool = True  # Normalize audio data
     slider_version: int = 1  # Slider version to use (1 or 2)
+    snapping_random_prob: float = 0.0  # Probability of randomizing hit object snapping in the dataset
 
 
 @dataclass

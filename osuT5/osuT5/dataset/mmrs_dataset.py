@@ -629,6 +629,14 @@ class BeatmapDatasetIterable:
         #                               torch.clamp(input_tokens + torch.randint_like(input_tokens, -10, 10), self.tokenizer.event_start[EventType.DISTANCE], self.tokenizer.event_end[EventType.DISTANCE] - 1),
         #                               input_tokens)
 
+        if self.args.snapping_random_prob > 0:
+            random_snappings = torch.randint_like(input_tokens,
+                                                  low=self.tokenizer.event_start[EventType.SNAPPING],
+                                                  high=self.tokenizer.event_end[EventType.SNAPPING])
+            mask = (self.tokenizer.event_start[EventType.SNAPPING] <= input_tokens) & (input_tokens < self.tokenizer.event_end[EventType.SNAPPING])
+            mask &= torch.rand_like(input_tokens, dtype=torch.float32) < self.args.snapping_random_prob
+            input_tokens = torch.where(mask, random_snappings, input_tokens)
+
         sequence["decoder_input_ids"] = input_tokens
         # sequence["decoder_attention_mask"] = input_tokens != self.tokenizer.pad_id
         sequence["labels"] = label_tokens

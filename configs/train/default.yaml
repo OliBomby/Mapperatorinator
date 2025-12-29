@@ -106,6 +106,7 @@ data:                  # Data settings
   frame_offset_augment_prob: 1.0  # Probability of augmenting beatmap sequences with frame offset
   normalize_audio: true  # Normalize audio data
   slider_version: 1  # Slider version to use (1 or 2)
+  snapping_random_prob: 0.0  # Probability of randomizing hit object snapping in the dataset
 
 
 dataloader:             # Dataloader settings
