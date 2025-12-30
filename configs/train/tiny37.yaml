@@ -5,7 +5,7 @@ defaults:
 
 compile: true          # PyTorch 2.0 optimization
 precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
-flash_attention: true  # Enable Flash Attention
+flash_attention: false  # Enable Flash Attention
 
 model:
   do_difficulty_embed: false
@@ -92,9 +92,9 @@ optim:                  # Optimizer settings
   base_lr_2: 0.001        # Secondary learning rate for the internal optimizer
   batch_size: 64
   grad_acc: 4
-  total_steps: 35000
+  total_steps: 90000
   warmup_steps: 0
-  sustain_steps: 10000      # Steps to sustain the learning rate after warmup
+  sustain_steps: 30000      # Steps to sustain the learning rate after warmup
   weight_decay: 0.01
   lr_scheduler: linear
   final_cosine: 0
