@@ -193,13 +193,24 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
 
         output = self.transformer.forward(**inputs)
 
+        loss = None
         if labels is not None:
             unreduced_loss = self.loss_fn(torch.swapaxes(output.logits, 1, -1), labels)
             if sample_weights is not None:
                 unreduced_loss *= sample_weights.unsqueeze(1)
-            output["loss"] = unreduced_loss.sum() / (labels != LABEL_IGNORE_ID).sum()
+            loss = unreduced_loss.sum() / (labels != LABEL_IGNORE_ID).sum()
 
-        return output
+        return Seq2SeqLMOutput(
+            loss=loss,
+            logits=output.logits,
+            past_key_values=output.past_key_values,
+            decoder_hidden_states=output.decoder_hidden_states,
+            decoder_attentions=output.decoder_attentions,
+            cross_attentions=output.cross_attentions,
+            encoder_last_hidden_state=output.encoder_last_hidden_state,
+            encoder_hidden_states=output.encoder_hidden_states,
+            encoder_attentions=output.encoder_attentions,
+        )
 
     def prepare_inputs_for_generation(
         self,
