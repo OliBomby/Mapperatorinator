@@ -27,6 +27,7 @@ class ModelConfig:
     name: str = "openai/whisper-base"  # Model name
     config_base: str = ""  # Model base for config lookup
     input_features: bool = True
+    input_raw_wave: bool = False
     project_encoder_input: bool = True
     embed_decoder_input: bool = True
     manual_norm_weights: bool = False

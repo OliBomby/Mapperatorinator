@@ -1,4 +1,5 @@
 input_features: false
+input_raw_wave: false
 project_encoder_input: true
 embed_decoder_input: true
 manual_norm_weights: false

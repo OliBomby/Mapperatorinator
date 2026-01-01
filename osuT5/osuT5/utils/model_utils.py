@@ -46,6 +46,7 @@ def get_model_config(args: TrainConfig, tokenizer: Tokenizer) -> Mapperatorinato
         num_classes=tokenizer.num_classes,
         num_mappers=tokenizer.num_mapper_classes,
         input_features=args.model.input_features,
+        input_raw_wave=args.model.input_raw_wave,
         project_encoder_input=args.model.project_encoder_input,
         embed_decoder_input=args.model.embed_decoder_input,
         do_style_embed=args.model.do_style_embed,
