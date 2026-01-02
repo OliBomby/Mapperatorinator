@@ -108,6 +108,8 @@ class MapperatorinatorConfig(PretrainedConfig):
             config.bos_token_id = bos_token_id
             config.eos_token_id = eos_token_id
             config.max_position_embeddings  = tgt_seq_len
+            setattr(config, "max_source_positions", src_seq_len // 3 - 1)
+            setattr(config, "max_target_positions", tgt_seq_len)
             config.decoder_start_token_id = bos_token_id
             if flash_attention:
                 config._attn_implementation = "flash_attention_2"

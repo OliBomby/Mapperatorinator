@@ -148,44 +148,45 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
             device = frames.device if frames is not None else decoder_input_ids.device
             beatmap_idx = torch.full([batch_size], self.num_classes, dtype=torch.long, device=device)
 
-        inputs_embeds = None
-        if encoder_outputs is None and frames is not None and not self.input_raw_wave:
-            frames = self.spectrogram(frames)  # (N, L, M)
-            frames = frames.to(dtype=self.transformer.dtype)  # Ensure correct dtype for the model
-            conds = []
-
-            if self.do_style_embed:
-                style_embedding = self.style_embedder(beatmap_idx)  # (N, D)
-                style_embedding = style_embedding.unsqueeze(1).repeat((1, frames.shape[1], 1))
-                conds.append(style_embedding)
-            if self.do_difficulty_embed:
-                difficulty_embedding = self.difficulty_embedder(difficulty)
-                conds.append(difficulty_embedding)
-            if self.do_mapper_embed:
-                mapper_embedding = self.mapper_embedder(mapper_idx)
-                conds.append(mapper_embedding)
-            if self.do_song_position_embed:
-                song_position_embedding = self.song_pos_embedder(song_position)
-                conds.append(song_position_embedding)
-
-            conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
-            inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)
-
         inputs = dict(
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,
             encoder_outputs=encoder_outputs, **kwargs
         )
 
-        if self.project_encoder_input:
-            inputs_embeds = self.encoder_embedder(inputs_embeds) if inputs_embeds is not None else None
+        inputs_embeds = None
+        if encoder_outputs is None and frames is None:
+            if not self.input_raw_wave:
+                frames = self.spectrogram(frames)  # (N, L, M)
+                frames = frames.to(dtype=self.transformer.dtype)  # Ensure correct dtype for the model
+                conds = []
 
-        if self.input_raw_wave:
-            inputs["input_values"] = frames.reshape(frames.shape[0], -1)
-        elif self.input_features:
-            inputs["input_features"] = torch.swapaxes(inputs_embeds, 1, 2) if inputs_embeds is not None else None
-        else:
-            inputs["inputs_embeds"] = inputs_embeds
+                if self.do_style_embed:
+                    style_embedding = self.style_embedder(beatmap_idx)  # (N, D)
+                    style_embedding = style_embedding.unsqueeze(1).repeat((1, frames.shape[1], 1))
+                    conds.append(style_embedding)
+                if self.do_difficulty_embed:
+                    difficulty_embedding = self.difficulty_embedder(difficulty)
+                    conds.append(difficulty_embedding)
+                if self.do_mapper_embed:
+                    mapper_embedding = self.mapper_embedder(mapper_idx)
+                    conds.append(mapper_embedding)
+                if self.do_song_position_embed:
+                    song_position_embedding = self.song_pos_embedder(song_position)
+                    conds.append(song_position_embedding)
+
+                conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
+                inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)
+
+            if self.project_encoder_input:
+                inputs_embeds = self.encoder_embedder(inputs_embeds) if inputs_embeds is not None else None
+
+            if self.input_raw_wave:
+                inputs["input_values"] = frames.reshape(frames.shape[0], -1)
+            elif self.input_features:
+                inputs["input_features"] = torch.swapaxes(inputs_embeds, 1, 2) if inputs_embeds is not None else None
+            else:
+                inputs["inputs_embeds"] = inputs_embeds
 
         if self.embed_decoder_input:
             inputs["decoder_inputs_embeds"] = self.decoder_embedder(decoder_input_ids)
