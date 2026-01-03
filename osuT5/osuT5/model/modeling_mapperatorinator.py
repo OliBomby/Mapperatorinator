@@ -155,7 +155,7 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
         )
 
         inputs_embeds = None
-        if encoder_outputs is None and frames is None:
+        if encoder_outputs is None and frames is not None:
             if not self.input_raw_wave:
                 frames = self.spectrogram(frames)  # (N, L, M)
                 frames = frames.to(dtype=self.transformer.dtype)  # Ensure correct dtype for the model
