@@ -3,6 +3,7 @@ import os.path
 import time
 from multiprocessing.managers import Namespace
 
+import numpy as np
 import torch
 import wandb
 from accelerate import Accelerator
@@ -402,8 +403,8 @@ def train_profiling(
         "./profiler_logs", worker_name=f"worker_{accelerator.process_index}")
 
     if args.profile.early_stop:
-        stop_step = ((args.profile.wait + args.profile.warmup + args.profile.active)
-                     * args.profile.repeat / args.optim.grad_acc)
+        stop_step = int(np.ceil((args.profile.wait + args.profile.warmup + args.profile.active)
+                     * args.profile.repeat / args.optim.grad_acc))
         args.optim.total_steps = shared.current_train_step + stop_step
 
     def on_trace_ready(trace):
