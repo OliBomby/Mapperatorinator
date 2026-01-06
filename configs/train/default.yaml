@@ -146,9 +146,9 @@ profile:                # Profiling settings
   do_profile: false
   early_stop: true
   wait: 80
-  warmup: 16
-  active: 16
-  repeat: 5
+  warmup: 8
+  active: 8
+  repeat: 1
 
 lora:
   r: 64
