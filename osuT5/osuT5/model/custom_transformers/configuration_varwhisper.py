@@ -17,8 +17,13 @@ class VarWhisperConfig(WhisperConfig):
         encoder_layerdrop=0.0,
         decoder_layerdrop=0.0,
         decoder_start_token_id=50257,
-        encoder_rope_scaling=None,
-        decoder_rope_scaling=None,
+        rope_scaling=None,
+        deterministic_flash_attn=False,
+        attention_bias=False,
+        global_attn_every_n_layers=1,
+        local_attention=128,
+        local_rope_theta=10000,
+        global_rope_theta=10000,
         use_cache=True,
         is_encoder_decoder=True,
         activation_function="gelu",
@@ -47,8 +52,13 @@ class VarWhisperConfig(WhisperConfig):
         median_filter_width=7,
         **kwargs,
     ):
-        self.encoder_rope_scaling = encoder_rope_scaling
-        self.decoder_rope_scaling = decoder_rope_scaling
+        self.rope_scaling = rope_scaling or { "factor": 1.0, "type": "dynamic" }
+        self.deterministic_flash_attn = deterministic_flash_attn
+        self.attention_bias = attention_bias
+        self.global_attn_every_n_layers = global_attn_every_n_layers
+        self.local_attention = local_attention
+        self.local_rope_theta = local_rope_theta
+        self.global_rope_theta = global_rope_theta
 
         super().__init__(
             vocab_size=vocab_size,

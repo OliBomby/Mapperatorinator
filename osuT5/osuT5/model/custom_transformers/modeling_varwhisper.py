@@ -38,7 +38,8 @@ from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_u
 from .configuration_varwhisper import VarWhisperConfig
 
 if is_flash_attn_2_available():
-    from flash_attn.flash_attn_interface import flash_attn_varlen_qkvpacked_func
+    from flash_attn.flash_attn_interface import flash_attn_varlen_kvpacked_func, flash_attn_varlen_qkvpacked_func, \
+    flash_attn_qkvpacked_func
     from flash_attn.layers.rotary import RotaryEmbedding
     from flash_attn.ops.triton.rotary import apply_rotary
 else:
@@ -257,15 +258,20 @@ class VarWhisperUnpaddedRotaryEmbedding(RotaryEmbedding):
 class VarWhisperRotaryEmbedding(nn.Module):
     inv_freq: torch.Tensor  # fix linting for `register_buffer`
 
-    def __init__(self, config: VarWhisperConfig, device=None):
+    def __init__(
+            self,
+            config: VarWhisperConfig,
+            max_seqlen: Optional[int] = None,
+            device=None
+    ):
         super().__init__()
         # BC: "rope_type" was originally "type"
         if hasattr(config, "rope_scaling") and isinstance(config.rope_scaling, dict):
             self.rope_type = config.rope_scaling.get("rope_type", config.rope_scaling.get("type"))
         else:
             self.rope_type = "default"
-        self.max_seq_len_cached = config.max_position_embeddings
-        self.original_max_seq_len = config.max_position_embeddings
+        self.max_seq_len_cached = max_seqlen or config.max_position_embeddings
+        self.original_max_seq_len = max_seqlen or config.max_position_embeddings
 
         self.config = config
         self.rope_init_fn = ROPE_INIT_FUNCTIONS[self.rope_type]
@@ -361,7 +367,40 @@ def eager_attention_forward(
     return (attn_output,)
 
 
-def flash_attention_forward(
+def flash_attention_encoder_forward(
+    module: "VarWhisperAttention",
+    qkv: torch.Tensor,
+    rotary_emb: VarWhisperUnpaddedRotaryEmbedding,
+    local_attention: tuple[int, int],
+    bs: int,
+    dim: int,
+    target_dtype: torch.dtype = torch.bfloat16,
+    **_kwargs,
+) -> tuple[torch.Tensor]:
+    # (batch_size, seqlen, 3, nheads, headdim)
+    qkv = rotary_emb(qkv)
+
+    kwargs = dict(
+        dropout_p=module.attention_dropout if module.training else 0.0,
+        deterministic=module.deterministic_flash_attn,
+        window_size=local_attention,
+    )
+
+    convert_dtype = qkv.dtype not in (torch.float16, torch.bfloat16)
+    if convert_dtype:
+        # FA2 implementation only supports fp16 and bf16. If FA2 is supported,
+        # bfloat16 must be supported as of FA2 2.5.7. (Turing GPUs not supported)
+        orig_dtype = qkv.dtype
+        qkv = qkv.to(target_dtype)
+
+        attn = flash_attn_qkvpacked_func(qkv, **kwargs)
+        attn = attn.to(orig_dtype)  # type: ignore
+    else:
+        attn = flash_attn_qkvpacked_func(qkv, **kwargs)
+    return (attn.view(bs, dim),)
+
+
+def flash_attention_decoder_forward(
     module: "VarWhisperAttention",
     qkv: torch.Tensor,
     rotary_emb: VarWhisperUnpaddedRotaryEmbedding,
@@ -374,7 +413,20 @@ def flash_attention_forward(
     **_kwargs,
 ) -> tuple[torch.Tensor]:
     # (total_seqlen, 3, nheads, headdim)
-    qkv = rotary_emb(qkv, cu_seqlens=cu_seqlens, max_seqlen=max_seqlen)
+    qkv = rotary_emb(
+        qkv,
+        cu_seqlens=cu_seqlens,
+        max_seqlen=max_seqlen,
+    )
+
+    kwargs = dict(
+        cu_seqlens=cu_seqlens,
+        max_seqlen=max_seqlen,
+        dropout_p=module.attention_dropout if module.training else 0.0,
+        deterministic=module.deterministic_flash_attn,
+        window_size=local_attention,
+        causal=True,
+    )
 
     convert_dtype = qkv.dtype not in (torch.float16, torch.bfloat16)
     if convert_dtype:
@@ -383,24 +435,59 @@ def flash_attention_forward(
         orig_dtype = qkv.dtype
         qkv = qkv.to(target_dtype)
 
-        attn = flash_attn_varlen_qkvpacked_func(
-            qkv,
-            cu_seqlens=cu_seqlens,
-            max_seqlen=max_seqlen,
-            dropout_p=module.attention_dropout if module.training else 0.0,
-            deterministic=module.deterministic_flash_attn,
-            window_size=local_attention,
-        )
+        attn = flash_attn_varlen_qkvpacked_func(qkv, **kwargs)
         attn = attn.to(orig_dtype)  # type: ignore
     else:
-        attn = flash_attn_varlen_qkvpacked_func(
-            qkv,
-            cu_seqlens=cu_seqlens,
-            max_seqlen=max_seqlen,
-            dropout_p=module.attention_dropout if module.training else 0.0,
-            deterministic=module.deterministic_flash_attn,
-            window_size=local_attention,
-        )
+        attn = flash_attn_varlen_kvpacked_func(qkv, **kwargs)
+    return (attn.view(bs, dim),)
+
+
+def flash_attention_cross_forward(
+    module: "VarWhisperAttention",
+    q: torch.Tensor,
+    kv: torch.Tensor,
+    rotary_emb: VarWhisperUnpaddedRotaryEmbedding,
+    cu_seqlens_q: torch.Tensor,
+    cu_seqlens_k: torch.Tensor,
+    max_seqlen_q: int,
+    max_seqlen_k: int,
+    local_attention: tuple[int, int],
+    bs: int,
+    dim: int,
+    target_dtype: torch.dtype = torch.bfloat16,
+    **_kwargs,
+) -> tuple[torch.Tensor]:
+    q, kv = rotary_emb(
+        q,
+        kv,
+        cu_seqlens_q=cu_seqlens_q,
+        cu_seqlens_k=cu_seqlens_k,
+        max_seqlen_q=max_seqlen_q,
+        max_seqlen_k=max_seqlen_k,
+    )
+
+    kwargs = dict(
+        cu_seqlens_q=cu_seqlens_q,
+        cu_seqlens_k=cu_seqlens_k,
+        max_seqlen_q=max_seqlen_q,
+        max_seqlen_k=max_seqlen_k,
+        dropout_p=module.attention_dropout if module.training else 0.0,
+        deterministic=module.deterministic_flash_attn,
+        window_size=local_attention,
+    )
+
+    convert_dtype = q.dtype not in (torch.float16, torch.bfloat16)
+    if convert_dtype:
+        # FA2 implementation only supports fp16 and bf16. If FA2 is supported,
+        # bfloat16 must be supported as of FA2 2.5.7. (Turing GPUs not supported)
+        orig_dtype = q.dtype
+        q = q.to(target_dtype)
+        kv = kv.to(target_dtype)
+
+        attn = flash_attn_varlen_kvpacked_func(q, kv, **kwargs)
+        attn = attn.to(orig_dtype)  # type: ignore
+    else:
+        attn = flash_attn_varlen_kvpacked_func(q, kv, **kwargs)
     return (attn.view(bs, dim),)
 
 
@@ -456,22 +543,39 @@ class VarWhisperAttention(nn.Module):
     See `forward` method for additional details.
     """
 
-    def __init__(self, config: VarWhisperConfig, layer_id: Optional[int] = None):
+    def __init__(
+            self,
+            config: VarWhisperConfig,
+            layer_id: Optional[int] = None,
+            is_decoder: bool = False,
+            is_causal: bool = False,
+            is_varlen: bool = False,
+            is_cross_attention: bool = False,
+    ):
         super().__init__()
         self.config = config
         self.layer_id = layer_id
+        self.is_decoder = is_decoder
+        self.is_causal = is_causal
+        self.is_varlen = is_varlen and config._attn_implementation == "flash_attention_2"
+        self.is_cross_attention = is_cross_attention
+        self.num_heads = config.decoder_attention_heads if is_decoder else config.encoder_attention_heads
 
-        if config.hidden_size % config.num_attention_heads != 0:
+        if config.d_model % self.num_heads != 0:
             raise ValueError(
-                f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention heads ({config.num_attention_heads})"
+                f"The hidden size ({config.d_model}) is not a multiple of the number of attention heads ({self.num_heads})"
             )
 
+        max_position_embeddings = config.max_target_positions if is_decoder else config.max_source_positions
         self.attention_dropout = config.attention_dropout
         self.deterministic_flash_attn = config.deterministic_flash_attn
-        self.num_heads = config.num_attention_heads
-        self.head_dim = config.hidden_size // config.num_attention_heads
+        self.head_dim = config.d_model // self.num_heads
         self.all_head_size = self.head_dim * self.num_heads
-        self.Wqkv = nn.Linear(config.hidden_size, 3 * self.all_head_size, bias=config.attention_bias)
+        if is_cross_attention:
+            self.Wq = nn.Linear(config.d_model, 1 * self.all_head_size, bias=config.attention_bias)
+            self.Wkv = nn.Linear(config.d_model, 2 * self.all_head_size, bias=config.attention_bias)
+        else:
+            self.Wqkv = nn.Linear(config.d_model, 3 * self.all_head_size, bias=config.attention_bias)
 
         if layer_id % config.global_attn_every_n_layers != 0:
             self.local_attention = (config.local_attention // 2, config.local_attention // 2)
@@ -479,44 +583,49 @@ class VarWhisperAttention(nn.Module):
             max_position_embeddings = config.local_attention
         else:
             self.local_attention = (-1, -1)
-            max_position_embeddings = config.max_position_embeddings
             rope_theta = config.global_rope_theta
 
-        if config._attn_implementation == "flash_attention_2":
+        if self.is_varlen:
             self.rotary_emb = VarWhisperUnpaddedRotaryEmbedding(
                 dim=self.head_dim, max_seqlen=max_position_embeddings, base=rope_theta
             )
         else:
             config_copy = copy.deepcopy(config)
             config_copy.rope_theta = rope_theta
-            self.rotary_emb = VarWhisperRotaryEmbedding(config=config_copy)
+            self.rotary_emb = VarWhisperRotaryEmbedding(config=config_copy, max_seqlen=max_position_embeddings)
 
-        self.Wo = nn.Linear(config.hidden_size, config.hidden_size, bias=config.attention_bias)
+        self.Wo = nn.Linear(config.d_model, config.d_model, bias=config.attention_bias)
         self.out_drop = nn.Dropout(config.attention_dropout) if config.attention_dropout > 0.0 else nn.Identity()
         self.pruned_heads = set()
 
     def forward(
         self,
         hidden_states: torch.Tensor,
+        key_value_states: Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = False,
         **kwargs,
     ) -> torch.Tensor:
-        qkv = self.Wqkv(hidden_states)
+        q = self.Wq(hidden_states)
+        kv = self.Wkv(key_value_states if key_value_states is not None else hidden_states)
 
         bs = hidden_states.shape[0]
-        if self.config._attn_implementation == "flash_attention_2":
-            qkv = qkv.view(-1, 3, self.num_heads, self.head_dim)
+        if self.is_varlen:
+            q = q.view(-1, self.num_heads, self.head_dim)
+            kv = kv.view(-1, 2, self.num_heads, self.head_dim)
         else:
-            qkv = qkv.view(bs, -1, 3, self.num_heads, self.head_dim)
+            q = q.view(bs, -1, self.num_heads, self.head_dim)
+            kv = kv.view(bs, -1, 2, self.num_heads, self.head_dim)
 
         attn_outputs = VARWHISPER_ATTENTION_FUNCTION[self.config._attn_implementation](
             self,
-            qkv=qkv,
+            q=q,
+            kv=kv,
             rotary_emb=self.rotary_emb,
             local_attention=self.local_attention,
             bs=bs,
             dim=self.all_head_size,
             output_attentions=output_attentions,
+            causal=self.is_causal,
             **kwargs,
         )
         hidden_states = attn_outputs[0]
@@ -531,10 +640,7 @@ class VarWhisperEncoderLayer(nn.Module):
         super().__init__()
         self.embed_dim = config.d_model
 
-        self.self_attn = VARWHISPER_ATTENTION_FUNCTION[config._attn_implementation](
-            embed_dim=self.embed_dim,
-            num_heads=config.encoder_attention_heads,
-            dropout=config.attention_dropout,
+        self.self_attn = VarWhisperAttention(
             config=config,
         )
         self.self_attn_layer_norm = nn.RMSNorm(self.embed_dim)
@@ -549,17 +655,14 @@ class VarWhisperEncoderLayer(nn.Module):
             self,
             hidden_states: torch.Tensor,
             attention_mask: torch.Tensor,
-            layer_head_mask: torch.Tensor,
+            position_ids: Optional[torch.LongTensor] = None,
             output_attentions: bool = False,
-            position_embeddings: Optional[Tuple[torch.Tensor]] = None,
     ) -> torch.Tensor:
         """
         Args:
             hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
             attention_mask (`torch.FloatTensor`): attention mask of size
                 `(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
-            layer_head_mask (`torch.FloatTensor`): mask for attention heads in a given layer of size
-                `(encoder_attention_heads,)`.
             output_attentions (`bool`, *optional*):
                 Whether or not to return the attentions tensors of all attention layers. See `attentions` under
                 returned tensors for more detail.
@@ -569,9 +672,8 @@ class VarWhisperEncoderLayer(nn.Module):
         hidden_states, attn_weights, _ = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
-            layer_head_mask=layer_head_mask,
+            position_ids=position_ids,
             output_attentions=output_attentions,
-            position_embeddings=position_embeddings,
         )
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
@@ -603,13 +705,10 @@ class VarWhisperDecoderLayer(nn.Module):
         super().__init__()
         self.embed_dim = config.d_model
 
-        self.self_attn = VARWHISPER_ATTENTION_FUNCTION[config._attn_implementation](
-            embed_dim=self.embed_dim,
-            num_heads=config.decoder_attention_heads,
-            dropout=config.attention_dropout,
+        self.self_attn = VarWhisperAttention(
             is_decoder=True,
             is_causal=True,
-            layer_idx=layer_idx,
+            layer_id=layer_idx,
             config=config,
         )
         self.dropout = config.dropout
@@ -617,12 +716,9 @@ class VarWhisperDecoderLayer(nn.Module):
         self.activation_dropout = config.activation_dropout
 
         self.self_attn_layer_norm = nn.RMSNorm(self.embed_dim)
-        self.encoder_attn = VARWHISPER_ATTENTION_FUNCTION[config._attn_implementation](
-            self.embed_dim,
-            config.decoder_attention_heads,
-            dropout=config.attention_dropout,
+        self.encoder_attn = VarWhisperAttention(
             is_decoder=True,
-            layer_idx=layer_idx,
+            layer_id=layer_idx,
             config=config,
         )
         self.encoder_attn_layer_norm = nn.RMSNorm(self.embed_dim)
@@ -636,13 +732,13 @@ class VarWhisperDecoderLayer(nn.Module):
             attention_mask: Optional[torch.Tensor] = None,
             encoder_hidden_states: Optional[torch.Tensor] = None,
             encoder_attention_mask: Optional[torch.Tensor] = None,
-            layer_head_mask: Optional[torch.Tensor] = None,
-            cross_attn_layer_head_mask: Optional[torch.Tensor] = None,
             past_key_value: Optional[EncoderDecoderCache] = None,
             output_attentions: Optional[bool] = False,
             use_cache: Optional[bool] = True,
             cache_position: Optional[torch.LongTensor] = None,
-            position_embeddings: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            cu_seqlens: Optional[torch.LongTensor] = None,
+            max_seqlen: Optional[int] = None,
     ) -> torch.Tensor:
         """
         Args:
@@ -653,10 +749,6 @@ class VarWhisperDecoderLayer(nn.Module):
                 cross attention input to the layer of shape `(batch, seq_len, embed_dim)`
             encoder_attention_mask (`torch.FloatTensor`): encoder attention mask of size
                 `(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
-            layer_head_mask (`torch.FloatTensor`): mask for attention heads in a given layer of size
-                `(encoder_attention_heads,)`.
-            cross_attn_layer_head_mask (`torch.FloatTensor`): mask for cross-attention heads in a given layer of
-                size `(decoder_attention_heads,)`.
             past_key_value (`Tuple(torch.FloatTensor)`): cached past key and value projection states
             output_attentions (`bool`, *optional*):
                 Whether or not to return the attentions tensors of all attention layers. See `attentions` under
@@ -670,10 +762,11 @@ class VarWhisperDecoderLayer(nn.Module):
             hidden_states=hidden_states,
             past_key_value=past_key_value,
             attention_mask=attention_mask,
-            layer_head_mask=layer_head_mask,
-            output_attentions=output_attentions,
             cache_position=cache_position,
-            position_embeddings=position_embeddings,
+            position_ids=position_ids,
+            cu_seqlens=cu_seqlens,
+            max_seqlen=max_seqlen,
+            output_attentions=output_attentions
         )
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
@@ -687,10 +780,11 @@ class VarWhisperDecoderLayer(nn.Module):
                 hidden_states=hidden_states,
                 key_value_states=encoder_hidden_states,
                 attention_mask=encoder_attention_mask,
-                layer_head_mask=cross_attn_layer_head_mask,
                 past_key_value=past_key_value,
-                output_attentions=output_attentions,
-                position_embeddings=None,
+                position_ids=position_ids,
+                cu_seqlens=cu_seqlens,
+                max_seqlen=max_seqlen,
+                output_attentions=output_attentions
             )
             hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
             hidden_states = residual + hidden_states
@@ -794,7 +888,6 @@ class VarWhisperEncoder(VarWhisperPreTrainedModel):
             self,
             input_features,
             attention_mask=None,
-            head_mask=None,
             output_attentions=None,
             output_hidden_states=None,
             return_dict=None,
@@ -824,12 +917,6 @@ class VarWhisperEncoder(VarWhisperPreTrainedModel):
         encoder_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
 
-        # check if head_mask has a correct number of layers specified if desired
-        if head_mask is not None:
-            assert head_mask.size()[0] == (
-                len(self.layers)
-            ), f"The head_mask should be specified for {len(self.layers)} layers, but it is for {head_mask.size()[0]}."
-
         for idx, encoder_layer in enumerate(self.layers):
             if output_hidden_states:
                 encoder_states = encoder_states + (hidden_states,)
@@ -848,7 +935,6 @@ class VarWhisperEncoder(VarWhisperPreTrainedModel):
                         encoder_layer.__call__,
                         hidden_states,
                         None,
-                        (head_mask[idx] if head_mask is not None else None),
                         output_attentions,
                         position_embeddings,
                     )
@@ -857,7 +943,6 @@ class VarWhisperEncoder(VarWhisperPreTrainedModel):
                     layer_outputs = encoder_layer(
                         hidden_states,
                         None,
-                        layer_head_mask=(head_mask[idx] if head_mask is not None else None),
                         output_attentions=output_attentions,
                         position_embeddings=position_embeddings,
                     )
@@ -922,8 +1007,6 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
             input_ids=None,
             attention_mask=None,
             encoder_hidden_states=None,
-            head_mask=None,
-            cross_attn_head_mask=None,
             past_key_values=None,
             inputs_embeds=None,
             position_ids=None,
@@ -967,13 +1050,6 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
                 inputs_embeds, indices, cu_seqlens, max_seqlen, *_ = _unpad_varwhisper_input(
                     inputs=inputs_embeds, attention_mask=attention_mask
                 )
-        else:
-            if position_ids is None:
-                position_ids = torch.arange(seq_len, device=device).unsqueeze(0)
-
-            attention_mask, sliding_window_mask = self._update_attention_mask(
-                attention_mask, output_attentions=output_attentions
-            )
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -1010,9 +1086,6 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
         hidden_states = inputs_embeds
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
 
-        # create position embeddings to be shared across the decoder layers
-        position_embeddings = self.rotary_emb(hidden_states, position_ids)
-
         causal_mask = self._update_causal_mask(
             attention_mask,
             inputs_embeds,
@@ -1032,13 +1105,6 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
         all_self_attns = () if output_attentions else None
         all_cross_attentions = () if (output_attentions and encoder_hidden_states is not None) else None
 
-        # check if head_mask/cross_attn_head_mask has a correct number of layers specified if desired
-        for attn_mask, mask_name in zip([head_mask, cross_attn_head_mask], ["head_mask", "cross_attn_head_mask"]):
-            if attn_mask is not None:
-                assert attn_mask.size()[0] == (len(self.layers)), (
-                    f"The `{mask_name}` should be specified for {len(self.layers)} layers, but it is for"
-                    f" {head_mask.size()[0]}."
-                )
         for idx, decoder_layer in enumerate(self.layers):
             # add LayerDrop (see https://arxiv.org/abs/1909.11556 for description)
             if output_hidden_states:
@@ -1055,28 +1121,26 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
                     causal_mask,
                     encoder_hidden_states,
                     None,  # encoder attention mask
-                    head_mask[idx] if head_mask is not None else None,
-                    cross_attn_head_mask[idx] if cross_attn_head_mask is not None else None,
                     None,  # past_key_value
                     output_attentions,
                     use_cache,
                     cache_position,
-                    position_embeddings
+                    position_ids,
+                    cu_seqlens,
+                    max_seqlen,
                 )
             else:
                 layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask,
                     encoder_hidden_states=encoder_hidden_states,
-                    layer_head_mask=(head_mask[idx] if head_mask is not None else None),
-                    cross_attn_layer_head_mask=(
-                        cross_attn_head_mask[idx] if cross_attn_head_mask is not None else None
-                    ),
                     past_key_value=past_key_values if use_cache else None,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
                     cache_position=cache_position,
-                    position_embeddings=position_embeddings
+                    position_ids=position_ids,
+                    cu_seqlens=cu_seqlens,
+                    max_seqlen=max_seqlen,
                 )
             hidden_states = layer_outputs[0]
 
@@ -1246,9 +1310,6 @@ class VarWhisperModel(VarWhisperPreTrainedModel):
             attention_mask: Optional[torch.LongTensor] = None,
             decoder_input_ids: Optional[torch.LongTensor] = None,
             decoder_attention_mask: Optional[torch.LongTensor] = None,
-            head_mask: Optional[torch.Tensor] = None,
-            decoder_head_mask: Optional[torch.Tensor] = None,
-            cross_attn_head_mask: Optional[torch.Tensor] = None,
             encoder_outputs: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
             past_key_values: Optional[Union[EncoderDecoderCache, Tuple[torch.FloatTensor]]] = None,
             decoder_inputs_embeds: Optional[Tuple[torch.FloatTensor]] = None,
@@ -1269,7 +1330,6 @@ class VarWhisperModel(VarWhisperPreTrainedModel):
         if encoder_outputs is None:
             encoder_outputs = self.encoder(
                 input_features,
-                head_mask=head_mask,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
@@ -1288,8 +1348,6 @@ class VarWhisperModel(VarWhisperPreTrainedModel):
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
             encoder_hidden_states=encoder_outputs[0],
-            head_mask=decoder_head_mask,
-            cross_attn_head_mask=cross_attn_head_mask,
             past_key_values=past_key_values,
             inputs_embeds=decoder_inputs_embeds,
             position_ids=decoder_position_ids,
@@ -1356,9 +1414,6 @@ class VarWhisperForConditionalGeneration(WhisperGenerationMixin, VarWhisperPreTr
             attention_mask: Optional[torch.LongTensor] = None,
             decoder_input_ids: Optional[torch.LongTensor] = None,
             decoder_attention_mask: Optional[torch.LongTensor] = None,
-            head_mask: Optional[torch.Tensor] = None,
-            decoder_head_mask: Optional[torch.Tensor] = None,
-            cross_attn_head_mask: Optional[torch.Tensor] = None,
             encoder_outputs: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
             past_key_values: Optional[Union[EncoderDecoderCache, Tuple[torch.FloatTensor]]] = None,
             decoder_inputs_embeds: Optional[Tuple[torch.FloatTensor]] = None,
@@ -1378,9 +1433,6 @@ class VarWhisperForConditionalGeneration(WhisperGenerationMixin, VarWhisperPreTr
             decoder_input_ids=decoder_input_ids,
             encoder_outputs=encoder_outputs,
             decoder_attention_mask=decoder_attention_mask,
-            head_mask=head_mask,
-            decoder_head_mask=decoder_head_mask,
-            cross_attn_head_mask=cross_attn_head_mask,
             past_key_values=past_key_values,
             decoder_inputs_embeds=decoder_inputs_embeds,
             decoder_position_ids=decoder_position_ids,
