@@ -49,7 +49,7 @@ class MapperatorinatorConfig(PretrainedConfig):
         rope_decoder_scaling_factor=1.0,
         rope_scaling=None,
         deterministic_flash_attn=False,
-        attention_bias=False,
+        attention_bias=True,
         global_attn_every_n_layers=1,
         local_attention=128,
         local_rope_theta=10000,

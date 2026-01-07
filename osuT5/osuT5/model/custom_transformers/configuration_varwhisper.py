@@ -19,7 +19,7 @@ class VarWhisperConfig(WhisperConfig):
         decoder_start_token_id=50257,
         rope_scaling=None,
         deterministic_flash_attn=False,
-        attention_bias=False,
+        attention_bias=True,
         global_attn_every_n_layers=1,
         local_attention=128,
         local_rope_theta=10000,

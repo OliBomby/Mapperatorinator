@@ -20,7 +20,7 @@ rope_scaling:
   rope_type: "default"
   factor: 1.0
 deterministic_flash_attn: false
-attention_bias: false
+attention_bias: true
 global_attn_every_n_layers: 1
 local_attention: 128
 local_rope_theta: 10000
