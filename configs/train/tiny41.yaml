@@ -83,10 +83,10 @@ optim:                  # Optimizer settings
   base_lr: 0.004         # Should be scaled with the number of devices present
   base_lr_2: 0.001        # Secondary learning rate for the internal optimizer
   batch_size: 64
-  grad_acc: 8
-  total_steps: 17000
+  grad_acc: 4
+  total_steps: 35000
   warmup_steps: 0
-  sustain_steps: 5000      # Steps to sustain the learning rate after warmup
+  sustain_steps: 10000      # Steps to sustain the learning rate after warmup
   weight_decay: 0.01
   lr_scheduler: linear
   final_cosine: 0
