@@ -16,6 +16,16 @@ rope_type: "dynamic"
 rope_encoder_scaling_factor: 1.0
 rope_decoder_scaling_factor: 1.0
 
+rope_scaling:
+  rope_type: "default"
+  factor: 1.0
+deterministic_flash_attn: false
+attention_bias: false
+global_attn_every_n_layers: 1
+local_attention: 128
+local_rope_theta: 10000
+global_rope_theta: 10000
+
 spectrogram:
   implementation: 'nnAudio'
   log_scale: false

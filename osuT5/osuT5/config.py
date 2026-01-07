@@ -40,6 +40,13 @@ class ModelConfig:
     rope_type: str = "dynamic"  # RoPE type (dynamic/static)
     rope_encoder_scaling_factor: float = 1.0
     rope_decoder_scaling_factor: float = 1.0
+    rope_scaling: dict = field(default_factory=lambda: { "factor": 1.0, "rope_type": "default" })
+    deterministic_flash_attn: bool = False
+    attention_bias: bool = False
+    global_attn_every_n_layers: int = 1
+    local_attention: int = 128
+    local_rope_theta: int = 10000
+    global_rope_theta: int = 10000
     spectrogram: SpectrogramConfig = field(default_factory=SpectrogramConfig)
     overwrite: dict = field(default_factory=lambda: {})  # Overwrite model config
     add_config: dict = field(default_factory=lambda: {})  # Add to model config

@@ -1,6 +1,7 @@
 from transformers import PretrainedConfig, T5Config, WhisperConfig, MoonshineConfig
 
 from .custom_transformers import NWhisperConfig, RoPEWhisperConfig
+from .custom_transformers.configuration_varwhisper import VarWhisperConfig
 
 
 class MapperatorinatorConfig(PretrainedConfig):
@@ -46,6 +47,13 @@ class MapperatorinatorConfig(PretrainedConfig):
         rope_type="dynamic",
         rope_encoder_scaling_factor=1.0,
         rope_decoder_scaling_factor=1.0,
+        rope_scaling=None,
+        deterministic_flash_attn=False,
+        attention_bias=False,
+        global_attn_every_n_layers=1,
+        local_attention=128,
+        local_rope_theta=10000,
+        global_rope_theta=10000,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -67,6 +75,8 @@ class MapperatorinatorConfig(PretrainedConfig):
             config = NWhisperConfig.from_pretrained("openai/whisper" + backbone_model_name[17:])
         elif backbone_model_name.startswith("Tiger14n/ropewhisper"):
             config = RoPEWhisperConfig.from_pretrained("openai/whisper" + backbone_model_name[20:])
+        elif backbone_model_name.startswith("OliBomby/varwhisper"):
+            config = VarWhisperConfig.from_pretrained("openai/whisper" + backbone_model_name[19:])
         else:
             raise NotImplementedError
 
@@ -103,6 +113,14 @@ class MapperatorinatorConfig(PretrainedConfig):
             config.rope_type = rope_type
             config.rope_encoder_scaling_factor = rope_encoder_scaling_factor
             config.rope_decoder_scaling_factor = rope_decoder_scaling_factor
+        if isinstance(config, VarWhisperConfig):
+            config.rope_scaling = rope_scaling or { "factor": 1.0, "rope_type": "default" }
+            config.deterministic_flash_attn = deterministic_flash_attn
+            config.attention_bias = attention_bias
+            config.global_attn_every_n_layers = global_attn_every_n_layers
+            config.local_attention = local_attention
+            config.local_rope_theta = local_rope_theta
+            config.global_rope_theta = global_rope_theta
         if isinstance(config, MoonshineConfig):
             config.pad_token_id = pad_token_id
             config.bos_token_id = bos_token_id

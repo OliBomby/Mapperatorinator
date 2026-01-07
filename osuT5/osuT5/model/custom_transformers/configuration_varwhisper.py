@@ -52,7 +52,7 @@ class VarWhisperConfig(WhisperConfig):
         median_filter_width=7,
         **kwargs,
     ):
-        self.rope_scaling = rope_scaling or { "factor": 1.0, "type": "dynamic" }
+        self.rope_scaling = rope_scaling or { "factor": 1.0, "rope_type": "default" }
         self.deterministic_flash_attn = deterministic_flash_attn
         self.attention_bias = attention_bias
         self.global_attn_every_n_layers = global_attn_every_n_layers

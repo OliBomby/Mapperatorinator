@@ -4,13 +4,10 @@ from typing import Optional, Dict
 
 import torch
 import torch.nn as nn
-from transformers import T5Config, T5ForConditionalGeneration, WhisperForConditionalGeneration, WhisperConfig, \
-    PreTrainedModel, GenerationMixin, MoonshineConfig, MoonshineForConditionalGeneration
+from transformers import PreTrainedModel, GenerationMixin, WhisperForConditionalGeneration
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 
 from .configuration_mapperatorinator import MapperatorinatorConfig
-from .custom_transformers import NWhisperConfig, RoPEWhisperConfig, NWhisperForConditionalGeneration, \
-    RoPEWhisperForConditionalGeneration
 from .spectrogram import MelSpectrogram
 
 LABEL_IGNORE_ID = -100
@@ -18,25 +15,35 @@ LABEL_IGNORE_ID = -100
 
 def get_backbone_model(name, config):
     if name.startswith("google/t5"):
+        from transformers import T5Config, T5ForConditionalGeneration
         if isinstance(config, dict):
             config = T5Config(**config)
         model = T5ForConditionalGeneration(config)
     elif name.startswith("OliBomby/nwhisper"):
+        from .custom_transformers import NWhisperConfig, NWhisperForConditionalGeneration
         if isinstance(config, dict):
             config = NWhisperConfig(**config)
         model = NWhisperForConditionalGeneration(config)
     elif name.startswith("Tiger14n/ropewhisper"):
+        from .custom_transformers import RoPEWhisperConfig, RoPEWhisperForConditionalGeneration
         if isinstance(config, dict):
             config = RoPEWhisperConfig(**config)
         model = RoPEWhisperForConditionalGeneration(config)
     elif name.startswith("openai/whisper"):
+        from transformers import WhisperConfig, WhisperForConditionalGeneration
         if isinstance(config, dict):
             config = WhisperConfig(**config)
         model = WhisperForConditionalGeneration(config)
     elif name.startswith("UsefulSensors/moonshine-tiny"):
+        from .custom_transformers import MoonshineConfig, MoonshineForConditionalGeneration
         if isinstance(config, dict):
             config = MoonshineConfig(**config)
         model = MoonshineForConditionalGeneration(config)
+    elif name.startswith("OliBomby/varwhisper"):
+        from .custom_transformers import VarWhisperConfig, VarWhisperForConditionalGeneration
+        if isinstance(config, dict):
+            config = VarWhisperConfig(**config)
+        model = VarWhisperForConditionalGeneration(config)
     else:
         raise NotImplementedError
 
