@@ -1021,7 +1021,7 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
 
             if encoder_hidden_states is not None:
                 encoder_hidden_states, _, encoder_cu_seqlens, encoder_max_seqlen, *_ = _unpad_varwhisper_input(
-                    inputs=encoder_hidden_states,
+                    inputs=encoder_hidden_states.contiguous(),
                     attention_mask=torch.ones(encoder_hidden_states.shape[:2], device=device, dtype=torch.bool),
                 )
 
