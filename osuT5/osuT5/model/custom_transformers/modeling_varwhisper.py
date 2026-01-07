@@ -81,6 +81,17 @@ def _unpad_varwhisper_input(
     return unpadded_inputs, indices, cu_seqlens, max_seqlen_in_batch, unpadded_position_ids, unpadded_labels
 
 
+def _unpad_encoder_hidden_states(encoder_hidden_states: torch.Tensor,):
+    # encoder_hidden_states contains no padding, so we just flatten it and compute cu_seqlens
+    batch, seqlen, *rest = encoder_hidden_states.shape
+    shape = batch * seqlen
+    unpadded_encoder_hidden_states = encoder_hidden_states.view(shape, *rest)
+
+    encoder_cu_seqlens = torch.arange(0, shape + 1, step=seqlen, dtype=torch.int32, device=encoder_hidden_states.device)
+
+    return unpadded_encoder_hidden_states, encoder_cu_seqlens, seqlen
+
+
 def _pad_varwhisper_output(
     inputs: torch.Tensor,
     indices: torch.Tensor,
@@ -1020,9 +1031,8 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
                 )
 
             if encoder_hidden_states is not None:
-                encoder_hidden_states, _, encoder_cu_seqlens, encoder_max_seqlen, *_ = _unpad_varwhisper_input(
-                    inputs=encoder_hidden_states.contiguous(),
-                    attention_mask=torch.ones(encoder_hidden_states.shape[:2], device=device, dtype=torch.bool),
+                encoder_hidden_states, encoder_cu_seqlens, encoder_max_seqlen = _unpad_encoder_hidden_states(
+                    encoder_hidden_states.contiguous()
                 )
 
         if inputs_embeds is None:
