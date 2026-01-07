@@ -638,7 +638,7 @@ class BeatmapDatasetIterable:
             input_tokens = torch.where(mask, random_snappings, input_tokens)
 
         sequence["decoder_input_ids"] = input_tokens
-        # sequence["decoder_attention_mask"] = input_tokens != self.tokenizer.pad_id
+        sequence["decoder_attention_mask"] = input_tokens != self.tokenizer.pad_id
         sequence["labels"] = label_tokens
 
         del sequence["out_context"]
