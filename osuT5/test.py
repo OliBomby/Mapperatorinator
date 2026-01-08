@@ -271,6 +271,7 @@ def main(args: TrainConfig):
             "wandb": {
                 "entity": "mappingtools",
                 "job_type": "testing",
+                "mode": args.logging.mode,
             }
         }
     )
