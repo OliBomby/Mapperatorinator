@@ -380,7 +380,6 @@ def flash_attention_forward(
     bs: int,
     dim: int,
     target_dtype: torch.dtype = torch.bfloat16,
-    rotary_emb: Optional[VarWhisperFlashRotaryEmbedding] = None,
     kv: Optional[torch.Tensor] = None,
     cu_seqlens: Optional[torch.Tensor] = None,
     max_seqlen: Optional[int] = None,
@@ -388,19 +387,10 @@ def flash_attention_forward(
     max_seqlen_k: Optional[int] = None,
     **_kwargs,
 ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
-    if rotary_emb is not None and kv is None:
-        qkv = rotary_emb.forward(
-            qkv,
-            cu_seqlens=cu_seqlens,
-            max_seqlen=max_seqlen,
-        )
-
     convert_dtype = qkv.dtype not in (torch.float16, torch.bfloat16)
     orig_dtype = qkv.dtype
 
     if convert_dtype:
-        # FA2 implementation only supports fp16 and bf16. If FA2 is supported,
-        # bfloat16 must be supported as of FA2 2.5.7. (Turing GPUs not supported)
         qkv = qkv.to(target_dtype)
         if kv is not None:
             kv = kv.to(target_dtype)
@@ -544,11 +534,13 @@ class VarWhisperAttention(nn.Module):
         self,
         hidden_states: torch.Tensor,
         key_value_states: Optional[torch.Tensor] = None,
+        cu_seqlens: Optional[torch.Tensor] = None,
+        max_seqlen: Optional[int] = None,
         output_attentions: Optional[bool] = False,
         **kwargs,
     ) -> Tuple[torch.Tensor, ...]:
         bs = hidden_states.shape[0]
-        is_varlen = "cu_seqlens" in kwargs
+        is_varlen = cu_seqlens is not None
 
         attn_func = partial(
             VARWHISPER_ATTENTION_FUNCTION[self.config._attn_implementation],
@@ -556,6 +548,8 @@ class VarWhisperAttention(nn.Module):
             local_attention=self.local_attention,
             bs=bs,
             dim=self.all_head_size,
+            cu_seqlens=cu_seqlens,
+            max_seqlen=max_seqlen,
             output_attentions=output_attentions,
             **kwargs,
         )
@@ -581,6 +575,12 @@ class VarWhisperAttention(nn.Module):
                 qkv = qkv.view(-1, 3, self.num_heads, self.head_dim)
             else:
                 qkv = qkv.view(bs, -1, 3, self.num_heads, self.head_dim)
+
+            qkv = self.rotary_emb.forward(
+                qkv,
+                cu_seqlens=cu_seqlens,
+                max_seqlen=max_seqlen,
+            )
 
             attn_outputs = attn_func(qkv=qkv, rotary_emb=self.rotary_emb)
 
