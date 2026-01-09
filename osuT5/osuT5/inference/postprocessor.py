@@ -127,7 +127,7 @@ class Postprocessor(object):
         }
 
         self.offset = args.offset
-        self.beat_length = 60000 / args.bpm
+        self.beat_length = 60000 / args.bpm if args.bpm else 500
         self.timing_leniency = args.timing_leniency
         self.types_first = args.train.data.types_first
         self.has_pos = args.train.data.add_positions
