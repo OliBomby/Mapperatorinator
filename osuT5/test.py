@@ -9,6 +9,7 @@ import wandb
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration
+from omegaconf import OmegaConf
 from torch import nn
 from tqdm import tqdm
 
@@ -257,6 +258,8 @@ def test(args: TrainConfig, accelerator: Accelerator, model, tokenizer, preprefi
 
 @hydra.main(config_path="../configs/train", config_name="tiny41", version_base="1.1")
 def main(args: TrainConfig):
+    args = OmegaConf.to_object(args)
+
     accelerator = Accelerator(
         cpu=args.device == "cpu",
         mixed_precision=args.precision,

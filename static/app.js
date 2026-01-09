@@ -42,35 +42,58 @@ $(document).ready(function() {
         resetFormToDefaults() {
             $('#inferenceForm')[0].reset();
 
-            // Set specific defaults
-            const defaults = {
-                model: 'v30', gamemode: '0', difficulty: '5', hp_drain_rate: '5',
-                circle_size: '4', keycount: '4', overall_difficulty: '8',
-                approach_rate: '9', slider_multiplier: '1.4', slider_tick_rate: '1',
-                year: '2023', cfg_scale: '1.0', temperature: '0.9', top_p: '0.9'
-            };
-
-            Object.entries(defaults).forEach(([id, value]) => {
-                $(`#${id}`).val(value);
-            });
-
-            // Reset checkboxes
-            $('#hitsounded').prop('checked', true);
-            $('#export_osz, #add_to_beatmap, #overwrite_reference_beatmap, #super_timing').prop('checked', false);
-
-            // Clear descriptors and context options
+            // Clear descriptors
             $('input[name="descriptors"], input[name="in_context_options"]')
                 .removeClass('positive-check negative-check').prop('checked', false);
 
-            // Clear paths and optional fields
-            $('#audio_path, #output_path, #beatmap_path, #lora_path, #mapper_id, #seed, #start_time, #end_time, #hold_note_ratio, #scroll_speed_ratio').val('');
-            PathManager.clearPlaceholders();
-            PathManager.validateAndAutofillPaths(false);
+            ValidationManager.clearPlaceholders();
+            return ValidationManager.validateAndAutofill(false);
         }
     };
 
     // UI Manager for conditional visibility
     const UIManager = {
+        clearable_inputs: '#audio_path, #beatmap_path, #output_path, #lora_path, #background_image',
+
+        init() {
+            this.attachClearButtonHandlers();
+            $(this.clearable_inputs).trigger('blur');
+        },
+
+        attachClearButtonHandlers() {
+            // Listen for input events (typing)
+            $(this.clearable_inputs).on('input', (e) => {
+                this.updateClearButtonVisibility(e.target);
+            });
+
+            // Listen for blur events (leaving field) - immediate validation
+            $(this.clearable_inputs).on('blur', (e) => {
+                this.updateClearButtonVisibility(e.target);
+            });
+
+            // Handle clear button clicks
+            $('.clear-input-btn').on('click', (e) => {
+                const targetId = $(e.target).data('target');
+                const $targetInput = $(`#${targetId}`);
+
+                $targetInput.val('');
+                this.updateClearButtonVisibility($targetInput[0]);
+                return ValidationManager.validateAndAutofill(false);
+            });
+        },
+
+        updateClearButtonVisibility(inputElement) {
+            const $input = $(inputElement);
+            const $clearBtn = $input.siblings('.clear-input-btn');
+            const hasValue = $input.val().trim() !== '';
+
+            if (hasValue) {
+                $clearBtn.show();
+            } else {
+                $clearBtn.hide();
+            }
+        },
+
         updateConditionalFields() {
             const selectedGamemode = $("#gamemode").val();
             const selectedModel = $("#model").val();
@@ -181,6 +204,8 @@ $(document).ready(function() {
 
                     if (browseType === 'folder') {
                         path = await window.pywebview.api.browse_folder();
+                    } else if (browseType === 'image') {
+                        path = await window.pywebview.api.browse_image();
                     } else {
                         let fileTypes = null;
 
@@ -222,68 +247,26 @@ $(document).ready(function() {
         }
     };
 
+    const validation_trigger_inputs = '#audio_path, #beatmap_path, #output_path';
+
     // Path Manager for autofill, validation and clear button support
-    const PathManager = {
+    const ValidationManager = {
         init() {
-            this.attachPathChangeHandlers();
-            this.attachClearButtonHandlers();
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').trigger('blur');
+            this.attachValidationChangeHandlers();
+            $(validation_trigger_inputs).trigger('blur');
         },
 
-        attachPathChangeHandlers() {
-            // Listen for input events (typing)
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('input', (e) => {
-                this.updateClearButtonVisibility(e.target);
-            });
-
+        attachValidationChangeHandlers() {
             // Listen for blur events (leaving field) - immediate validation
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').on('blur', (e) => {
-                this.updateClearButtonVisibility(e.target);
-                this.validateAndAutofillPaths(false);
+            $(validation_trigger_inputs).on('blur', (_) => {
+                return this.validateAndAutofill(false);
             });
         },
 
-        attachClearButtonHandlers() {
-            // Handle clear button clicks
-            $('.clear-input-btn').on('click', (e) => {
-                const targetId = $(e.target).data('target');
-                const $targetInput = $(`#${targetId}`);
-
-                $targetInput.val('');
-                this.updateClearButtonVisibility($targetInput[0]);
-
-                this.validateAndAutofillPaths(false);
-            });
-
-            // Initial visibility check for all fields
-            $('#audio_path, #beatmap_path, #output_path, #lora_path').each((index, element) => {
-                this.updateClearButtonVisibility(element);
-            });
-        },
-
-        updateClearButtonVisibility(inputElement) {
-            const $input = $(inputElement);
-            const $clearBtn = $input.siblings('.clear-input-btn');
-            const hasValue = $input.val().trim() !== '';
-
-            if (hasValue) {
-                $clearBtn.show();
-            } else {
-                $clearBtn.hide();
-            }
-        },
-
-        validateAndAutofillPaths(showFlashMessages = false) { // isFileDialog replaced by showFlashMessages
+        validateAndAutofill(showFlashMessages = false) { // isFileDialog replaced by showFlashMessages
             const audioPath = $('#audio_path').val().trim();
             const beatmapPath = $('#beatmap_path').val().trim();
             const outputPath = $('#output_path').val().trim();
-
-            // Only validate if at least one path is provided
-            if (!audioPath && !beatmapPath && !outputPath) {
-                this.clearPlaceholders();
-                UIManager.updateConditionalFields();
-                return Promise.resolve(true);
-            }
 
             // Call backend validation
             return new Promise((resolve) => {
@@ -304,29 +287,53 @@ $(document).ready(function() {
                         if (showFlashMessages) {
                             Utils.showFlashMessage('Error validating paths. Check console for details.', 'error');
                         }
+                        this.clearPlaceholders();
                         resolve(false);
                     }
                 });
             });
         },
 
+        placeholder_elements: {
+            '#audio_path': 'audio_path',
+            '#output_path': 'output_path',
+            '#beatmap_path': 'beatmap_path',
+            '#gamemode': 'gamemode',
+            '#difficulty': 'difficulty',
+            '#title': 'title',
+            '#title_unicode': 'title_unicode',
+            '#artist': 'artist',
+            '#artist_unicode': 'artist_unicode',
+            '#creator': 'creator',
+            '#version': 'version',
+            '#preview_time': 'preview_time',
+            '#background_image': 'background',
+            '#source': 'source',
+            '#tags': 'tags',
+            '#hp_drain_rate': 'hp_drain_rate',
+            '#circle_size': 'circle_size',
+            '#approach_rate': 'approach_rate',
+            '#overall_difficulty': 'overall_difficulty',
+            '#slider_multiplier': 'slider_multiplier',
+            '#slider_tick_rate': 'slider_tick_rate',
+            '#hold_note_ratio': 'hold_note_ratio',
+            '#scroll_speed_ratio': 'scroll_speed_ratio',
+            '#mapper_id': 'mapper_id',
+        },
+
         handleValidationResponse(response, showFlashMessages = false) {
             this.clearValidationErrors();
-            const $audioPathInput = $('#audio_path');
-            const $outputPathInput = $('#output_path');
+            const autofilledArgs = response.autofilled_args;
 
-            // Show autofilled paths as placeholders
-            if (response.autofilled_audio_path && !$audioPathInput.val().trim()) {
-                $audioPathInput.attr('placeholder', response.autofilled_audio_path);
-            } else if (!$audioPathInput.val().trim()) {
-                $audioPathInput.attr('placeholder', '');
-            }
-
-            if (response.autofilled_output_path && !$outputPathInput.val().trim()) {
-                $outputPathInput.attr('placeholder', response.autofilled_output_path);
-            } else if (!$outputPathInput.val().trim()) {
-                $outputPathInput.attr('placeholder', '');
-            }
+            // Show autofilled values as placeholders
+            Object.entries(this.placeholder_elements).forEach(([selector, argName]) => {
+                const $input = $(selector);
+                if (autofilledArgs && autofilledArgs[argName] !== undefined && autofilledArgs[argName] !== null) {
+                    $input.attr('placeholder', autofilledArgs[argName]);
+                } else {
+                    $input.attr('placeholder', '');
+                }
+            });
 
             if (showFlashMessages) {
                 // Show errors as flash messages and inline indicators
@@ -374,23 +381,11 @@ $(document).ready(function() {
         },
 
         clearPlaceholders() {
-            $('#audio_path, #output_path').attr('placeholder', '');
+            Object.keys(this.placeholder_elements).forEach(selector => {
+                $(selector).attr('placeholder', '');
+            });
             this.clearValidationErrors();
         },
-
-        // Apply placeholder values to form fields before submission
-        applyPlaceholderValues() {
-            const $audioPath = $('#audio_path');
-            const $outputPath = $('#output_path');
-
-            if (!$audioPath.val().trim() && $audioPath.attr('placeholder')) {
-                $audioPath.val($audioPath.attr('placeholder'));
-            }
-
-            if (!$outputPath.val().trim() && $outputPath.attr('placeholder')) {
-                $outputPath.val($outputPath.attr('placeholder'));
-            }
-        }
     };
 
     // Descriptor Manager
@@ -545,7 +540,7 @@ $(document).ready(function() {
             if (confirm("Are you sure you want to reset all settings to default values? This cannot be undone.")) {
                 Utils.resetFormToDefaults();
                 $("#model, #gamemode, #beatmap_path").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
+                $(UIManager.clearable_inputs).trigger('blur');
                 this.showConfigStatus("All settings reset to default values", "success");
             }
         },
@@ -607,8 +602,8 @@ $(document).ready(function() {
 
                 // Trigger updates
                 $("#model, #gamemode").trigger('change');
-                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('blur');
-                $('#audio_path, #output_path, #beatmap_path, #lora_path').trigger('input');
+                $(UIManager.clearable_inputs).trigger('blur');
+                $(UIManager.clearable_inputs).trigger('input');
 
                 this.showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
 
@@ -645,11 +640,13 @@ $(document).ready(function() {
         },
 
         async validateForm() {
-            PathManager.applyPlaceholderValues();
+            const $audioPath = $('#audio_path');
+            const $beatmapPath = $('#beatmap_path');
+            const $outputPath = $('#output_path');
 
-            const audioPath = $('#audio_path').val().trim();
-            const beatmapPath = $('#beatmap_path').val().trim();
-            const outputPath = $('#output_path').val().trim();
+            const audioPath = $audioPath.val().trim() || $audioPath.attr('placeholder');
+            const beatmapPath = $beatmapPath.val().trim() || $beatmapPath.attr('placeholder');
+            const outputPath = $outputPath.val().trim() || $outputPath.attr('placeholder');
 
             if (!audioPath && !beatmapPath) {
                 Utils.smoothScroll(0);
@@ -667,11 +664,11 @@ $(document).ready(function() {
             if (beatmapPath && !beatmapPath.toLowerCase().endsWith('.osu')) {
                 Utils.smoothScroll('#beatmap_path');
                 Utils.showFlashMessage("Beatmap file must have .osu extension", 'error');
-                PathManager.showInlineError('#beatmap_path', 'Must be .osu file');
+                ValidationManager.showInlineError('#beatmap_path', 'Must be .osu file');
                 return false;
             }
 
-            const pathsAreValid = await PathManager.validateAndAutofillPaths(true);
+            const pathsAreValid = await ValidationManager.validateAndAutofill(true);
             if (!pathsAreValid) {
                 Utils.smoothScroll(0);
                 return false;
@@ -971,7 +968,8 @@ $(document).ready(function() {
 
         // Initialize all managers
         FileBrowser.init();
-        PathManager.init();
+        UIManager.init();
+        ValidationManager.init();
         DescriptorManager.init();
         ConfigManager.init();
         InferenceManager.init();

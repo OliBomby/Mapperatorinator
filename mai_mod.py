@@ -11,8 +11,9 @@ from rich.console import Console
 import hydra
 from slider import Beatmap, Spinner
 
-from config import MaiModConfig
-from inference import prepare_args, get_args_from_beatmap, get_config, load_model_with_server
+from config import MaiModConfig, InferenceConfig
+from inference import get_args_from_beatmap, get_config, load_model_with_server, compile_args, \
+    setup_inference_environment
 from osuT5.osuT5.dataset.data_utils import get_groups, Group
 from osuT5.osuT5.event import EventType, Event, ContextType
 from osuT5.osuT5.inference import Preprocessor, Processor, GenerationConfig
@@ -331,6 +332,8 @@ def ai_mod(
 
 @hydra.main(config_path="configs", config_name="mai_mod", version_base="1.1")
 def main(args: MaiModConfig):
+    args = OmegaConf.to_object(args)
+
     # Select inference config based on the beatmap gamemode
     if args.beatmap_path:
         beatmap_path = Path(args.beatmap_path)
@@ -356,12 +359,13 @@ def main(args: MaiModConfig):
                 conf = hydra.compose(config_name="mai_mod", overrides=merged_overrides)
                 args.inference = OmegaConf.to_object(conf).inference
 
-    i_args = args.inference
+    i_args: InferenceConfig = args.inference
     i_args.beatmap_path = args.beatmap_path
     i_args.audio_path = args.audio_path
     i_args.precision = args.precision
 
-    prepare_args(i_args)
+    compile_args(i_args)
+    setup_inference_environment(i_args.seed)
 
     model, tokenizer = load_model_with_server(
         i_args.model_path,
