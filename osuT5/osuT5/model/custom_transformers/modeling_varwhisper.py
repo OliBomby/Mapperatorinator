@@ -602,11 +602,12 @@ class VarWhisperAttention(nn.Module):
             if past_key_value is not None:
                 q, key_states, value_states = qkv.unbind(dim=2)
 
-                key_states, value_states = key_states.transpose(1, 3), value_states.transpose(1, 3) # (bs, nheads, seqlen, head_dim)
+                key_states, value_states = key_states.transpose(1, 2), value_states.transpose(1, 2) # (bs, nheads, seqlen, head_dim)
                 key_states, value_states = past_key_value.update(
                     key_states, value_states, self.layer_idx, {"cache_position": cache_position}
                 )
                 kv = torch.stack((key_states, value_states), dim=2).transpose(1, 3)  # (bs, seqlen, 2, nheads, head_dim)
+                kv = kv[:, :cache_position[-1]]  # trim to the current cache position
 
                 attn_outputs = attn_func(qkv=q, kv=kv)
             else:
