@@ -4,7 +4,7 @@ defaults:
   - model: t5_small
 
 compile: false          # PyTorch 2.0 optimization
-precision: 'no'         # Enable mixed precision (no/fp16/bf16/fp8)
+precision: 'no'         # Enable mixed precision (no/fp16/bf16)
 
 data:                  # Data settings
   tgt_seq_len: 512

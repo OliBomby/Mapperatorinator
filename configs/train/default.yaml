@@ -3,9 +3,9 @@ defaults:
 
 compile: true          # PyTorch 2.0 optimization
 device: gpu             # Training device (cpu/gpu)
-precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
+precision: 'bf16'         # Enable mixed precision (no/fp16/bf16)
+attn_implementation: 'sdpa'  # Attention implementation (eager/sdpa/flash_attention_2)
 seed: 42                # Project seed
-flash_attention: false  # Enable Flash Attention
 
 checkpoint_path: ''     # Project checkpoint directory (to resume training)
 pretrained_path: ''     # Path to pretrained model weights (to do transfer learning)

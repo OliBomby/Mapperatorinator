@@ -16,25 +16,32 @@ from .spectrogram import MelSpectrogram
 LABEL_IGNORE_ID = -100
 
 
-def get_backbone_model(name, config):
+def get_backbone_model(config: MapperatorinatorConfig):
+    name = config.backbone_model_name
+    b_config = config.backbone_config
+
     if name.startswith("google/t5"):
-        if isinstance(config, dict):
-            config = T5Config(**config)
-        model = T5ForConditionalGeneration(config)
+        if isinstance(b_config, dict):
+            b_config = T5Config(**b_config)
+        model_cls = T5ForConditionalGeneration
     elif name.startswith("OliBomby/nwhisper"):
-        if isinstance(config, dict):
-            config = NWhisperConfig(**config)
-        model = NWhisperForConditionalGeneration(config)
+        if isinstance(b_config, dict):
+            b_config = NWhisperConfig(**b_config)
+        model_cls = NWhisperForConditionalGeneration
     elif name.startswith("Tiger14n/ropewhisper"):
-        if isinstance(config, dict):
-            config = RoPEWhisperConfig(**config)
-        model = RoPEWhisperForConditionalGeneration(config)
+        if isinstance(b_config, dict):
+            b_config = RoPEWhisperConfig(**b_config)
+        model_cls = RoPEWhisperForConditionalGeneration
     elif name.startswith("openai/whisper"):
-        if isinstance(config, dict):
-            config = WhisperConfig(**config)
-        model = WhisperForConditionalGeneration(config)
+        if isinstance(b_config, dict):
+            b_config = WhisperConfig(**b_config)
+        model_cls = WhisperForConditionalGeneration
     else:
         raise NotImplementedError
+
+    b_config._attn_implementation = config._attn_implementation
+    b_config.torch_dtype = config.torch_dtype
+    model = model_cls(b_config)
 
     return model
 
@@ -65,7 +72,7 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
             config.pad_mode,
         )
 
-        self.transformer: WhisperForConditionalGeneration = get_backbone_model(config.backbone_model_name, config.backbone_config)
+        self.transformer: WhisperForConditionalGeneration = get_backbone_model(config)
 
         self.num_classes = config.num_classes
         self.input_features = config.input_features

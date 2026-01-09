@@ -60,7 +60,7 @@ class MelSpectrogram(nn.Module):
                 pad_mode=pad_mode,
             )
 
-    def forward(self, samples: torch.tensor) -> torch.tensor:
+    def forward(self, samples: torch.Tensor) -> torch.Tensor:
         """
         Convert a batch of audio frames into a batch of Mel spectrogram frames.
 
@@ -81,3 +81,12 @@ class MelSpectrogram(nn.Module):
             spectrogram = torch.log1p(spectrogram)
         spectrogram = spectrogram.permute(0, 2, 1)
         return spectrogram
+
+    def _apply(self, *args, **kwargs):
+        # Let device movement happen
+        super()._apply(*args, **kwargs)
+
+        # Force fp32
+        self.transform.to(torch.float32)
+
+        return self

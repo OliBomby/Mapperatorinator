@@ -10,7 +10,7 @@ import torch
 from accelerate.utils import set_seed
 from omegaconf import OmegaConf, DictConfig
 from slider import Beatmap
-from transformers.utils import cached_file
+from transformers.utils import cached_file, is_flash_attn_2_available
 
 import osu_diffusion
 import routed_pickle
@@ -59,6 +59,25 @@ def compile_device_and_seed(args: InferenceConfig | FidConfig, verbose=True):
         else:
             message = f"Requested device '{args.device}' not available. Falling back to CPU."
             args.device = "cpu"
+
+    if verbose and message is not None:
+        print(message)
+
+    message = None
+    if args.attn_implementation == "auto":
+        if args.precision in ("bf16", "fp16") and args.device == "cuda" and is_flash_attn_2_available():
+            message = "Using Flash Attention for attention (auto-selected)."
+            args.attn_implementation = "flash_attention_2"
+        else:
+            message = "Using SDPA for attention (auto-selected)."
+            args.attn_implementation = "sdpa"
+    elif args.attn_implementation == "flash_attention_2":
+        if not is_flash_attn_2_available():
+            message = "Flash Attention is not available. Falling back to SDPA."
+            args.attn_implementation = "sdpa"
+        elif args.precision not in ("bf16", "fp16") or args.device != "cuda":
+            message = "Flash Attention requires bf16/fp16 precision and CUDA device. Falling back to SDPA."
+            args.attn_implementation = "sdpa"
 
     if verbose and message is not None:
         print(message)
@@ -457,6 +476,7 @@ def load_model_with_server(
         max_batch_size: int = 8,
         use_server: bool = False,
         precision: str = "fp32",
+        attn_implementation: str = "sdpa",
         eval_mode: bool = True,
         lora_path=None,
 ):
@@ -465,6 +485,7 @@ def load_model_with_server(
         t5_args=t5_args,
         device=device,
         precision=precision,
+        attn_implementation=attn_implementation,
         eval_mode=eval_mode,
         pickle_module=routed_pickle,
         lora_path=lora_path,
@@ -531,6 +552,7 @@ def main(args: InferenceConfig):
         max_batch_size=args.max_batch_size,
         use_server=args.use_server,
         precision=args.precision,
+        attn_implementation=args.attn_implementation,
         lora_path=args.lora_path,
     )
 

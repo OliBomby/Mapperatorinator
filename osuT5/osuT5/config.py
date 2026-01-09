@@ -200,8 +200,8 @@ class TrainConfig:
     compile: bool = True
     device: str = "gpu"
     precision: str = "bf16"
+    attn_implementation: str = "sdpa"
     seed: int = 42
-    flash_attention: bool = False
     checkpoint_path: str = ""
     pretrained_path: str = ""
     pretrained_t5_compat: bool = False

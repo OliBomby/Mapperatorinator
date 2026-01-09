@@ -35,12 +35,16 @@ def get_shared_training_state() -> Namespace:
     return shared
 
 
-def get_model_config(args: TrainConfig, tokenizer: Tokenizer) -> MapperatorinatorConfig:
+def _get_model_config(
+        args: TrainConfig,
+        tokenizer: Tokenizer,
+        torch_dtype: torch.dtype,
+        attn_implementation: str,
+) -> MapperatorinatorConfig:
     return MapperatorinatorConfig(
         backbone_model_name=args.model.name,
         backbone_overwrite=args.model.overwrite,
         backbone_add_config=args.model.add_config,
-        flash_attention=args.flash_attention,
         vocab_size_in=tokenizer.vocab_size_in,
         vocab_size_out=tokenizer.vocab_size_out,
         num_classes=tokenizer.num_classes,
@@ -77,12 +81,37 @@ def get_model_config(args: TrainConfig, tokenizer: Tokenizer) -> Mapperatorinato
         eos_token_id=tokenizer.eos_id,
         decoder_start_token_id=tokenizer.sos_id,
         max_length=args.data.tgt_seq_len,
+        torch_dtype=torch_dtype,
+        attn_implementation=attn_implementation,
     )
 
 
-def get_model(args: TrainConfig, tokenizer: Tokenizer) -> Mapperatorinator:
-    model = Mapperatorinator(get_model_config(args, tokenizer))
+def _get_model(
+        args: TrainConfig,
+        tokenizer: Tokenizer,
+        torch_dtype: torch.dtype,
+        attn_implementation: str,
+) -> Mapperatorinator:
+    model = Mapperatorinator(_get_model_config(
+        args,
+        tokenizer,
+        torch_dtype,
+        attn_implementation,
+    ))
     return model
+
+
+def _precision_to_dtype(precision: str) -> torch.dtype:
+    if precision == "fp32":
+        return torch.float32
+    elif precision == "fp16":
+        return torch.float16
+    elif precision == "bf16":
+        return torch.bfloat16
+    elif precision == "amp":
+        return torch.float32  # Handled separately with autocast
+    else:
+        raise ValueError(f"Unsupported precision: {precision}")
 
 
 def load_model(
@@ -90,6 +119,7 @@ def load_model(
         t5_args: TrainConfig,
         device,
         precision: str = "fp32",
+        attn_implementation: str = "sdpa",
         eval_mode: bool = True,
         pickle_module=None,
 ):
@@ -98,6 +128,7 @@ def load_model(
         t5_args,
         device,
         precision,
+        attn_implementation,
         eval_mode,
         pickle_module,
     )
@@ -109,6 +140,7 @@ def load_model_loaders(
         t5_args: TrainConfig,
         device,
         precision: str = "fp32",
+        attn_implementation: str = "sdpa",
         eval_mode: bool = True,
         pickle_module=None,
         lora_path=None,
@@ -135,14 +167,21 @@ def load_model_loaders(
     tokenizer = tokenizer_loader()
 
     def model_loader():
+        dtype = _precision_to_dtype(precision)
         if ckpt_path_str == "":
-            model = get_model(t5_args, tokenizer)
+            model = _get_model(t5_args, tokenizer, torch_dtype=dtype, attn_implementation=attn_implementation)
+            model.to(device=device, dtype=dtype)
         elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
-            model = Mapperatorinator.from_pretrained(ckpt_path_str)
+            model = Mapperatorinator.from_pretrained(
+                ckpt_path_str,
+                torch_dtype=dtype,
+                attn_implementation=attn_implementation,
+                device_map=device
+            )
             model.generation_config.disable_compile = True
         else:
-            model_state = torch.load(ckpt_path / "pytorch_model.bin", map_location=device, weights_only=True)
-            model = get_model(t5_args, tokenizer)
+            model_state = torch.load(ckpt_path / "pytorch_model.bin", weights_only=True)
+            model = _get_model(t5_args, tokenizer, torch_dtype=dtype, attn_implementation=attn_implementation)
             if t5_args.pretrained_t5_compat:
                 del model_state["shared.weight"]
                 del model_state["encoder.embed_tokens.weight"]
@@ -151,6 +190,7 @@ def load_model_loaders(
                 model.transformer.load_state_dict(model_state, strict=False)
             else:
                 model.load_state_dict(model_state)
+            model.to(device=device, dtype=dtype)
 
         if lora_path is not None:
             try:
@@ -163,14 +203,6 @@ def load_model_loaders(
 
         if eval_mode:
             model.eval()
-
-        model.to(device)
-
-        if precision == "bf16":
-            # Cast every submodule to bfloat16 except for the spectrogram module
-            for name, module in model.named_modules():
-                if name != "" and "spectrogram" not in name:
-                    module.to(torch.bfloat16)
 
         print(f"Model loaded: {ckpt_path_str} on device {device}")
         return model
