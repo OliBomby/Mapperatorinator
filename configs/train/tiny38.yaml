@@ -5,7 +5,6 @@ defaults:
 
 compile: true          # PyTorch 2.0 optimization
 precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
-flash_attention: true  # Enable Flash Attention
 
 data:                  # Data settings
   dataset_type: "mmrs"
