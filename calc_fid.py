@@ -209,6 +209,7 @@ def generate_beatmaps(beatmap_paths, fid_args: FidConfig, return_dict, idx):
         max_batch_size=args.max_batch_size,
         use_server=args.use_server,
         precision=args.precision,
+        attn_implementation=args.attn_implementation,
     )
 
     if args.compile:

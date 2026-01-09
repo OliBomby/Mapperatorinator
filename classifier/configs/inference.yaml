@@ -1,6 +1,6 @@
 compile: true          # PyTorch 2.0 optimization
 device: gpu             # Training device (cpu/gpu)
-precision: 'no'         # Enable mixed precision (no/fp16/bf16/fp8)
+precision: 'no'         # Enable mixed precision (no/fp16/bf16)
 checkpoint_path: 'OliBomby/osu-classifier'     # Project checkpoint directory (to resume training)
 beatmap_path: ''        # Path to beatmap to classify
 audio_path: ''          # Path to audio to classify

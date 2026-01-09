@@ -44,6 +44,7 @@ class InferenceConfig:
     seed: Optional[int] = None  # Random seed
     device: str = 'auto'  # Inference device (cpu/cuda/mps/auto)
     precision: str = 'fp32'         # Lower precision for speed (fp32/bf16/amp)
+    attn_implementation: str = 'auto'  # Attention implementation (auto/eager/sdpa/flash_attention_2)
     add_to_beatmap: bool = False  # Add generated content to the reference beatmap
     overwrite_reference_beatmap: bool = False  # Overwrite the reference beatmap instead of creating a new one
     export_osz: bool = False  # Export beatmap as .osz file

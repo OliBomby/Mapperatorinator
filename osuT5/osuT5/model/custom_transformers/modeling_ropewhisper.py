@@ -583,6 +583,9 @@ class RoPEWhisperFlashAttention2(RoPEWhisperAttention):
                 key_states, value_states = past_key_value.update(
                     key_states, value_states, self.layer_idx, {"cache_position": cache_position}
                 )
+                if cache_position is not None:
+                    key_states = key_states[:, :, :cache_position[-1] + 1]
+                    value_states = value_states[:, :, :cache_position[-1] + 1]
 
         # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]
         #  We would need to refactor the KV cache to be able to avoid many of these transpose/reshape/view.
@@ -1564,7 +1567,7 @@ class RoPEWhisperDecoder(RoPEWhisperPreTrainedModel):
             output_attentions: bool,
     ):
         if self.config._attn_implementation == "flash_attention_2":
-            if attention_mask is not None and 0.0 in attention_mask:
+            if attention_mask is not None and 0.0 in attention_mask and attention_mask.dim() == 2:
                 return attention_mask
             return None
 

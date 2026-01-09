@@ -13,7 +13,6 @@ class MapperatorinatorConfig(PretrainedConfig):
         backbone_model_name: str = "openai/whisper-base",
         backbone_overwrite: dict = None,
         backbone_add_config: dict = None,
-        flash_attention: bool = False,
         vocab_size_in=9920,
         vocab_size_out=3988,
         num_classes: int = 0,
@@ -105,8 +104,6 @@ class MapperatorinatorConfig(PretrainedConfig):
             config.decoder_start_token_id = bos_token_id
             config.forced_decoder_ids = None
             config.suppress_tokens = None
-            if flash_attention:
-                config._attn_implementation = "flash_attention_2"
         if isinstance(config, NWhisperConfig):
             config.input_vocab_size = vocab_size_in
         if isinstance(config, RoPEWhisperConfig):

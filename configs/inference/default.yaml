@@ -31,6 +31,7 @@ negative_descriptors: null # List of descriptors to avoid when using classifier-
 seed: null                # Random seed
 device: auto             # Inference device (cpu/cuda/mps/auto)
 precision: 'fp32'         # Lower precision for speed (fp32/bf16/amp)
+attn_implementation: 'auto'  # Attention implementation (auto/eager/sdpa/flash_attention_2)
 add_to_beatmap: false     # Add generated content to the reference beatmap
 overwrite_reference_beatmap: false # Overwrite the reference beatmap instead of creating a new one
 export_osz: false         # Export beatmap as .osz file

@@ -1,6 +1,6 @@
 compile: true          # PyTorch 2.0 optimization
 device: gpu             # Training device (cpu/gpu)
-precision: 'bf16-mixed'         # Enable mixed precision (no/fp16/bf16/fp8)
+precision: 'bf16-mixed'         # Enable mixed precision (no/fp16/bf16)
 seed: 42                # Project seed
 
 checkpoint_path: ''     # Project checkpoint directory (to resume training)

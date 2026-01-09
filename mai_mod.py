@@ -372,6 +372,8 @@ def main(args: MaiModConfig):
         i_args.train,
         i_args.device,
         max_batch_size=i_args.max_batch_size,
+        precision=i_args.precision,
+        attn_implementation=i_args.attn_implementation,
         use_server=False,
     )
 

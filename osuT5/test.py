@@ -1,5 +1,4 @@
 import time
-from pathlib import Path
 from typing import Optional
 
 import hydra
@@ -15,55 +14,17 @@ from tqdm import tqdm
 
 from osuT5.config import TrainConfig
 from osuT5.dataset.ors_dataset import STEPS_PER_MILLISECOND, LABEL_IGNORE_ID
-from osuT5.model import Mapperatorinator
 from osuT5.tokenizer import ContextType
 from osuT5.utils import calc_loss, get_stats
-from osuT5.tokenizer import EventType, Tokenizer
+from osuT5.tokenizer import EventType
 from osuT5.utils import (
     setup_args,
-    get_model,
+    load_model,
     get_dataloaders, Averager, add_prefix, acc_range, fuzzy_acc_range,
     get_shared_training_state,
 )
 
 logger = get_logger(__name__)
-
-
-def load_model(
-        ckpt_path_str: str,
-        t5_args: TrainConfig,
-        device,
-):
-    if ckpt_path_str == "":
-        raise ValueError("Model path is empty.")
-
-    ckpt_path = Path(ckpt_path_str)
-
-    def tokenizer_loader():
-        if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
-            tokenizer = Tokenizer.from_pretrained(ckpt_path_str)
-        else:
-            tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", weights_only=False)
-            tokenizer = Tokenizer()
-            tokenizer.load_state_dict(tokenizer_state)
-        return tokenizer
-
-    tokenizer = tokenizer_loader()
-
-    def model_loader():
-        if not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
-            model = Mapperatorinator.from_pretrained(ckpt_path_str)
-            model.generation_config.disable_compile = True
-        else:
-            model_state = torch.load(ckpt_path / "pytorch_model.bin", map_location=device, weights_only=True)
-            model = get_model(t5_args, tokenizer)
-            model.load_state_dict(model_state)
-
-        model.eval()
-        model.to(device)
-        return model
-
-    return model_loader(), tokenizer
 
 
 def test(args: TrainConfig, accelerator: Accelerator, model, tokenizer, preprefix: str):
@@ -279,8 +240,14 @@ def main(args: TrainConfig):
         }
     )
 
-    model, tokenizer = load_model(args.checkpoint_path, args, "cuda")
-    model.eval()
+    model, tokenizer = load_model(
+        args.checkpoint_path,
+        args,
+        device=accelerator.device,
+        # Ignore precision argument because that is handled by accelerator
+        attn_implementation=args.attn_implementation,
+        eval_mode=True,
+    )
 
     # noinspection PyTypeChecker
     model = accelerator.prepare(model)
