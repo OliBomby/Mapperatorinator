@@ -15,7 +15,7 @@ import werkzeug.serving
 from flask import Flask, render_template, request, Response, jsonify
 
 from config import InferenceConfig
-from inference import autofill_paths
+from inference import compile_args
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
@@ -460,26 +460,33 @@ def validate_paths():
         inference_args = InferenceConfig()
         inference_args.beatmap_path = beatmap_path
 
-        result = autofill_paths(inference_args)
+        try:
+            compile_args(inference_args, verbose=False)
+        except ValueError as v:
+            return jsonify({
+                'success': False,
+                'autofilled_args': None,
+                'errors': [str(v)]
+            }), 200
 
         # Return the results
         response_data = {
-            'success': result['success'],
+            'success': True,
             'autofilled_audio_path': inference_args.audio_path,
             'autofilled_output_path': inference_args.output_path,
-            'errors': result['errors']
+            'errors': []
         }
 
         return jsonify(response_data), 200
 
     except Exception as e:
         error_msg = f"Error during path validation: {str(e)}"
-        print(f"Path validation error: {error_msg}")
+        print(error_msg)
         return jsonify({
             'success': False,
-            'errors': [error_msg],
             'autofilled_audio_path': None,
-            'autofilled_output_path': None
+            'autofilled_output_path': None,
+            'errors': [error_msg]
         }), 500
 
 
