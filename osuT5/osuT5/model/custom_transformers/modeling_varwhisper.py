@@ -234,15 +234,20 @@ class VarWhisperFlashRotaryEmbedding(RotaryEmbedding):
         qkv: torch.Tensor,
         cu_seqlens: Optional[torch.Tensor] = None,
         max_seqlen: Optional[int] = None,
+        seqlen_offset: Union[int, torch.Tensor] = 0,
     ) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         """
         Apply rotary embedding *inplace* to qkv.
         qkv: (total_nnz, 3, nheads, headdim)
         cu_seqlens: (batch + 1,) cumulative sequence lengths
         max_seqlen: int max seq length in the batch
+        seqlen_offset: (batch_size,) or int. Each sequence in x is shifted by this amount.
+            Most commonly used in inference when we have KV cache.
+            If it's a tensor of shape (batch_size,), then to update the cos / sin cache, one
+            should pass in max_seqlen, which will update the cos / sin cache up to that length.
         """
         if cu_seqlens is None:
-            return super().forward(qkv, max_seqlen=max_seqlen)
+            return super().forward(qkv, max_seqlen=max_seqlen, seqlen_offset=seqlen_offset)
 
         if max_seqlen is not None:
             self._update_cos_sin_cache(max_seqlen, device=qkv.device, dtype=qkv.dtype)
@@ -558,6 +563,7 @@ class VarWhisperAttention(nn.Module):
 
         if is_varlen:
             past_key_value = None  # past_key_value not supported for varlen inputs
+            cache_position = None
 
         is_updated = False
         if past_key_value is not None:
@@ -597,6 +603,7 @@ class VarWhisperAttention(nn.Module):
                 qkv,
                 cu_seqlens=cu_seqlens,
                 max_seqlen=max_seqlen,
+                seqlen_offset=cache_position[0].item() if cache_position is not None else 0,
             )
 
             if past_key_value is not None:
