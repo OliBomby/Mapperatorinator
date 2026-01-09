@@ -386,7 +386,7 @@ def flash_attention_forward(
     cu_seqlens_k: Optional[torch.Tensor] = None,
     max_seqlen_k: Optional[int] = None,
     **_kwargs,
-) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
+) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
     convert_dtype = qkv.dtype not in (torch.float16, torch.bfloat16)
     orig_dtype = qkv.dtype
 
@@ -417,9 +417,9 @@ def flash_attention_forward(
         attn = attn.to(orig_dtype)  # type: ignore
 
     if cu_seqlens is None:
-        return attn.view(bs, -1, dim), None, None
+        return attn.view(bs, -1, dim), None
 
-    return attn.view(bs, dim), None, None
+    return attn.view(bs, dim), None
 
 
 def sdpa_attention_forward(
@@ -480,13 +480,13 @@ class VarWhisperAttention(nn.Module):
             config: VarWhisperConfig,
             num_heads: int,
             max_position_embeddings: int,
-            layer_id: int = 1,
+            layer_idx: int = 1,
             is_causal: bool = False,
             is_cross_attention: bool = False,
     ):
         super().__init__()
         self.config = config
-        self.layer_id = layer_id
+        self.layer_idx = layer_idx
         self.is_causal = is_causal
         self.is_cross_attention = is_cross_attention
         self.num_heads = num_heads
@@ -507,7 +507,7 @@ class VarWhisperAttention(nn.Module):
         else:
             self.Wqkv = nn.Linear(config.d_model, 3 * self.all_head_size, bias=config.attention_bias)
 
-        if layer_id % config.global_attn_every_n_layers != 0:
+        if layer_idx % config.global_attn_every_n_layers != 0:
             self.local_attention = (config.local_attention // 2, config.local_attention // 2)
             rope_theta = config.local_rope_theta if config.local_rope_theta is not None else config.global_rope_theta
             self.max_position_embeddings = config.local_attention
@@ -536,9 +536,11 @@ class VarWhisperAttention(nn.Module):
         key_value_states: Optional[torch.Tensor] = None,
         cu_seqlens: Optional[torch.Tensor] = None,
         max_seqlen: Optional[int] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        past_key_value: Optional[EncoderDecoderCache] = None,
         output_attentions: Optional[bool] = False,
         **kwargs,
-    ) -> Tuple[torch.Tensor, ...]:
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
         bs = hidden_states.shape[0]
         is_varlen = cu_seqlens is not None
 
@@ -554,27 +556,42 @@ class VarWhisperAttention(nn.Module):
             **kwargs,
         )
 
+        if is_varlen:
+            past_key_value = None  # past_key_value not supported for varlen inputs
+
+        is_updated = False
+        if past_key_value is not None:
+            is_updated = past_key_value.is_updated.get(self.layer_idx)
+            if self.is_cross_attention:
+                # after the first generated id, we can subsequently re-use all key/value_states from cache
+                past_key_value.is_updated[self.layer_idx] = True
+                past_key_value = past_key_value.cross_attention_cache
+            else:
+                past_key_value = past_key_value.self_attention_cache
+
         if self.is_cross_attention:
             assert key_value_states is not None, "key_value_states must be provided for cross-attention"
             q = self.Wq(hidden_states)
-            kv = self.Wkv(key_value_states)
+            q = q.view(-1, self.num_heads, self.head_dim) if is_varlen else q.view(bs, -1, self.num_heads, self.head_dim)
 
-            if is_varlen:
-                q = q.view(-1, self.num_heads, self.head_dim)
-                kv = kv.view(-1, 2, self.num_heads, self.head_dim)
+            if past_key_value and is_updated:
+                # reuse k,v, cross_attentions
+                key_states = past_key_value.key_cache[self.layer_idx]
+                value_states = past_key_value.value_cache[self.layer_idx]
+                kv = torch.stack((key_states, value_states), dim=2).transpose(1, 3)  # (bs, seqlen, 2, nheads, head_dim)
             else:
-                q = q.view(bs, -1, self.num_heads, self.head_dim)
-                kv = kv.view(bs, -1, 2, self.num_heads, self.head_dim)
+                kv = self.Wkv(key_value_states)
+                kv = kv.view(-1, 2, self.num_heads, self.head_dim) if is_varlen else kv.view(bs, -1, 2, self.num_heads, self.head_dim)
+
+                if past_key_value is not None:
+                    key_states, value_states = kv.transpose(1, 3).unbind(dim=2)
+                    past_key_value.update(key_states, value_states, self.layer_idx)
 
             attn_outputs = attn_func(qkv=q, kv=kv)
         else:
             assert key_value_states is None, "key_value_states must be None for self-attention"
             qkv = self.Wqkv(hidden_states)
-
-            if is_varlen:
-                qkv = qkv.view(-1, 3, self.num_heads, self.head_dim)
-            else:
-                qkv = qkv.view(bs, -1, 3, self.num_heads, self.head_dim)
+            qkv = qkv.view(-1, 3, self.num_heads, self.head_dim) if is_varlen else qkv.view(bs, -1, 3, self.num_heads, self.head_dim)
 
             qkv = self.rotary_emb.forward(
                 qkv,
@@ -582,17 +599,28 @@ class VarWhisperAttention(nn.Module):
                 max_seqlen=max_seqlen,
             )
 
-            attn_outputs = attn_func(qkv=qkv, rotary_emb=self.rotary_emb)
+            if past_key_value is not None:
+                q, key_states, value_states = qkv.unbind(dim=2)
+
+                key_states, value_states = key_states.transpose(1, 3), value_states.transpose(1, 3) # (bs, nheads, seqlen, head_dim)
+                key_states, value_states = past_key_value.update(
+                    key_states, value_states, self.layer_idx, {"cache_position": cache_position}
+                )
+                kv = torch.stack((key_states, value_states), dim=2).transpose(1, 3)  # (bs, seqlen, 2, nheads, head_dim)
+
+                attn_outputs = attn_func(qkv=q, kv=kv)
+            else:
+                attn_outputs = attn_func(qkv=qkv)
 
         hidden_states, *rest = attn_outputs
         hidden_states = self.out_drop(self.Wo(hidden_states))
 
-        return hidden_states, *rest
+        return hidden_states, *rest, past_key_value
 
 
 # Copied from transformers.models.mbart.modeling_mbart.MBartEncoderLayer with MBart->Whisper, MBART->WHISPER
 class VarWhisperEncoderLayer(GradientCheckpointingLayer):
-    def __init__(self, config: VarWhisperConfig, layer_id: int):
+    def __init__(self, config: VarWhisperConfig, layer_idx: int):
         super().__init__()
         self.embed_dim: int = config.d_model
 
@@ -600,7 +628,7 @@ class VarWhisperEncoderLayer(GradientCheckpointingLayer):
             config=config,
             num_heads=config.encoder_attention_heads,
             max_position_embeddings=config.max_source_positions,
-            layer_id=layer_id,
+            layer_idx=layer_idx,
         )
         self.self_attn_layer_norm = nn.RMSNorm(self.embed_dim)
         self.dropout: float = config.dropout
@@ -663,7 +691,7 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
             config=config,
             num_heads=config.decoder_attention_heads,
             max_position_embeddings=config.max_target_positions,
-            layer_id=layer_idx,
+            layer_idx=layer_idx,
             is_causal=True,
         )
         self.dropout: float = config.dropout
@@ -675,7 +703,7 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
             config=config,
             num_heads=config.decoder_attention_heads,
             max_position_embeddings=config.max_target_positions,
-            layer_id=layer_idx,
+            layer_idx=layer_idx,
             is_cross_attention=True,
         )
         self.cross_attn_layer_norm = nn.RMSNorm(self.embed_dim)
@@ -803,7 +831,7 @@ class VarWhisperEncoder(VarWhisperPreTrainedModel):
         self.conv1 = nn.Conv1d(self.num_mel_bins, embed_dim, kernel_size=3, padding=1)
         self.conv2 = nn.Conv1d(embed_dim, embed_dim, kernel_size=3, stride=2, padding=1)
 
-        self.layers = nn.ModuleList([VarWhisperEncoderLayer(config, layer_id=layer_id) for layer_id in range(config.encoder_layers)])
+        self.layers = nn.ModuleList([VarWhisperEncoderLayer(config, layer_idx=layer_idx) for layer_idx in range(config.encoder_layers)])
         self.layer_norm = nn.RMSNorm(config.d_model)
 
         self.gradient_checkpointing = False
