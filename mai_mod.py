@@ -12,7 +12,7 @@ import hydra
 from slider import Beatmap, Spinner
 
 from config import MaiModConfig, InferenceConfig
-from inference import get_args_from_beatmap, get_config, load_model_with_server, compile_args, \
+from inference import get_config, load_model_with_server, compile_args, \
     setup_inference_environment
 from osuT5.osuT5.dataset.data_utils import get_groups, Group
 from osuT5.osuT5.event import EventType, Event, ContextType
@@ -377,7 +377,6 @@ def main(args: MaiModConfig):
         use_server=False,
     )
 
-    get_args_from_beatmap(i_args, tokenizer)
     generation_config, beatmap_config = get_config(i_args)
 
     return ai_mod(
