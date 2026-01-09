@@ -19,7 +19,7 @@ from transformers import AutoProcessor, AutoModel
 from classifier.classify import ExampleDataset
 from classifier.libs.model.model import OsuClassifierOutput
 from classifier.libs.utils import load_ckpt
-from config import FidConfig
+from config import FidConfig, InferenceConfig
 from inference import load_diff_model, generate, load_model_with_server, compile_device_and_seed, \
     setup_inference_environment
 from osuT5.osuT5.dataset.data_utils import load_audio_file, load_mmrs_metadata, filter_mmrs_metadata
@@ -195,9 +195,7 @@ def get_rhythm(beatmap, passive=False):
     return rhythm
 
 
-def generate_beatmaps(beatmap_paths, fid_args: FidConfig, return_dict, idx):
-    args = fid_args.inference
-    args.device = fid_args.device
+def generate_beatmaps(beatmap_paths, args: InferenceConfig, dataset_type, idx):
     torch.set_grad_enabled(False)
     torch.set_float32_matmul_precision('high')
 
@@ -229,12 +227,12 @@ def generate_beatmaps(beatmap_paths, fid_args: FidConfig, return_dict, idx):
             beatmap = Beatmap.from_path(beatmap_path)
             output_path = Path("generated") / beatmap_path.stem
 
-            if fid_args.dataset_type == "ors":
+            if dataset_type == "ors":
                 audio_path = beatmap_path.parents[1] / list(beatmap_path.parents[1].glob('audio.*'))[0]
             else:
                 audio_path = beatmap_path.parent / beatmap.audio_filename
 
-            if fid_args.skip_generation or (output_path.exists() and len(list(output_path.glob("*.osu"))) > 0):
+            if output_path.exists() and len(list(output_path.glob("*.osu"))) > 0:
                 if not output_path.exists() or len(list(output_path.glob("*.osu"))) == 0:
                     raise FileNotFoundError(f"Generated beatmap not found in {output_path}")
                 print(f"Skipping {beatmap_path.stem} as it already exists")
@@ -419,9 +417,10 @@ def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: 
 
 @hydra.main(config_path="configs", config_name="calc_fid", version_base="1.1")
 def main(args: FidConfig):
-    args = OmegaConf.to_object(args)
-    compile_device_and_seed(args)
-    setup_inference_environment(args)
+    args: FidConfig = OmegaConf.to_object(args)
+    compile_device_and_seed(args.inference)
+    setup_inference_environment(args.inference.seed)
+    args.device = args.inference.device
 
     print(f"Logging to directory: {os.getcwd()}")
 
@@ -435,22 +434,22 @@ def main(args: FidConfig):
 
     if not args.skip_generation:
         # Assign beatmaps to processes in a round-robin fashion
-        num_processes = args.num_processes
+        num_processes = max(args.num_processes, 1)
         chunks = [[] for _ in range(num_processes)]
         for i, path in enumerate(beatmap_paths):
             chunks[i % num_processes].append(path)
 
-        manager = Manager()
-        return_dict = manager.dict()
-        processes = []
+        if args.num_processes <= 0:
+            generate_beatmaps(chunks[0], args.inference, args.dataset_type, 0)
+        else:
+            processes = []
+            for i in range(num_processes):
+                p = Process(target=generate_beatmaps, args=(chunks[i], args.inference, args.dataset_type, i))
+                processes.append(p)
+                p.start()
 
-        for i in range(num_processes):
-            p = Process(target=generate_beatmaps, args=(chunks[i], args, return_dict, i))
-            processes.append(p)
-            p.start()
-
-        for p in processes:
-            p.join()
+            for p in processes:
+                p.join()
 
     calculate_metrics(args, beatmap_paths)
 

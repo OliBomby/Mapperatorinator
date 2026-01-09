@@ -111,10 +111,8 @@ class InferenceConfig:
 
 @dataclass
 class FidConfig:
-    device: str = 'auto'  # Inference device (cpu/cuda/mps/auto)
-    compile: bool = True
     num_processes: int = 3
-    seed: int = 0
+    device: str = 'auto'
 
     skip_generation: bool = False
     fid: bool = True

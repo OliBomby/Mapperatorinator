@@ -3,9 +3,7 @@ defaults:
   - inference: tiny41
   - _self_
 
-compile: false
 num_processes: 32
-seed: 0
 
 skip_generation: false
 fid: true
@@ -27,6 +25,8 @@ dataset_end: 106  # Contains 324 std beatmaps
 gamemodes: [0]  # List of gamemodes to include in the dataset
 
 inference:
+  seed: 0
+  compile: false
   super_timing: false
   temperature: 0.9        # Sampling temperature
   top_p: 0.9              # Top-p sampling threshold

@@ -35,7 +35,7 @@ def setup_inference_environment(seed: int):
     set_seed(seed)
 
 
-def compile_device_and_seed(args: InferenceConfig | FidConfig, verbose=True):
+def compile_device_and_seed(args: InferenceConfig, verbose=True):
     message = None
     if args.device == "auto":
         if torch.cuda.is_available():
