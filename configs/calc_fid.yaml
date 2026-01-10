@@ -4,6 +4,7 @@ defaults:
   - _self_
 
 num_processes: 32
+compile: false
 
 skip_generation: false
 fid: true

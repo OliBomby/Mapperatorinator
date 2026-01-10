@@ -113,6 +113,7 @@ class InferenceConfig:
 class FidConfig:
     num_processes: int = 3
     device: str = 'auto'
+    compile: bool = False
 
     skip_generation: bool = False
     fid: bool = True
