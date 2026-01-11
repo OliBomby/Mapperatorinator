@@ -51,7 +51,7 @@ def get_backbone_model(config: MapperatorinatorConfig):
         raise NotImplementedError
 
     b_config._attn_implementation = config._attn_implementation
-    b_config.torch_dtype = config.torch_dtype
+    b_config.dtype = config.dtype
     model = model_cls(b_config)
 
     return model

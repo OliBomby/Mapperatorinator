@@ -38,7 +38,7 @@ def get_shared_training_state() -> Namespace:
 def _get_model_config(
         args: TrainConfig,
         tokenizer: Tokenizer,
-        torch_dtype: torch.dtype,
+        dtype: torch.dtype,
         attn_implementation: str,
 ) -> MapperatorinatorConfig:
     return MapperatorinatorConfig(
@@ -89,7 +89,7 @@ def _get_model_config(
         eos_token_id=tokenizer.eos_id,
         decoder_start_token_id=tokenizer.sos_id,
         max_length=args.data.tgt_seq_len,
-        torch_dtype=torch_dtype,
+        dtype=dtype,
         attn_implementation=attn_implementation,
     )
 
@@ -97,13 +97,13 @@ def _get_model_config(
 def _get_model(
         args: TrainConfig,
         tokenizer: Tokenizer,
-        torch_dtype: torch.dtype,
+        dtype: torch.dtype,
         attn_implementation: str,
 ) -> Mapperatorinator:
     model = Mapperatorinator(_get_model_config(
         args,
         tokenizer,
-        torch_dtype,
+        dtype,
         attn_implementation,
     ))
     return model
@@ -177,19 +177,19 @@ def load_model_loaders(
     def model_loader():
         dtype = _precision_to_dtype(precision)
         if ckpt_path_str == "":
-            model = _get_model(t5_args, tokenizer, torch_dtype=dtype, attn_implementation=attn_implementation)
+            model = _get_model(t5_args, tokenizer, dtype=dtype, attn_implementation=attn_implementation)
             model.to(device=device, dtype=dtype)
         elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
             model = Mapperatorinator.from_pretrained(
                 ckpt_path_str,
-                torch_dtype=dtype,
+                dtype=dtype,
                 attn_implementation=attn_implementation,
                 device_map=device
             )
             model.generation_config.disable_compile = True
         else:
             model_state = torch.load(ckpt_path / "pytorch_model.bin", weights_only=True)
-            model = _get_model(t5_args, tokenizer, torch_dtype=dtype, attn_implementation=attn_implementation)
+            model = _get_model(t5_args, tokenizer, dtype=dtype, attn_implementation=attn_implementation)
             if t5_args.pretrained_t5_compat:
                 del model_state["shared.weight"]
                 del model_state["encoder.embed_tokens.weight"]

@@ -290,7 +290,7 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
     cm3p_model, cm3p_processor = None, None
     if args.fid_cm3p:
         cm3p_processor = AutoProcessor.from_pretrained(args.cm3p_ckpt, trust_remote_code=True, revision="main")
-        cm3p_model = AutoModel.from_pretrained(args.cm3p_ckpt, device_map=args.device, torch_dtype=torch.bfloat16,
+        cm3p_model = AutoModel.from_pretrained(args.cm3p_ckpt, device_map=args.device, dtype=torch.bfloat16,
                                                trust_remote_code=True, revision="main")
 
     real_features = []
