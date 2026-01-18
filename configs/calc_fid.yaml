@@ -3,7 +3,7 @@ defaults:
   - inference: tiny41
   - _self_
 
-num_processes: 4
+num_processes: 32
 compile: false
 
 skip_generation: false
@@ -35,7 +35,7 @@ inference:
   lookahead: 0.4            # Fraction of audio sequence to skip at the end of the audio window
   year: 2023
   resnap_events: true
-  use_server: false
+  use_server: true
 
 hydra:
   job:
@@ -43,7 +43,7 @@ hydra:
     name: calc_fid
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/sweeps/test_1/inference=tiny41-2
+    dir: ./logs_fid/sweeps/test_1/inference=tiny41-3
   sweep:
     dir: ./logs_fid/sweeps/test_1
     subdir: ${hydra.job.override_dirname}
