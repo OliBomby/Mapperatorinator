@@ -448,7 +448,7 @@ class VarWhisperAttention(nn.Module):
         cu_seqlens: Optional[torch.Tensor] = None,
         max_seqlen: Optional[int] = None,
         cache_position: Optional[torch.LongTensor] = None,
-        past_key_value = None,
+        past_key_value: Optional[EncoderDecoderCache | Cache] = None,
         position_ids: Optional[torch.LongTensor] = None,
         output_attentions: Optional[bool] = False,
         **kwargs,

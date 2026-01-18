@@ -533,7 +533,7 @@ class RoPEWhisperFlashAttention2(RoPEWhisperAttention):
         self,
         hidden_states: torch.Tensor,
         key_value_states: Optional[torch.Tensor] = None,
-        past_key_value: Optional[EncoderDecoderCache] = None,
+        past_key_value: Optional[EncoderDecoderCache | Cache] = None,
         attention_mask: Optional[torch.Tensor] = None,
         layer_head_mask: Optional[torch.Tensor] = None,
         output_attentions: bool = False,
@@ -567,8 +567,7 @@ class RoPEWhisperFlashAttention2(RoPEWhisperAttention):
         current_states = key_value_states if key_value_states is not None else hidden_states
         if is_cross_attention and past_key_value and is_updated:
             # reuse k,v, cross_attentions
-            key_states = past_key_value.key_cache[self.layer_idx]
-            value_states = past_key_value.value_cache[self.layer_idx]
+            key_states, value_states = past_key_value[self.layer_idx]
         else:
             key_states = self.k_proj(current_states).view(bsz, -1, self.num_heads, self.head_dim)
             value_states = self.v_proj(current_states).view(bsz, -1, self.num_heads, self.head_dim)
@@ -648,7 +647,7 @@ class RoPEWhisperSdpaAttention(RoPEWhisperAttention):
             self,
             hidden_states: torch.Tensor,
             key_value_states: Optional[torch.Tensor] = None,
-            past_key_value: Optional[EncoderDecoderCache] = None,
+            past_key_value: Optional[EncoderDecoderCache | Cache] = None,
             attention_mask: Optional[torch.Tensor] = None,
             layer_head_mask: Optional[torch.Tensor] = None,
             output_attentions: bool = False,
@@ -694,8 +693,7 @@ class RoPEWhisperSdpaAttention(RoPEWhisperAttention):
         current_states = key_value_states if key_value_states is not None else hidden_states
         if is_cross_attention and past_key_value and is_updated:
             # reuse k,v, cross_attentions
-            key_states = past_key_value.key_cache[self.layer_idx]
-            value_states = past_key_value.value_cache[self.layer_idx]
+            key_states, value_states = past_key_value[self.layer_idx]
         else:
             key_states = self.k_proj(current_states)
             key_states = key_states.view(bsz, -1, self.num_heads, self.head_dim).transpose(1, 2)
