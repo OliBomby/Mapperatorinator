@@ -32,96 +32,13 @@ from .configuration_varwhisper import VarWhisperConfig
 if is_flash_attn_2_available():
     from flash_attn.flash_attn_interface import flash_attn_varlen_kvpacked_func, flash_attn_varlen_qkvpacked_func, \
     flash_attn_qkvpacked_func, flash_attn_kvpacked_func
-    from flash_attn.layers.rotary import RotaryEmbedding
+    from flash_attn.layers.rotary import RotaryEmbedding, apply_rotary_emb_qkv_
     from flash_attn.ops.triton.rotary import apply_rotary
 else:
     RotaryEmbedding = object
 
 
 logger = logging.get_logger(__name__)
-
-
-def _unpad_varwhisper_input(
-    inputs: torch.Tensor,
-    attention_mask: torch.Tensor,
-    position_ids: Optional[torch.Tensor] = None,
-    labels: Optional[torch.Tensor] = None,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int, Optional[torch.Tensor], Optional[torch.Tensor]]:
-    """
-    Remove padding from input sequences.
-
-    Args:
-        inputs: (batch, seqlen, ...) or (batch, seqlen)
-        attention_mask: (batch, seqlen), bool / int, 1 means valid and 0 means not valid.
-        position_ids: (batch, seqlen), int, position ids
-        labels: (batch, seqlen), int, labels
-
-    Returns:
-        unpadded_inputs: (total_nnz, ...), where total_nnz = number of tokens selected in attention_mask.
-        indices: (total_nnz)
-        cu_seqlens: (batch + 1), the cumulative sequence lengths
-        max_seqlen_in_batch: int
-        unpadded_position_ids: (total_nnz) or None
-        unpadded_labels: (total_nnz) or None
-    """
-    seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
-    indices = torch.nonzero(attention_mask.flatten(), as_tuple=False).flatten()
-    max_seqlen_in_batch = int(seqlens_in_batch.max().item())
-    cu_seqlens = torch.nn.functional.pad(torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0))
-
-    if inputs.dim() == 2:
-        unpadded_inputs = inputs.flatten()[indices]
-    else:
-        batch, seqlen, *rest = inputs.shape
-        shape = batch * seqlen
-        unpadded_inputs = inputs.view(shape, *rest)[indices]
-
-    unpadded_position_ids = position_ids.flatten()[indices] if position_ids is not None else None
-    unpadded_labels = labels.flatten()[indices] if labels is not None else None
-
-    return unpadded_inputs, indices, cu_seqlens, max_seqlen_in_batch, unpadded_position_ids, unpadded_labels
-
-
-def _unpad_encoder_hidden_states(encoder_hidden_states: torch.Tensor,):
-    # encoder_hidden_states contains no padding, so we just flatten it and compute cu_seqlens
-    batch, seqlen, *rest = encoder_hidden_states.shape
-    shape = batch * seqlen
-    unpadded_encoder_hidden_states = encoder_hidden_states.view(shape, *rest)
-
-    encoder_cu_seqlens = torch.arange(0, shape + 1, step=seqlen, dtype=torch.int32, device=encoder_hidden_states.device)
-
-    return unpadded_encoder_hidden_states, encoder_cu_seqlens, seqlen
-
-
-def _pad_varwhisper_output(
-    inputs: torch.Tensor,
-    indices: torch.Tensor,
-    batch: int,
-    seqlen: int,
-) -> torch.Tensor:
-    """
-    Add padding to sequences.
-
-    Args:
-        inputs: (total_nnz, ...) or (total_nnz,), where total_nnz = number of tokens selected in attention_mask.
-        indices: (total_nnz)
-        batch: int, batch size
-        seqlen: int, max sequence length
-
-    Returns:
-        padded_inputs: (batch, seqlen, ...) or (batch, seqlen)
-    """
-    if inputs.dim() == 1:
-        output = torch.zeros(batch * seqlen, dtype=inputs.dtype, device=inputs.device)
-        output[indices] = inputs
-        padded_inputs = output.view(batch, seqlen)
-    else:
-        _, *rest = inputs.shape
-        output = torch.zeros(batch * seqlen, *rest, dtype=inputs.dtype, device=inputs.device)
-        output[indices] = inputs
-        padded_inputs = output.view(batch, seqlen, *rest)
-
-    return padded_inputs
 
 
 class ApplyRotaryEmbUnpad(torch.autograd.Function):
@@ -281,8 +198,8 @@ class VarWhisperRotaryEmbedding(nn.Module):
             self.rope_type = config.rope_scaling.get("rope_type", config.rope_scaling.get("type"))
         else:
             self.rope_type = "default"
-        self.max_seq_len_cached = max_seqlen
-        self.original_max_seq_len = max_seqlen
+        self.max_seq_len_cached = config.max_position_embeddings
+        self.original_max_seq_len = config.max_position_embeddings
 
         self.config = config
         self.rope_init_fn = ROPE_INIT_FUNCTIONS[self.rope_type]
@@ -314,7 +231,7 @@ def rotate_half(x):
     return torch.cat((-x2, x1), dim=-1)
 
 
-def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
+def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     """Applies Rotary Position Embedding to the query and key tensors.
 
     Args:
@@ -322,8 +239,6 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
         k (`torch.Tensor`): The key tensor.
         cos (`torch.Tensor`): The cosine part of the rotary embedding.
         sin (`torch.Tensor`): The sine part of the rotary embedding.
-        position_ids (`torch.Tensor`, *optional*):
-            Deprecated and unused.
         unsqueeze_dim (`int`, *optional*, defaults to 1):
             The 'unsqueeze_dim' argument specifies the dimension along which to unsqueeze cos[position_ids] and
             sin[position_ids] so that they can be properly broadcasted to the dimensions of q and k. For example, note
@@ -343,22 +258,17 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
 
 def eager_attention_forward(
     module: "VarWhisperAttention",
-    qkv: torch.Tensor,
-    attention_mask: torch.Tensor,
-    sliding_window_mask: torch.Tensor,
-    position_ids: Optional[torch.LongTensor],
-    local_attention: tuple[int, int],
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
     bs: int,
     dim: int,
+    local_attention: tuple[int, int] = (-1, -1),
+    attention_mask: torch.Tensor = None,
+    sliding_window_mask: torch.Tensor = None,
     output_attentions: Optional[bool] = False,
     **_kwargs,
 ) -> Union[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor]]:
-    # qkv: [batch_size, seqlen, 3, nheads, headdim]
-    cos, sin = module.rotary_emb(qkv, position_ids=position_ids)
-    query, key, value = qkv.transpose(3, 1).unbind(dim=2)
-    # query, key, value: [batch_size, heads, seq_len, head_dim]
-    query, key = apply_rotary_pos_emb(query, key, cos, sin)
-
     scale = module.head_dim**-0.5
     attn_weights = torch.matmul(query, key.transpose(2, 3)) * scale
 
@@ -429,21 +339,16 @@ def flash_attention_forward(
 
 def sdpa_attention_forward(
     module: "VarWhisperAttention",
-    qkv: torch.Tensor,
-    attention_mask: torch.Tensor,
-    sliding_window_mask: torch.Tensor,
-    position_ids: Optional[torch.LongTensor],
-    local_attention: tuple[int, int],
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
     bs: int,
     dim: int,
+    local_attention: tuple[int, int] = (-1, -1),
+    attention_mask: torch.Tensor = None,
+    sliding_window_mask: torch.Tensor = None,
     **_kwargs,
 ) -> tuple[torch.Tensor]:
-    # qkv: [batch_size, seqlen, 3, nheads, headdim]
-    cos, sin = module.rotary_emb(qkv, position_ids=position_ids)
-    query, key, value = qkv.transpose(3, 1).unbind(dim=2)
-    # query, key, value: [batch_size, heads, seq_len, head_dim]
-    query, key = apply_rotary_pos_emb(query, key, cos, sin)
-
     if local_attention != (-1, -1):
         attention_mask = sliding_window_mask
 
@@ -530,7 +435,8 @@ class VarWhisperAttention(nn.Module):
             config_copy = copy.deepcopy(config)
             config_copy.rope_theta = rope_theta
             config_copy.hidden_size = config.d_model
-            self.rotary_emb = VarWhisperRotaryEmbedding(config=config_copy, max_seqlen=self.max_position_embeddings)
+            config_copy.max_position_embeddings = self.max_position_embeddings
+            self.rotary_emb = VarWhisperRotaryEmbedding(config=config_copy)
 
         self.Wo = nn.Linear(config.d_model, config.d_model, bias=config.attention_bias)
         self.out_drop = nn.Dropout(config.attention_dropout) if config.attention_dropout > 0.0 else nn.Identity()
@@ -542,7 +448,8 @@ class VarWhisperAttention(nn.Module):
         cu_seqlens: Optional[torch.Tensor] = None,
         max_seqlen: Optional[int] = None,
         cache_position: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[EncoderDecoderCache] = None,
+        past_key_value = None,
+        position_ids: Optional[torch.LongTensor] = None,
         output_attentions: Optional[bool] = False,
         **kwargs,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
@@ -553,6 +460,7 @@ class VarWhisperAttention(nn.Module):
             VARWHISPER_ATTENTION_FUNCTION[self.config._attn_implementation],
             module=self,
             local_attention=self.local_attention,
+            sliding_window_mask=None,
             bs=bs,
             dim=self.all_head_size,
             cu_seqlens=cu_seqlens,
@@ -562,6 +470,7 @@ class VarWhisperAttention(nn.Module):
         )
 
         if is_varlen:
+            assert not self.config.use_cache
             past_key_value = None  # past_key_value not supported for varlen inputs
             cache_position = None
 
@@ -575,50 +484,78 @@ class VarWhisperAttention(nn.Module):
             else:
                 past_key_value = past_key_value.self_attention_cache
 
-        if self.is_cross_attention:
-            assert key_value_states is not None, "key_value_states must be provided for cross-attention"
-            q = self.Wq(hidden_states)
-            q = q.view(-1, self.num_heads, self.head_dim) if is_varlen else q.view(bs, -1, self.num_heads, self.head_dim)
+        if self.config._attn_implementation == "flash_attention_2":
+            if self.is_cross_attention:
+                q = self.Wq(hidden_states)
+                q = q.view(-1, self.num_heads, self.head_dim) if is_varlen else q.view(bs, -1, self.num_heads, self.head_dim)
 
-            if past_key_value and is_updated:
-                # reuse k,v, cross_attentions
-                key_states = past_key_value.key_cache[self.layer_idx]
-                value_states = past_key_value.value_cache[self.layer_idx]
-                kv = torch.stack((key_states, value_states), dim=2).transpose(1, 3)  # (bs, seqlen, 2, nheads, head_dim)
-            else:
-                kv = self.Wkv(key_value_states)
-                kv = kv.view(-1, 2, self.num_heads, self.head_dim) if is_varlen else kv.view(bs, -1, 2, self.num_heads, self.head_dim)
+                if past_key_value and is_updated:
+                    # reuse k,v, cross_attentions
+                    key_states, value_states = past_key_value[self.layer_idx]
+                    kv = torch.stack((key_states, value_states), dim=2).transpose(1, 3)  # (bs, seqlen, 2, nheads, head_dim)
+                else:
+                    kv = self.Wkv(key_value_states)
+                    kv = kv.view(-1, 2, self.num_heads, self.head_dim) if is_varlen else kv.view(bs, -1, 2, self.num_heads, self.head_dim)
 
-                if past_key_value is not None:
-                    key_states, value_states = kv.transpose(1, 3).unbind(dim=2)
-                    past_key_value.update(key_states, value_states, self.layer_idx)
-
-            attn_outputs = attn_func(qkv=q, kv=kv)
-        else:
-            assert key_value_states is None, "key_value_states must be None for self-attention"
-            qkv = self.Wqkv(hidden_states)
-            qkv = qkv.view(-1, 3, self.num_heads, self.head_dim) if is_varlen else qkv.view(bs, -1, 3, self.num_heads, self.head_dim)
-
-            qkv = self.rotary_emb.forward(
-                qkv,
-                cu_seqlens=cu_seqlens,
-                max_seqlen=max_seqlen,
-                seqlen_offset=cache_position[0].item() if cache_position is not None else 0,
-            )
-
-            if past_key_value is not None:
-                q, key_states, value_states = qkv.unbind(dim=2)
-
-                key_states, value_states = key_states.transpose(1, 2), value_states.transpose(1, 2) # (bs, nheads, seqlen, head_dim)
-                key_states, value_states = past_key_value.update(
-                    key_states, value_states, self.layer_idx, {"cache_position": cache_position}
-                )
-                kv = torch.stack((key_states, value_states), dim=2).transpose(1, 3)  # (bs, seqlen, 2, nheads, head_dim)
-                kv = kv[:, :cache_position[-1]]  # trim to the current cache position
+                    if past_key_value is not None:
+                        key_states, value_states = kv.transpose(1, 3).unbind(dim=2)
+                        past_key_value.update(key_states, value_states, self.layer_idx)
 
                 attn_outputs = attn_func(qkv=q, kv=kv)
             else:
-                attn_outputs = attn_func(qkv=qkv)
+                qkv = self.Wqkv(hidden_states)
+                qkv = qkv.view(-1, 3, self.num_heads, self.head_dim) if is_varlen else qkv.view(bs, -1, 3, self.num_heads, self.head_dim)
+
+                qkv = self.rotary_emb.forward(
+                    qkv,
+                    cu_seqlens=cu_seqlens,
+                    max_seqlen=max_seqlen,
+                    seqlen_offset=position_ids[:, 0] if position_ids is not None and max_seqlen is not None else 0,
+                )
+
+                if past_key_value is not None:
+                    q, key_states, value_states = qkv.unbind(dim=2)
+
+                    key_states, value_states = key_states.transpose(1, 2), value_states.transpose(1, 2) # (bs, nheads, seqlen, head_dim)
+                    key_states, value_states = past_key_value.update(
+                        key_states, value_states, self.layer_idx, {"cache_position": cache_position}
+                    )
+                    kv = torch.stack((key_states, value_states), dim=2).transpose(1, 3)  # (bs, seqlen, 2, nheads, head_dim)
+                    kv = kv[:, :cache_position[-1] + 1]  # trim to the current cache position
+
+                    attn_outputs = attn_func(qkv=q, kv=kv)
+                else:
+                    attn_outputs = attn_func(qkv=qkv)
+        else:
+            if self.is_cross_attention:
+                query_states = self.Wq(hidden_states).view(bs, -1, self.num_heads, self.head_dim).transpose(1, 2)
+
+                if past_key_value and is_updated:
+                    # reuse k,v, cross_attentions
+                    key_states, value_states = past_key_value[self.layer_idx]
+                else:
+                    kv = self.Wkv(key_value_states).view(bs, -1, 2, self.num_heads, self.head_dim)
+                    key_states, value_states = kv.transpose(1, 3).unbind(dim=2)
+
+                    if past_key_value is not None:
+                        past_key_value.update(key_states, value_states, self.layer_idx)
+            else:
+                qkv = self.Wqkv(hidden_states).view(bs, -1, 3, self.num_heads, self.head_dim)
+                query_states, key_states, value_states = qkv.transpose(1, 3).unbind(dim=2)
+
+                cos, sin = self.rotary_emb(query_states, position_ids=position_ids)
+                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+
+                if past_key_value is not None:
+                    # sin and cos are specific to RoPE models; cache_position needed for the static cache
+                    cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+                    key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+            attn_outputs = attn_func(
+                query=query_states,
+                key=key_states,
+                value=value_states,
+            )
 
         hidden_states, *rest = attn_outputs
         hidden_states = self.out_drop(self.Wo(hidden_states))
@@ -912,6 +849,89 @@ class VarWhisperEncoder(VarWhisperPreTrainedModel):
         )
 
 
+def _unpad_varwhisper_input(
+    inputs: torch.Tensor,
+    attention_mask: torch.Tensor,
+    position_ids: Optional[torch.Tensor] = None,
+    labels: Optional[torch.Tensor] = None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int, Optional[torch.Tensor], Optional[torch.Tensor]]:
+    """
+    Remove padding from input sequences.
+
+    Args:
+        inputs: (batch, seqlen, ...) or (batch, seqlen)
+        attention_mask: (batch, seqlen), bool / int, 1 means valid and 0 means not valid.
+        position_ids: (batch, seqlen), int, position ids
+        labels: (batch, seqlen), int, labels
+
+    Returns:
+        unpadded_inputs: (total_nnz, ...), where total_nnz = number of tokens selected in attention_mask.
+        indices: (total_nnz)
+        cu_seqlens: (batch + 1), the cumulative sequence lengths
+        max_seqlen_in_batch: int
+        unpadded_position_ids: (total_nnz) or None
+        unpadded_labels: (total_nnz) or None
+    """
+    seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
+    indices = torch.nonzero(attention_mask.flatten(), as_tuple=False).flatten()
+    max_seqlen_in_batch = int(seqlens_in_batch.max().item())
+    cu_seqlens = torch.nn.functional.pad(torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0))
+
+    if inputs.dim() == 2:
+        unpadded_inputs = inputs.flatten()[indices]
+    else:
+        batch, seqlen, *rest = inputs.shape
+        shape = batch * seqlen
+        unpadded_inputs = inputs.view(shape, *rest)[indices]
+
+    unpadded_position_ids = position_ids.flatten()[indices] if position_ids is not None else None
+    unpadded_labels = labels.flatten()[indices] if labels is not None else None
+
+    return unpadded_inputs, indices, cu_seqlens, max_seqlen_in_batch, unpadded_position_ids, unpadded_labels
+
+
+def _unpad_encoder_hidden_states(encoder_hidden_states: torch.Tensor,):
+    # encoder_hidden_states contains no padding, so we just flatten it and compute cu_seqlens
+    batch, seqlen, *rest = encoder_hidden_states.shape
+    shape = batch * seqlen
+    unpadded_encoder_hidden_states = encoder_hidden_states.view(shape, *rest)
+
+    encoder_cu_seqlens = torch.arange(0, shape + 1, step=seqlen, dtype=torch.int32, device=encoder_hidden_states.device)
+
+    return unpadded_encoder_hidden_states, encoder_cu_seqlens, seqlen
+
+
+def _pad_varwhisper_output(
+    inputs: torch.Tensor,
+    indices: torch.Tensor,
+    batch: int,
+    seqlen: int,
+) -> torch.Tensor:
+    """
+    Add padding to sequences.
+
+    Args:
+        inputs: (total_nnz, ...) or (total_nnz,), where total_nnz = number of tokens selected in attention_mask.
+        indices: (total_nnz)
+        batch: int, batch size
+        seqlen: int, max sequence length
+
+    Returns:
+        padded_inputs: (batch, seqlen, ...) or (batch, seqlen)
+    """
+    if inputs.dim() == 1:
+        output = torch.zeros(batch * seqlen, dtype=inputs.dtype, device=inputs.device)
+        output[indices] = inputs
+        padded_inputs = output.view(batch, seqlen)
+    else:
+        _, *rest = inputs.shape
+        output = torch.zeros(batch * seqlen, *rest, dtype=inputs.dtype, device=inputs.device)
+        output[indices] = inputs
+        padded_inputs = output.view(batch, seqlen, *rest)
+
+    return padded_inputs
+
+
 class VarWhisperDecoder(VarWhisperPreTrainedModel):
     main_input_name = "input_ids"
 
@@ -978,7 +998,7 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
             attention_mask = torch.ones((batch_size, seq_len), device=device, dtype=torch.bool)
 
         repad = False
-        cu_seqlens, max_seqlen = None, None
+        cu_seqlens, max_seqlen = None, self.config.max_target_positions
         encoder_cu_seqlens, encoder_max_seqlen = None, None
         if self.config._attn_implementation == "flash_attention_2" and not use_cache:
             repad = True

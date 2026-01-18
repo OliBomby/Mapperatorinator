@@ -13,5 +13,3 @@ temperature: 0.9        # Sampling temperature
 top_p: 0.9              # Top-p sampling threshold
 max_batch_size: 32       # Maximum batch size for inference
 generate_positions: false
-precision: 'bf16'         # Lower precision for speed (fp32/bf16/amp)
-attn_implementation: 'flash_attention_2'  # Attention implementation (auto/eager/sdpa/flash_attention_2)
