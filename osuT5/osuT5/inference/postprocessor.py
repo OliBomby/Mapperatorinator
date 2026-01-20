@@ -4,6 +4,7 @@ import dataclasses
 import os
 import zipfile
 from datetime import timedelta
+import logging
 from string import Template
 from typing import Optional
 
@@ -118,7 +119,7 @@ def position_to_progress(slider_path: SliderPath, pos: np.ndarray) -> np.ndarray
 
 
 class Postprocessor(object):
-    def __init__(self, args: InferenceConfig):
+    def __init__(self, args: InferenceConfig, logger: Optional[logging.Logger] = None):
         """Postprocessing stage that converts a list of Event objects to a beatmap file."""
         self.curve_type_shorthand = {
             "B": "Bezier",
@@ -136,6 +137,8 @@ class Postprocessor(object):
         self.end_time = args.end_time
         self.has_sv = args.train.data.add_sv
 
+        self.logger = logging.getLogger(__name__) if logger is None else logger.getChild(__name__)
+
     def generate(
             self,
             events: list[Event],
@@ -146,7 +149,6 @@ class Postprocessor(object):
 
         Args:
             events: List of Event objects.
-            output_path: Path to the output directory.
             beatmap_config: BeatmapConfig object.
             timing: List of TimingPoint objects.
 
@@ -291,7 +293,7 @@ class Postprocessor(object):
 
             elif hit_type == EventType.SLIDER_HEAD:
                 if slider_head is not None:
-                    print(f"Warning: Incomplete slider at {int(round(slider_head.time))}")
+                    self.logger.warning(f"Warning: Incomplete slider at {int(round(slider_head.time))}")
 
                 slider_head = group
                 last_anchor = None
@@ -322,7 +324,7 @@ class Postprocessor(object):
                 total_duration = group.time - slider_head.time
 
                 if total_duration <= 0 or span_duration <= 0:
-                    print(f"Warning: Invalid slider duration at {slider_start_time}")
+                    self.logger.warning(f"Warning: Invalid slider duration at {slider_start_time}")
                     slider_head = None
                     last_anchor = None
                     anchor_info = []

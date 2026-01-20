@@ -43,7 +43,7 @@ hydra:
     name: calc_fid
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/sweeps/test_1/inference=tiny41-3
+    dir: ./logs_fid/sweeps/test_1/inference=tiny41-2
   sweep:
     dir: ./logs_fid/sweeps/test_1
     subdir: ${hydra.job.override_dirname}
