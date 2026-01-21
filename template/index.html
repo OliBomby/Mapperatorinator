@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mapperatorinator Interface (Flask+pywebview)</title>
+    <title>Mapperatorinator Interface</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
@@ -12,13 +12,21 @@
 <div id="flash-container"></div>
 <div class="container">
     <main>
+        <!-- Language Selector -->
+        <div class="language-selector-container" style="text-align: right; margin-bottom: 10px;">
+            <select id="language-selector" class="styled-select" style="width: auto; min-width: 120px;">
+                <option value="en">English</option>
+                <option value="zh-CN">简体中文</option>
+            </select>
+        </div>
+
         <form id="inferenceForm" method="POST" class="card form-card">
 
             <!-- Paths Section -->
             <fieldset style="gap: 10px">
-                <legend>Paths</legend>
+                <legend data-i18n="sections.paths">Paths</legend>
                 <div class="path-input-group">
-                    <label for="audio_path" title="Path to audio file">Audio Path:</label>
+                    <label for="audio_path" data-i18n="labels.audio_path" data-i18n-title="tooltips.audio_path" title="Path to audio file">Audio Path:</label>
                     <div class="input-with-clear">
                         <input type="text" id="audio_path" name="audio_path" />
                         <button type="button" class="clear-input-btn" data-target="audio_path" style="display: none;">×</button>
@@ -26,25 +34,25 @@
                     <button type="button" class="browse-button" data-browse-type="file" data-target="audio_path">Browse...</button>
                 </div>
                 <div class="path-input-group">
-                    <label for="output_path" title="Path to output folder">Output Path:</label>
+                    <label for="output_path" data-i18n="labels.output_path" data-i18n-title="tooltips.output_path" title="Path to output folder">Output Path:</label>
                     <div class="input-with-clear">
                         <input type="text" id="output_path" name="output_path" />
                         <button type="button" class="clear-input-btn" data-target="output_path" style="display: none;">×</button>
                     </div>
-                    <button type="button" class="browse-button" data-browse-type="folder" data-target="output_path">Browse...</button>
+                    <button type="button" class="browse-button" data-browse-type="folder" data-target="output_path" data-i18n="buttons.browse">Browse...</button>
                 </div>
                 <div class="path-input-group">
-                    <label for="beatmap_path" title="Path to .osu file to autofill metadata, audio path, and output path, or use as reference">Beatmap Path:</label>
+                    <label for="beatmap_path" data-i18n="labels.beatmap_path" data-i18n-title="tooltips.beatmap_path" title="Path to .osu file to autofill metadata, audio path, and output path, or use as reference">Beatmap Path:</label>
                     <div class="input-with-clear">
                         <input type="text" id="beatmap_path" name="beatmap_path" />
                         <button type="button" class="clear-input-btn" data-target="beatmap_path" style="display: none;">×</button>
                     </div>
-                    <button type="button" class="browse-button" data-browse-type="file" data-target="beatmap_path">Browse...</button>
+                    <button type="button" class="browse-button" data-browse-type="file" data-target="beatmap_path" data-i18n="buttons.browse">Browse...</button>
                 </div>
 
                 <!-- In-Context Options Box -->
                 <div id="in-context-options-box" class="context-options-box" style="display: none;">
-                    <h4 title="List of additional context to provide to the model">In-Context Options</h4>
+                    <h4 data-i18n="sections.in_context_options" data-i18n-title="tooltips.in_context_options" title="List of additional context to provide to the model">In-Context Options</h4>
                     <div class="context-options-container">
                         {% for option in [('TIMING', 'Timing'), ('KIAI', 'Kiai'), ('GD', 'Guest Difficulty'), ('NO_HS', 'No Hitsound')] %}
                         <div class="context-option-item" data-value="{{ option[0] }}">
@@ -58,26 +66,27 @@
 
             <!-- Basic Settings -->
             <fieldset>
-                <legend>Basic Settings</legend>
-                <label for="model">Model:</label>
+                <legend data-i18n="sections.basic_settings">Basic Settings</legend>
+                <label for="model" data-i18n="labels.model">Model:</label>
                 <select id="model" name="model" class="styled-select">
-                    <option value="v28">Mapperatorinator V28</option>
-                    <option value="v29">Mapperatorinator V29 (Supports gamemodes and descriptors)</option>
-                    <option value="v30" selected>Mapperatorinator V30 (Best model)</option>
-                    <option value="v31">Mapperatorinator V31 (Slightly more accurate than V29)</option>
+                    <option value="v28" data-i18n="models.v28">Mapperatorinator V28</option>
+                    <option value="v29" data-i18n="models.v29">Mapperatorinator V29 (Supports gamemodes and descriptors)</option>
+                    <option value="v30" selected data-i18n="models.v30">Mapperatorinator V30 (Best model)</option>
+                    <option value="v31" data-i18n="models.v31">Mapperatorinator V31 (Slightly more accurate than V29)</option>
                 </select>
 
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="gamemode">Gamemode:</label>
+                        <label for="gamemode" data-i18n="labels.gamemode">Gamemode:</label>
                         <select id="gamemode" name="gamemode" class="styled-select">
-                            {% for mode in [('0', 'Standard'), ('1', 'Taiko'), ('2', 'Catch the Beat'), ('3', 'Mania')] %}
-                            <option value="{{ mode[0] }}">{{ mode[1] }}</option>
-                            {% endfor %}
+                            <option value="0" data-i18n="gamemodes.0">Standard</option>
+                            <option value="1" data-i18n="gamemodes.1">Taiko</option>
+                            <option value="2" data-i18n="gamemodes.2">Catch the Beat</option>
+                            <option value="3" data-i18n="gamemodes.3">Mania</option>
                         </select>
                     </div>
                     <div class="metadata-group">
-                        <label for="difficulty" title="Difficulty rating (star rating)">Difficulty (star rating):</label>
+                        <label for="difficulty" data-i18n="labels.difficulty" data-i18n-title="tooltips.difficulty" title="Difficulty rating (star rating)">Difficulty (star rating):</label>
                         <input type="number" step="0.1" id="difficulty" name="difficulty" min="0" value="5" />
                     </div>
                 </div>
@@ -85,60 +94,60 @@
 
             <!-- Song Metadata -->
             <fieldset>
-                <legend>Song Metadata</legend>
+                <legend data-i18n="sections.song_metadata">Song Metadata</legend>
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="title" title="Song title">Title:</label>
+                        <label for="title" data-i18n="labels.title" data-i18n-title="tooltips.title" title="Song title">Title:</label>
                         <input type="text" id="title" name="title" />
                     </div>
                     <div class="metadata-group">
-                        <label for="title_unicode" title="Song title in Unicode/Japanese">Title (Unicode):</label>
+                        <label for="title_unicode" data-i18n="labels.title_unicode" data-i18n-title="tooltips.title_unicode" title="Song title in Unicode/Japanese">Title (Unicode):</label>
                         <input type="text" id="title_unicode" name="title_unicode" />
                     </div>
                 </div>
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="artist" title="Song artist">Artist:</label>
+                        <label for="artist" data-i18n="labels.artist" data-i18n-title="tooltips.artist" title="Song artist">Artist:</label>
                         <input type="text" id="artist" name="artist" />
                     </div>
                     <div class="metadata-group">
-                        <label for="artist_unicode" title="Artist name in Unicode/Japanese">Artist (Unicode):</label>
+                        <label for="artist_unicode" data-i18n="labels.artist_unicode" data-i18n-title="tooltips.artist_unicode" title="Artist name in Unicode/Japanese">Artist (Unicode):</label>
                         <input type="text" id="artist_unicode" name="artist_unicode" />
                     </div>
                 </div>
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="creator" title="Beatmap creator/mapper name">Creator:</label>
+                        <label for="creator" data-i18n="labels.creator" data-i18n-title="tooltips.creator" title="Beatmap creator/mapper name">Creator:</label>
                         <input type="text" id="creator" name="creator" />
                     </div>
                     <div class="metadata-group">
-                        <label for="version" title="Beatmap version/difficulty name">Version:</label>
+                        <label for="version" data-i18n="labels.version" data-i18n-title="tooltips.version" title="Beatmap version/difficulty name">Version:</label>
                         <input type="text" id="version" name="version" />
                     </div>
                 </div>
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="preview_time" title="Preview time in milliseconds">Preview Time (ms):</label>
+                        <label for="preview_time" data-i18n="labels.preview_time" data-i18n-title="tooltips.preview_time" title="Preview time in milliseconds">Preview Time (ms):</label>
                         <input type="number" id="preview_time" name="preview_time" min="-1" max="600000" />
                     </div>
                     <div class="metadata-group">
-                        <label for="background_image" title="Background image file">Background Image:</label>
+                        <label for="background_image" data-i18n="labels.background_image" data-i18n-title="tooltips.background_image" title="Background image file">Background Image:</label>
                         <div class="path-input-group">
                             <div class="input-with-clear">
                                 <input type="text" id="background_image" name="background_image" />
                                 <button type="button" class="clear-input-btn" data-target="background_image" style="display: none;">×</button>
                             </div>
-                            <button type="button" class="browse-button" data-browse-type="image" data-target="background_image">Browse...</button>
+                            <button type="button" class="browse-button" data-browse-type="image" data-target="background_image" data-i18n="buttons.browse">Browse...</button>
                         </div>
                     </div>
                 </div>
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="source" title="Sourcename (e.g., album, anime, game)">Source:</label>
+                        <label for="source" data-i18n="labels.source" data-i18n-title="tooltips.source" title="Sourcename (e.g., album, anime, game)">Source:</label>
                         <input type="text" id="source" name="source" />
                     </div>
                     <div class="metadata-group">
-                        <label for="tags" title="Tags for searching and categorizing, separated by spaces">Tags:</label>
+                        <label for="tags" data-i18n="labels.tags" data-i18n-title="tooltips.tags" title="Tags for searching and categorizing, separated by spaces">Tags:</label>
                         <input type="text" id="tags" name="tags" />
                     </div>
                 </div>
@@ -146,20 +155,20 @@
 
             <!-- Difficulty Metadata -->
             <fieldset>
-                <legend>Difficulty Metadata</legend>
+                <legend data-i18n="sections.difficulty_metadata">Difficulty Metadata</legend>
 
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="hp_drain_rate" title="HP drain rate (HP)">HP Drain Rate (HP):</label>
+                        <label for="hp_drain_rate" data-i18n="labels.hp_drain_rate" data-i18n-title="tooltips.hp_drain_rate" title="HP drain rate (HP)">HP Drain Rate (HP):</label>
                         <input type="number" step="0.1" id="hp_drain_rate" name="hp_drain_rate" min="0" max="10" value="5" />
                     </div>
                     <div class="metadata-group">
                         <div class="form-group conditional-field" id="group-circle_size" data-show-for-gamemode="0" style="display: none;">
-                            <label for="circle_size" title="Circle size (CS)">Circle Size (CS):</label>
+                            <label for="circle_size" data-i18n="labels.circle_size" data-i18n-title="tooltips.circle_size" title="Circle size (CS)">Circle Size (CS):</label>
                             <input type="number" step="0.1" id="circle_size" name="circle_size" min="0" max="10" value="4" />
                         </div>
                         <div class="form-group conditional-field" id="group-keycount" data-show-for-gamemode="3" style="display: none;">
-                            <label for="keycount" title="Number of keys for mania">Key Count:</label>
+                            <label for="keycount" data-i18n="labels.keycount" data-i18n-title="tooltips.keycount" title="Number of keys for mania">Key Count:</label>
                             <input type="number" id="keycount" name="keycount" min="0" max="18" value="4" />
                         </div>
                     </div>
@@ -167,22 +176,22 @@
 
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="overall_difficulty" title="Overall difficulty (OD)">Overall Difficulty (OD):</label>
+                        <label for="overall_difficulty" data-i18n="labels.overall_difficulty" data-i18n-title="tooltips.overall_difficulty" title="Overall difficulty (OD)">Overall Difficulty (OD):</label>
                         <input type="number" step="0.1" id="overall_difficulty" name="overall_difficulty" min="0" max="10" value="8" />
                     </div>
                     <div class="metadata-group">
-                        <label for="approach_rate" title="Approach rate (AR)">Approach Rate (AR):</label>
+                        <label for="approach_rate" data-i18n="labels.approach_rate" data-i18n-title="tooltips.approach_rate" title="Approach rate (AR)">Approach Rate (AR):</label>
                         <input type="number" step="0.1" id="approach_rate" name="approach_rate" min="0" max="10" value="9" />
                     </div>
                 </div>
 
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="slider_multiplier" title="Slider velocity multiplier">Slider Multiplier:</label>
+                        <label for="slider_multiplier" data-i18n="labels.slider_multiplier" data-i18n-title="tooltips.slider_multiplier" title="Slider velocity multiplier">Slider Multiplier:</label>
                         <input type="number" step="0.1" id="slider_multiplier" name="slider_multiplier" min="0" max="3.6" value="1.4" />
                     </div>
                     <div class="metadata-group">
-                        <label for="slider_tick_rate" title="Slider tick rate">Slider Tick Rate:</label>
+                        <label for="slider_tick_rate" data-i18n="labels.slider_tick_rate" data-i18n-title="tooltips.slider_tick_rate" title="Slider tick rate">Slider Tick Rate:</label>
                         <input type="number" step="0.5" id="slider_tick_rate" name="slider_tick_rate" min="0.5" max="4.0" value="1" />
                     </div>
                 </div>
@@ -190,21 +199,21 @@
 
             <!-- Advanced Settings -->
             <fieldset>
-                <legend>Advanced Settings</legend>
+                <legend data-i18n="sections.advanced_settings">Advanced Settings</legend>
 
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="lora_path" title="Path to folder or HuggingFace repository with LoRA weights and config. This can be used to tweak the style of the model beyond its usual capabilities.">LoRA Path or ID:</label>
+                        <label for="lora_path" data-i18n="labels.lora_path" data-i18n-title="tooltips.lora_path" title="Path to folder or HuggingFace repository with LoRA weights and config. This can be used to tweak the style of the model beyond its usual capabilities.">LoRA Path or ID:</label>
                         <div class="path-input-group">
                             <div class="input-with-clear">
                                 <input type="text" id="lora_path" name="lora_path" />
                                 <button type="button" class="clear-input-btn" data-target="lora_path" style="display: none;">×</button>
                             </div>
-                            <button type="button" class="browse-button" data-browse-type="folder" data-target="lora_path">Browse...</button>
+                            <button type="button" class="browse-button" data-browse-type="folder" data-target="lora_path" data-i18n="buttons.browse">Browse...</button>
                         </div>
                     </div>
                     <div class="metadata-group">
-                        <label for="seed" title="Random seed for generation">Random Seed:</label>
+                        <label for="seed" data-i18n="labels.seed" data-i18n-title="tooltips.seed" title="Random seed for generation">Random Seed:</label>
                         <input type="text" id="seed" name="seed" />
                     </div>
                 </div>
@@ -212,13 +221,13 @@
                 <div class="metadata-row">
                     <div class="metadata-group">
                         <div class="form-group conditional-field" id="group-hold_note_ratio" data-show-for-gamemode="3" style="display: none;">
-                            <label for="hold_note_ratio" title="Hold note ratio for mania 0-1">Hold Note Ratio:</label>
+                            <label for="hold_note_ratio" data-i18n="labels.hold_note_ratio" data-i18n-title="tooltips.hold_note_ratio" title="Hold note ratio for mania 0-1">Hold Note Ratio:</label>
                             <input type="number" step="0.01" id="hold_note_ratio" name="hold_note_ratio" min="0" max="1" />
                         </div>
                     </div>
                     <div class="metadata-group">
                         <div class="form-group conditional-field" id="group-scroll_speed_ratio" data-show-for-gamemode="2,3" style="display: none;">
-                            <label for="scroll_speed_ratio" title="Scroll speed ratio for mania and ctb 0-1">Scroll Speed Ratio:</label>
+                            <label for="scroll_speed_ratio" data-i18n="labels.scroll_speed_ratio" data-i18n-title="tooltips.scroll_speed_ratio" title="Scroll speed ratio for mania and ctb 0-1">Scroll Speed Ratio:</label>
                             <input type="number" step="0.01" id="scroll_speed_ratio" name="scroll_speed_ratio" min="0" max="1" />
                         </div>
                     </div>
@@ -226,22 +235,22 @@
 
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="mapper_id" title="Mapper user ID for style">Mapper ID:</label>
+                        <label for="mapper_id" data-i18n="labels.mapper_id" data-i18n-title="tooltips.mapper_id" title="Mapper user ID for style">Mapper ID:</label>
                         <input type="text" id="mapper_id" name="mapper_id" />
                     </div>
                     <div class="metadata-group">
-                        <label for="cfg_scale" title="Scale of the classifier-free guidance">CFG Scale:</label>
+                        <label for="cfg_scale" data-i18n="labels.cfg_scale" data-i18n-title="tooltips.cfg_scale" title="Scale of the classifier-free guidance">CFG Scale:</label>
                         <input type="number" step="0.1" id="cfg_scale" name="cfg_scale" min="0" value="1.0"/>
                     </div>
                 </div>
 
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="temperature">Temperature:</label>
+                        <label for="temperature" data-i18n="labels.temperature">Temperature:</label>
                         <input type="number" id="temperature" name="temperature" step="0.01" min="0" max="1" value="0.9">
                     </div>
                     <div class="metadata-group">
-                        <label for="top_p">Top-p:</label>
+                        <label for="top_p" data-i18n="labels.top_p">Top-p:</label>
                         <input type="number" id="top_p" name="top_p" step="0.01" min="0" max="1" value="0.9">
                     </div>
                 </div>
@@ -249,7 +258,7 @@
                 <div class="metadata-row">
                     <div class="metadata-group">
                         <div class="form-group conditional-field" id="group-year" data-hide-for-model="v30">
-                            <label for="year" title="Year of the song (2007-2023)">Year (2007-2023):</label>
+                            <label for="year" data-i18n="labels.year" title="Year of the song (2007-2023)">Year (2007-2023):</label>
                             <input type="number" id="year" name="year" min="2007" max="2023" value="2023" />
                         </div>
                     </div>
@@ -258,15 +267,15 @@
 
             <!-- Generation Interval -->
             <fieldset>
-                <legend>Generation Interval</legend>
+                <legend data-i18n="sections.generation_interval">Generation Interval</legend>
 
                 <div class="metadata-row">
                     <div class="metadata-group">
-                        <label for="start_time" title="Generation start time in milliseconds">Start Time (ms):</label>
+                        <label for="start_time" data-i18n="labels.start_time" data-i18n-title="tooltips.start_time" title="Generation start time in milliseconds">Start Time (ms):</label>
                         <input type="number" id="start_time" name="start_time" min="0" />
                     </div>
                     <div class="metadata-group">
-                        <label for="end_time" title="Generation end time in milliseconds">End Time (ms):</label>
+                        <label for="end_time" data-i18n="labels.end_time" data-i18n-title="tooltips.end_time" title="Generation end time in milliseconds">End Time (ms):</label>
                         <input type="number" id="end_time" name="end_time" min="0" />
                     </div>
                 </div>
@@ -274,36 +283,36 @@
 
             <!-- Options -->
             <fieldset>
-                <legend>Options</legend>
+                <legend data-i18n="sections.options">Options</legend>
                 <div class="option-item">
                     <input type="checkbox" id="export_osz" name="export_osz" value="false" />
-                    <label for="export_osz" title="Whether to export a .osz file containing the generated beatmap and audio file">Export .osz</label>
+                    <label for="export_osz" data-i18n="options.export_osz" data-i18n-title="options.export_osz_tooltip" title="Whether to export a .osz file containing the generated beatmap and audio file">Export .osz</label>
                 </div>
 
                 <div class="option-item conditional-field" id="add-to-beatmap-option" style="display: none;">
                     <input type="checkbox" id="add_to_beatmap" name="add_to_beatmap" value="false" />
-                    <label for="add_to_beatmap" title="Whether to merge the generated content with the reference beatmap">Add to Beatmap</label>
+                    <label for="add_to_beatmap" data-i18n="options.add_to_beatmap" data-i18n-title="options.add_to_beatmap_tooltip" title="Whether to merge the generated content with the reference beatmap">Add to Beatmap</label>
                 </div>
 
                 <div class="option-item conditional-field" id="overwrite-reference-beatmap-option" style="display: none;">
                     <input type="checkbox" id="overwrite_reference_beatmap" name="overwrite_reference_beatmap" value="false" />
-                    <label for="overwrite_reference_beatmap" title="Whether to overwrite the reference beatmap file instead of creating a new file">Overwrite Reference Beatmap</label>
+                    <label for="overwrite_reference_beatmap" data-i18n="options.overwrite_reference_beatmap" data-i18n-title="options.overwrite_reference_beatmap_tooltip" title="Whether to overwrite the reference beatmap file instead of creating a new file">Overwrite Reference Beatmap</label>
                 </div>
 
                 <div class="option-item conditional-field" id="option-item-hitsounded" data-hide-for-model="v30">
                     <input type="checkbox" id="hitsounded" name="hitsounded" value="true" checked />
-                    <label for="hitsounded">Add Hitsounds</label>
+                    <label for="hitsounded" data-i18n="options.hitsounded">Add Hitsounds</label>
                 </div>
 
                 <div class="option-item">
                     <input type="checkbox" id="super_timing" name="super_timing" value="false" />
-                    <label for="super_timing" title="Whether to use slow accurate variable BPM timing generator">Super Timing</label>
+                    <label for="super_timing" data-i18n="options.super_timing" data-i18n-title="options.super_timing_tooltip" title="Whether to use slow accurate variable BPM timing generator">Super Timing</label>
                 </div>
 
                 <div class="option-item" id="bf16-option" style="display: none;">
                     <input type="checkbox" id="enable_bf16" name="enable_bf16" value="true" checked />
-                    <label for="enable_bf16" title="Use BF16 precision for ~15% faster inference on Ampere+ GPUs (RTX 30xx/40xx)">
-                        BF16 Precision <span id="bf16-gpu-info" style="font-size: 0.85em; color: var(--text-secondary);"></span>
+                    <label for="enable_bf16" data-i18n-title="options.enable_bf16_tooltip" title="Use BF16 precision for ~15% faster inference on Ampere+ GPUs (RTX 30xx/40xx)">
+                        <span data-i18n="options.enable_bf16">BF16 Precision</span> <span id="bf16-gpu-info" style="font-size: 0.85em; color: var(--text-secondary);"></span>
                     </label>
                 </div>
             </fieldset>
@@ -311,7 +320,7 @@
             <!-- Descriptors -->
             <div class="custom-dropdown-descriptors conditional-field" data-hide-for-model="v30">
                 <button type="button" class="dropdown-header">
-                    <span class="dropdown-title" title="List of descriptors for style (1 click = include, 2 clicks = exclude)">Descriptors</span>
+                    <span class="dropdown-title" data-i18n="sections.descriptors" data-i18n-title="tooltips.descriptors" title="List of descriptors for style (1 click = include, 2 clicks = exclude)">Descriptors</span>
                     <span class="dropdown-arrow">&#9660;</span>
                 </button>
                 <div class="dropdown-content" inert>
@@ -409,12 +418,17 @@
 
                         {% for group in descriptor_groups %}
                         <div class="descriptor-group">
-                            <h3>{{ group.title }}</h3>
+                            {% set group_key = group.title|lower|replace(" ", "_") %}
+                            <h3 data-i18n="descriptors.groups.{{ group_key }}">{{ group.title }}</h3>
                             {% for item in group["items"] %}
                             <div class="descriptor-item">
                                 {% set item_id = "desc-" ~ item.value|replace(" ", "-") %}
+                                {% set item_key = item.value|replace(" ", "_")|replace("-", "_") %}
                                 <input type="checkbox" id="{{ item_id }}" name="descriptors" value="{{ item.value }}" />
-                                <label for="{{ item_id }}" title="{{ item.title }}">{{ item.value }}</label>
+                                <label for="{{ item_id }}" 
+                                       data-i18n="descriptors.items.{{ item.value }}.label"
+                                       data-i18n-title="descriptors.items.{{ item.value }}.tooltip"
+                                       title="{{ item.title }}">{{ item.value }}</label>
                             </div>
                             {% endfor %}
                         </div>
@@ -426,7 +440,7 @@
             <!-- Negative Descriptors -->
             <div class="custom-dropdown-descriptors conditional-field" data-hide-for-model="v30">
                 <button class="dropdown-header">
-                    <span class="dropdown-title" title="List of negative descriptors for style to avoid (1 click = include, 2 clicks = exclude)">Negative Descriptors</span>
+                    <span class="dropdown-title" data-i18n="sections.negative_descriptors" data-i18n-title="tooltips.negative_descriptors" title="List of negative descriptors for style to avoid (1 click = include, 2 clicks = exclude)">Negative Descriptors</span>
                     <span class="dropdown-arrow">&#9660;</span>
                 </button>
                 <div class="dropdown-content" inert>
@@ -485,12 +499,16 @@
 
                         {% for group in negative_descriptor_groups %}
                         <div class="descriptor-group">
-                            <h3>{{ group.title }} (Negative)</h3>
+                            {% set group_key = group.title|lower|replace(" ", "_") %}
+                            <h3 data-i18n="descriptors.groups.{{ group_key }}" data-i18n-suffix=" (排除)"> {{ group.title }} (Negative)</h3>
                             {% for item in group["items"] %}
                             <div class="descriptor-item">
                                 {% set item_id = "neg-desc-" ~ item.value|replace(" ", "-") %}
                                 <input type="checkbox" id="{{ item_id }}" name="negative_descriptors" value="{{ item.value }}" />
-                                <label for="{{ item_id }}" title="{{ item.title }}">{{ item.value }}</label>
+                                <label for="{{ item_id }}" 
+                                       data-i18n="descriptors.items.{{ item.value }}.label"
+                                       data-i18n-title="descriptors.items.{{ item.value }}.tooltip"
+                                       title="{{ item.title }}">{{ item.value }}</label>
                             </div>
                             {% endfor %}
                         </div>
@@ -500,35 +518,35 @@
             </div>
             <!-- Config Section -->
             <fieldset>
-                <legend>Config</legend>
+                <legend data-i18n="sections.config">Config</legend>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button type="button" id="export-config-btn" class="browse-button">Export</button>
+                    <button type="button" id="export-config-btn" class="browse-button" data-i18n="buttons.export">Export</button>
                     <input type="file" id="import-config-input" accept=".json" style="display: none;" />
-                    <button type="button" id="import-config-btn" class="browse-button">Import</button>
-                    <button type="button" id="reset-config-btn" class="browse-button">Clear</button>
+                    <button type="button" id="import-config-btn" class="browse-button" data-i18n="buttons.import">Import</button>
+                    <button type="button" id="reset-config-btn" class="browse-button" data-i18n="buttons.clear">Clear</button>
                 </div>
                 <div id="config-status" style="margin-top: 10px; font-size: 14px;"></div>
             </fieldset>
 
-            <button type="submit">Run Inference</button>
+            <button type="submit" data-i18n="buttons.run_inference">Run Inference</button>
         </form>
 
         <!-- Progress Output -->
         <div id="progress_output" class="card" style="margin-top:20px; display:none;">
-            <h3>Progress</h3>
-            <div id="init_message">Initializing process... This may take a moment.</div>
+            <h3 data-i18n="progress.title">Progress</h3>
+            <div id="init_message" data-i18n="progress.initializing">Initializing process... This may take a moment.</div>
             <div id="progressTitle" style="font-weight:bold; padding-bottom:5px;"></div>
             <div id="progressBarContainer">
                 <div id="progressBar"></div>
             </div>
             <div style="margin-top: 10px; text-align: center;">
-                <button type="button" id="cancel-button" class="cancel-button" style="display:none;">Cancel</button>
+                <button type="button" id="cancel-button" class="cancel-button" style="display:none;" data-i18n="buttons.cancel">Cancel</button>
             </div>
             <div id="beatmapLink" style="display:none; margin-top:10px;">
-                <a id="beatmapLinkAnchor" href="#" target="_blank">Click Here to go to the created beatmap...</a>
+                <a id="beatmapLinkAnchor" href="#" target="_blank" data-i18n="links.open_folder">Click here to open the folder containing your map.</a>
             </div>
             <div id="errorLogLink" style="display:none; margin-top:10px;">
-                <a id="errorLogLinkAnchor" href="#">See why... (opens error log)</a>
+                <a id="errorLogLinkAnchor" href="#" data-i18n="links.open_log">See why... (opens error log)</a>
             </div>
         </div>
     </main>
@@ -536,6 +554,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+<script src="{{ url_for('static', filename='i18n.js') }}"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

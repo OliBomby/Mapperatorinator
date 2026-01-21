@@ -1,0 +1,489 @@
+{
+    "meta": {
+        "language": "zh-CN",
+        "name": "简体中文",
+        "version": "1.0.0",
+        "author": "Mapperatorinator Community"
+    },
+    "page": {
+        "title": "Mapperatorinator 谱面生成器"
+    },
+    "sections": {
+        "paths": "路径设置",
+        "basic_settings": "基本设置",
+        "song_metadata": "歌曲信息",
+        "difficulty_metadata": "难度设置",
+        "advanced_settings": "高级设置",
+        "generation_interval": "生成区间",
+        "options": "选项",
+        "descriptors": "描述符",
+        "negative_descriptors": "排除描述符",
+        "config": "配置管理",
+        "in_context_options": "上下文选项"
+    },
+    "labels": {
+        "audio_path": "音频路径",
+        "output_path": "输出路径",
+        "beatmap_path": "谱面路径",
+        "model": "模型",
+        "gamemode": "游戏模式",
+        "difficulty": "难度（星级）",
+        "title": "标题",
+        "title_unicode": "标题（Unicode）",
+        "artist": "艺术家",
+        "artist_unicode": "艺术家（Unicode）",
+        "creator": "谱师",
+        "version": "难度名",
+        "preview_time": "预览时间（ms）",
+        "background_image": "背景图片",
+        "source": "来源",
+        "tags": "标签",
+        "hp_drain_rate": "HP 掉血速度",
+        "circle_size": "CS 圆圈大小",
+        "overall_difficulty": "OD 综合难度",
+        "approach_rate": "AR 缩圈速度",
+        "slider_multiplier": "滑条速度倍率",
+        "slider_tick_rate": "滑条点密度",
+        "keycount": "按键数量",
+        "hold_note_ratio": "长按音符比例",
+        "scroll_speed_ratio": "滚动速度比例",
+        "lora_path": "LoRA 路径或 ID",
+        "seed": "随机种子",
+        "mapper_id": "谱师 ID",
+        "cfg_scale": "CFG 引导强度",
+        "temperature": "温度",
+        "top_p": "Top-p",
+        "year": "年份（2007-2023）",
+        "start_time": "开始时间（ms）",
+        "end_time": "结束时间（ms）"
+    },
+    "tooltips": {
+        "audio_path": "音频文件的路径",
+        "output_path": "输出文件夹的路径",
+        "beatmap_path": "用于自动填充元数据、音频路径和输出路径的 .osu 文件，或作为参考谱面",
+        "difficulty": "难度评级（星数）",
+        "title": "歌曲标题",
+        "title_unicode": "歌曲标题（Unicode/日文）",
+        "artist": "歌曲艺术家",
+        "artist_unicode": "艺术家名称（Unicode/日文）",
+        "creator": "谱面制作者/谱师名称",
+        "version": "谱面版本/难度名称",
+        "preview_time": "预览时间（毫秒）",
+        "background_image": "背景图片文件",
+        "source": "来源（如：专辑、动漫、游戏）",
+        "tags": "用于搜索和分类的标签，以空格分隔",
+        "hp_drain_rate": "HP 掉血速度",
+        "circle_size": "圆圈大小（CS）",
+        "overall_difficulty": "综合难度（OD）",
+        "approach_rate": "缩圈速度（AR）",
+        "slider_multiplier": "滑条速度倍率",
+        "slider_tick_rate": "滑条点密度",
+        "keycount": "Mania 模式的按键数量",
+        "hold_note_ratio": "Mania 模式长按音符比例（0-1）",
+        "scroll_speed_ratio": "Mania 和 CTB 模式滚动速度比例（0-1）",
+        "lora_path": "LoRA 权重和配置的文件夹路径或 HuggingFace 仓库。可用于调整模型风格。",
+        "seed": "生成时使用的随机种子",
+        "mapper_id": "谱师用户 ID，用于风格参考",
+        "cfg_scale": "无分类器引导的强度",
+        "start_time": "生成开始时间（毫秒）",
+        "end_time": "生成结束时间（毫秒）",
+        "in_context_options": "提供给模型的额外上下文列表",
+        "descriptors": "风格描述符列表（单击=包含，双击=排除）",
+        "negative_descriptors": "要避免的负面风格描述符列表（单击=包含，双击=排除）"
+    },
+    "buttons": {
+        "browse": "浏览...",
+        "run_inference": "开始生成",
+        "cancel": "取消",
+        "cancelling": "取消中...",
+        "export": "导出",
+        "import": "导入",
+        "clear": "清空"
+    },
+    "models": {
+        "v28": "Mapperatorinator V28",
+        "v29": "Mapperatorinator V29（支持游戏模式和描述符）",
+        "v30": "Mapperatorinator V30（最佳模型）",
+        "v31": "Mapperatorinator V31（比 V29 略准确）"
+    },
+    "gamemodes": {
+        "0": "Standard（标准）",
+        "1": "Taiko（太鼓）",
+        "2": "Catch the Beat（接水果）",
+        "3": "Mania（下落式）"
+    },
+    "options": {
+        "export_osz": "导出 .osz 文件",
+        "export_osz_tooltip": "是否导出包含生成谱面和音频文件的 .osz 文件",
+        "add_to_beatmap": "添加到谱面",
+        "add_to_beatmap_tooltip": "是否将生成的内容合并到参考谱面中",
+        "overwrite_reference_beatmap": "覆盖参考谱面",
+        "overwrite_reference_beatmap_tooltip": "是否覆盖参考谱面文件而不是创建新文件",
+        "hitsounded": "添加打击音效",
+        "super_timing": "超级 Timing",
+        "super_timing_tooltip": "是否使用慢速精确的可变 BPM Timing 生成器",
+        "enable_bf16": "BF16 精度",
+        "enable_bf16_tooltip": "在 Ampere+ GPU（RTX 30xx/40xx）上使用 BF16 精度，推理速度提升约 15%"
+    },
+    "in_context_options": {
+        "TIMING": "Timing",
+        "KIAI": "Kiai",
+        "GD": "客串难度",
+        "NO_HS": "无打击音效"
+    },
+    "progress": {
+        "title": "进度",
+        "initializing": "正在初始化进程...请稍候。",
+        "generating_timing": "正在生成 Timing",
+        "generating_kiai": "正在生成 Kiai",
+        "generating_map": "正在生成谱面",
+        "refining_positions": "正在优化位置",
+        "processing_complete": "处理完成",
+        "processing_failed": "处理失败",
+        "error_detected": "检测到错误",
+        "connection_error": "连接错误"
+    },
+    "messages": {
+        "success": {
+            "inference_started": "推理已开始",
+            "inference_cancelled": "推理已成功取消。",
+            "config_exported": "配置导出成功",
+            "config_imported": "配置导入成功！",
+            "settings_reset": "所有设置已重置为默认值",
+            "folder_open_sent": "文件夹打开请求已发送。"
+        },
+        "error": {
+            "process_running": "进程已在运行中",
+            "start_failed": "启动推理进程失败。请检查后端控制台。",
+            "validation_failed": "路径验证出错。请查看控制台了解详情。",
+            "audio_not_found": "音频文件未找到",
+            "beatmap_not_found": "谱面文件未找到",
+            "beatmap_invalid_ext": "谱面文件必须是 .osu 格式",
+            "audio_or_beatmap_required": "运行推理需要提供谱面路径或音频路径",
+            "output_or_beatmap_required": "运行推理需要提供输出路径或谱面路径",
+            "browse_failed": "浏览失败。请确保后端 API 正在运行。",
+            "connection_lost": "错误：与进程流的连接丢失。",
+            "file_not_found": "错误：所需文件未找到。",
+            "generation_error": "创建谱面时出错。请查看控制台/日志了解详情。",
+            "task_error": "启动或执行生成任务时出错。",
+            "config_invalid": "请选择有效的 JSON 配置文件。",
+            "config_import_failed": "配置导入出错",
+            "export_cancelled": "用户已取消导出",
+            "save_failed": "保存配置失败",
+            "cancel_failed": "发送取消请求失败。未知错误。",
+            "open_folder_failed": "通过后端打开文件夹失败。",
+            "open_log_failed": "通过后端打开日志文件失败。",
+            "invalid_osu_file": "请选择有效的 .osu 文件。"
+        },
+        "confirm": {
+            "reset_settings": "确定要将所有设置重置为默认值吗？此操作无法撤销。"
+        }
+    },
+    "links": {
+        "open_folder": "点击此处打开包含谱面的文件夹。",
+        "open_log": "查看原因...（打开错误日志）",
+        "beatmap_created": "点击此处前往已创建的谱面..."
+    },
+    "descriptors": {
+        "groups": {
+            "general": "通用",
+            "meta_information": "元信息",
+            "style": "风格",
+            "song_representation": "歌曲表现",
+            "skillsets": "技能组",
+            "aim": "瞄准",
+            "tap": "点击",
+            "scene": "场景"
+        },
+        "items": {
+            "gimmick": {
+                "label": "gimmick（机制图）",
+                "tooltip": "专注于单一独特的设计或玩法理念。"
+            },
+            "2B": {
+                "label": "2B",
+                "tooltip": "包含两个或更多物件同时放置的玩法元素。"
+            },
+            "slider only": {
+                "label": "slider only（纯滑条）",
+                "tooltip": "物件选择仅限于滑条。"
+            },
+            "circle only": {
+                "label": "circle only（纯圆圈）",
+                "tooltip": "物件选择仅限于圆圈。"
+            },
+            "swing": {
+                "label": "swing（摇摆）",
+                "tooltip": "大部分/所有物件使用 1/3、1/6 和 1/12 节拍细分。"
+            },
+            "collab": {
+                "label": "collab（合作图）",
+                "tooltip": "由两个或更多谱师共同制作的谱面。"
+            },
+            "megacollab": {
+                "label": "megacollab（大型合作图）",
+                "tooltip": "由 8 个或更多谱师共同制作的谱面。"
+            },
+            "marathon": {
+                "label": "marathon（马拉松）",
+                "tooltip": "游玩时间超过 5 分钟的谱面。"
+            },
+            "gungathon": {
+                "label": "gungathon（超长马拉松）",
+                "tooltip": "游玩时间超过 10 分钟的谱面。"
+            },
+            "multi-song": {
+                "label": "multi-song（多歌曲）",
+                "tooltip": "音频中包含多首歌曲。"
+            },
+            "variable timing": {
+                "label": "variable timing（变速）",
+                "tooltip": "包含多个时间点，通常用于非节拍器歌曲。"
+            },
+            "accelerating bpm": {
+                "label": "accelerating bpm（加速 BPM）",
+                "tooltip": "节奏逐渐加快的特点。"
+            },
+            "time signatures": {
+                "label": "time signatures（拍号）",
+                "tooltip": "频繁变换或使用不常见的拍号。"
+            },
+            "storyboard": {
+                "label": "storyboard（故事板）",
+                "tooltip": "包含增强游戏体验的故事板。"
+            },
+            "storyboard gimmick": {
+                "label": "storyboard gimmick（故事板机制）",
+                "tooltip": "使用故事板元素改变谱面的游玩方式。"
+            },
+            "keysounds": {
+                "label": "keysounds（按键音）",
+                "tooltip": "使用各种音高的打击音效创建旋律。"
+            },
+            "download unavailable": {
+                "label": "download unavailable（无法下载）",
+                "tooltip": "无法从 osu! 网站下载。"
+            },
+            "custom skin": {
+                "label": "custom skin（自定义皮肤）",
+                "tooltip": "使用自定义皮肤元素和图形。"
+            },
+            "featured artist": {
+                "label": "featured artist（精选艺术家）",
+                "tooltip": "使用 osu! 精选艺术家列表中的歌曲。"
+            },
+            "custom song": {
+                "label": "custom song（定制歌曲）",
+                "tooltip": "使用专门为该谱面制作的歌曲。"
+            },
+            "messy": {
+                "label": "messy（凌乱）",
+                "tooltip": "视觉上混乱且无序的图案。"
+            },
+            "geometric": {
+                "label": "geometric（几何）",
+                "tooltip": "在设计中融入几何形状。"
+            },
+            "grid snap": {
+                "label": "grid snap（网格对齐）",
+                "tooltip": "物件沿方形网格放置。"
+            },
+            "hexgrid": {
+                "label": "hexgrid（六边形网格）",
+                "tooltip": "物件沿六边形网格放置。"
+            },
+            "freeform": {
+                "label": "freeform（自由式）",
+                "tooltip": "视觉结构较为宽松的方式。"
+            },
+            "symmetrical": {
+                "label": "symmetrical（对称）",
+                "tooltip": "在设计中运用对称性。"
+            },
+            "old-style revival": {
+                "label": "old-style revival（复古风格）",
+                "tooltip": "模仿早期作图风格。"
+            },
+            "clean": {
+                "label": "clean（整洁）",
+                "tooltip": "视觉上简洁有序的图案。"
+            },
+            "slidershapes": {
+                "label": "slidershapes（滑条造型）",
+                "tooltip": "使用多种滑条设计。"
+            },
+            "distance snapped": {
+                "label": "distance snapped（距离对齐）",
+                "tooltip": "使用 osu! 内置的距离对齐功能。"
+            },
+            "iNiS-style": {
+                "label": "iNiS-style（iNiS 风格）",
+                "tooltip": "源自原版 DS 游戏。"
+            },
+            "avant-garde": {
+                "label": "avant-garde（前卫）",
+                "tooltip": "实验性的设计理念。"
+            },
+            "perfect stacks": {
+                "label": "perfect stacks（完美堆叠）",
+                "tooltip": "具有完美重叠的堆叠音符。"
+            },
+            "ninja spinners": {
+                "label": "ninja spinners（忍者转盘）",
+                "tooltip": "具有非常短的转盘。"
+            },
+            "simple": {
+                "label": "simple（简单）",
+                "tooltip": "易于理解和上手的设计。"
+            },
+            "chaotic": {
+                "label": "chaotic（混乱）",
+                "tooltip": "不可预测的谱面设计。"
+            },
+            "repetition": {
+                "label": "repetition（重复）",
+                "tooltip": "具有可识别的相同图案。"
+            },
+            "progression": {
+                "label": "progression（渐进）",
+                "tooltip": "难度逐渐提升。"
+            },
+            "high contrast": {
+                "label": "high contrast（高对比）",
+                "tooltip": "使用醒目的设计来跟随音乐变化。"
+            },
+            "improvisation": {
+                "label": "improvisation（即兴）",
+                "tooltip": "使用与音乐不直接匹配的图案。"
+            },
+            "playfield usage": {
+                "label": "playfield usage（游戏区域使用）",
+                "tooltip": "有意识地使用游戏区域。"
+            },
+            "playfield constraint": {
+                "label": "playfield constraint（游戏区域限制）",
+                "tooltip": "将物件放置限制在游戏区域的一部分。"
+            },
+            "video gimmick": {
+                "label": "video gimmick（视频联动）",
+                "tooltip": "在图案设计中参考背景视频。"
+            },
+            "difficulty spike": {
+                "label": "difficulty spike（难度峰值）",
+                "tooltip": "突然显著增加的挑战。"
+            },
+            "low sv": {
+                "label": "low sv（低滑条速度）",
+                "tooltip": "显著使用低滑条速度。"
+            },
+            "high sv": {
+                "label": "high sv（高滑条速度）",
+                "tooltip": "显著使用高滑条速度。"
+            },
+            "colorhax": {
+                "label": "colorhax（颜色技巧）",
+                "tooltip": "有意使用连击颜色来增强沉浸感。"
+            },
+            "tech": {
+                "label": "tech（技术）",
+                "tooltip": "测试不常见的技能。"
+            },
+            "slider tech": {
+                "label": "slider tech（滑条技术）",
+                "tooltip": "测试涉及复杂滑条的技能。"
+            },
+            "complex sv": {
+                "label": "complex sv（复杂滑条速度）",
+                "tooltip": "大幅变化的滑条速度以测试读图能力。"
+            },
+            "reading": {
+                "label": "reading（读图）",
+                "tooltip": "测试玩家的读图技能。"
+            },
+            "visually dense": {
+                "label": "visually dense（视觉密集）",
+                "tooltip": "具有许多可见音符的图案，使读图变难。"
+            },
+            "overlap reading": {
+                "label": "overlap reading（重叠读图）",
+                "tooltip": "重叠的物件遮挡音符顺序。"
+            },
+            "jump aim": {
+                "label": "jump aim（跳跃瞄准）",
+                "tooltip": "重点关注跳跃。"
+            },
+            "sharp aim": {
+                "label": "sharp aim（锐角瞄准）",
+                "tooltip": "大量使用锐角移动。"
+            },
+            "wide aim": {
+                "label": "wide aim（广角瞄准）",
+                "tooltip": "使用广角移动图案。"
+            },
+            "linear aim": {
+                "label": "linear aim（线性瞄准）",
+                "tooltip": "需要持续的直线移动。"
+            },
+            "aim control": {
+                "label": "aim control（瞄准控制）",
+                "tooltip": "具有突然的速度或方向变化。"
+            },
+            "flow aim": {
+                "label": "flow aim（流畅瞄准）",
+                "tooltip": "鼓励完全连续的光标移动。"
+            },
+            "precision": {
+                "label": "precision（精确）",
+                "tooltip": "需要精细、精确的光标移动。"
+            },
+            "finger control": {
+                "label": "finger control（手指控制）",
+                "tooltip": "测试复杂的点击能力。"
+            },
+            "complex snap divisors": {
+                "label": "complex snap divisors（复杂节拍细分）",
+                "tooltip": "使用不常见的节拍细分。"
+            },
+            "bursts": {
+                "label": "bursts（短连打）",
+                "tooltip": "连续的交替图案，通常 9 个音符或更少。"
+            },
+            "streams": {
+                "label": "streams（连打）",
+                "tooltip": "连续的交替图案，通常超过 9 个音符。"
+            },
+            "spaced streams": {
+                "label": "spaced streams（间隔连打）",
+                "tooltip": "音符之间有大间距的连打。"
+            },
+            "cutstreams": {
+                "label": "cutstreams（切割连打）",
+                "tooltip": "间距非常不均匀的连打。"
+            },
+            "stamina": {
+                "label": "stamina（耐力）",
+                "tooltip": "测试长时间的耐力。"
+            },
+            "aspire": {
+                "label": "aspire",
+                "tooltip": "使用 bug 实现独特效果。"
+            },
+            "mapping contest": {
+                "label": "mapping contest（作图比赛）",
+                "tooltip": "作图比赛的参赛作品。"
+            },
+            "tournament custom": {
+                "label": "tournament custom（锦标赛定制）",
+                "tooltip": "为锦标赛定制的谱面。"
+            },
+            "tag": {
+                "label": "tag（接力）",
+                "tooltip": "为多人接力模式设计。"
+            },
+            "port": {
+                "label": "port（移植）",
+                "tooltip": "最初为其他媒体创建，然后导入。"
+            }
+        }
+    }
+}
