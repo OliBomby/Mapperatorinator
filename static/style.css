@@ -109,6 +109,18 @@ fieldset {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    position: relative; /* Paths header: make the fieldset a positioning context */
+}
+
+/* Only the first fieldset (Paths) has the language selector overlay; reserve vertical space for it */
+form#inferenceForm > fieldset:first-of-type {
+    padding-top: 50px; /* ~35px control height + spacing */
+}
+
+form#inferenceForm > fieldset:first-of-type > legend {
+    position: absolute;
+    top: 10px;
+    left: 10px;
 }
 
 legend {
@@ -117,9 +129,37 @@ legend {
     border-bottom: 2px solid var(--accent-color);
 }
 
-label {
-    display: block;
-    transition: color var(--transition-speed);
+/* Place the language selector on the same visual row as the legend */
+.fieldset-legend-control {
+    position: absolute;
+    top: 10px; /* matches fieldset padding */
+    right: 10px;
+    height: 35px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 10px;
+}
+
+/* Ensure the select doesn't stretch */
+.fieldset-legend-control #language-selector {
+    width: auto;
+    min-width: 120px;
+    height: 35px;
+}
+
+.i18n-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-secondary);
+}
+
+/* Make sure SVG graphics inherit the .i18n-icon color */
+.i18n-icon svg,
+.i18n-icon svg * {
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 0.5px;
 }
 
 input[type="text"],

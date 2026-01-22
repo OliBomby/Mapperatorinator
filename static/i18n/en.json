@@ -1,0 +1,490 @@
+{
+    "meta": {
+        "language": "en",
+        "name": "English",
+        "version": "1.0.0",
+        "author": "Mapperatorinator Team"
+    },
+    "page": {
+        "title": "Mapperatorinator Interface"
+    },
+    "sections": {
+        "paths": "Paths",
+        "basic_settings": "Basic Settings",
+        "song_metadata": "Song Metadata",
+        "difficulty_metadata": "Difficulty Metadata",
+        "advanced_settings": "Advanced Settings",
+        "generation_interval": "Generation Interval",
+        "options": "Options",
+        "descriptors": "Descriptors",
+        "negative_descriptors": "Negative Descriptors",
+        "config": "Config",
+        "in_context_options": "In-Context Options"
+    },
+    "labels": {
+        "audio_path": "Audio Path",
+        "output_path": "Output Path",
+        "beatmap_path": "Beatmap Path",
+        "model": "Model",
+        "gamemode": "Gamemode",
+        "difficulty": "Difficulty (star rating)",
+        "title": "Title",
+        "title_unicode": "Title (Unicode)",
+        "artist": "Artist",
+        "artist_unicode": "Artist (Unicode)",
+        "creator": "Creator",
+        "version": "Version",
+        "preview_time": "Preview Time (ms)",
+        "background_image": "Background Image",
+        "source": "Source",
+        "tags": "Tags",
+        "hp_drain_rate": "HP Drain Rate (HP)",
+        "circle_size": "Circle Size (CS)",
+        "overall_difficulty": "Overall Difficulty (OD)",
+        "approach_rate": "Approach Rate (AR)",
+        "slider_multiplier": "Slider Multiplier",
+        "slider_tick_rate": "Slider Tick Rate",
+        "keycount": "Key Count",
+        "hold_note_ratio": "Hold Note Ratio",
+        "scroll_speed_ratio": "Scroll Speed Ratio",
+        "lora_path": "LoRA Path or ID",
+        "seed": "Random Seed",
+        "mapper_id": "Mapper ID",
+        "cfg_scale": "CFG Scale",
+        "temperature": "Temperature",
+        "top_p": "Top-p",
+        "year": "Year (2007-2023)",
+        "start_time": "Start Time (ms)",
+        "end_time": "End Time (ms)"
+    },
+    "tooltips": {
+        "audio_path": "Path to audio file",
+        "output_path": "Path to output folder",
+        "beatmap_path": "Path to .osu file to autofill metadata, audio path, and output path, or use as reference",
+        "difficulty": "Difficulty rating (star rating)",
+        "title": "Song title",
+        "title_unicode": "Song title in Unicode/Japanese",
+        "artist": "Song artist",
+        "artist_unicode": "Artist name in Unicode/Japanese",
+        "creator": "Beatmap creator/mapper name",
+        "version": "Beatmap version/difficulty name",
+        "preview_time": "Preview time in milliseconds",
+        "background_image": "Background image file",
+        "source": "Source name (e.g., album, anime, game)",
+        "tags": "Tags for searching and categorizing, separated by spaces",
+        "hp_drain_rate": "HP drain rate (HP)",
+        "circle_size": "Circle size (CS)",
+        "overall_difficulty": "Overall difficulty (OD)",
+        "approach_rate": "Approach rate (AR)",
+        "slider_multiplier": "Slider velocity multiplier",
+        "slider_tick_rate": "Slider tick rate",
+        "keycount": "Number of keys for mania",
+        "hold_note_ratio": "Hold note ratio for mania 0-1",
+        "scroll_speed_ratio": "Scroll speed ratio for mania and ctb 0-1",
+        "lora_path": "Path to folder or HuggingFace repository with LoRA weights and config. This can be used to tweak the style of the model beyond its usual capabilities.",
+        "seed": "Random seed for generation",
+        "mapper_id": "Mapper user ID for style",
+        "cfg_scale": "Scale of the classifier-free guidance",
+        "year": "Year of the song (2007-2023)",
+        "start_time": "Generation start time in milliseconds",
+        "end_time": "Generation end time in milliseconds",
+        "in_context_options": "List of additional context to provide to the model",
+        "descriptors": "List of descriptors for style (1 click = include, 2 clicks = exclude)",
+        "negative_descriptors": "List of negative descriptors for style to avoid (1 click = include, 2 clicks = exclude)"
+    },
+    "buttons": {
+        "browse": "Browse...",
+        "run_inference": "Run Inference",
+        "cancel": "Cancel",
+        "cancelling": "Cancelling...",
+        "export": "Export",
+        "import": "Import",
+        "clear": "Clear"
+    },
+    "models": {
+        "v28": "Mapperatorinator V28",
+        "v29": "Mapperatorinator V29 (Supports gamemodes and descriptors)",
+        "v30": "Mapperatorinator V30 (Best model)",
+        "v31": "Mapperatorinator V31 (Slightly more accurate than V29)"
+    },
+    "gamemodes": {
+        "0": "Standard",
+        "1": "Taiko",
+        "2": "Catch the Beat",
+        "3": "Mania"
+    },
+    "options": {
+        "export_osz": "Export .osz",
+        "export_osz_tooltip": "Whether to export a .osz file containing the generated beatmap and audio file",
+        "add_to_beatmap": "Add to Beatmap",
+        "add_to_beatmap_tooltip": "Whether to merge the generated content with the reference beatmap",
+        "overwrite_reference_beatmap": "Overwrite Reference Beatmap",
+        "overwrite_reference_beatmap_tooltip": "Whether to overwrite the reference beatmap file instead of creating a new file",
+        "hitsounded": "Add Hitsounds",
+        "super_timing": "Super Timing",
+        "super_timing_tooltip": "Whether to use slow accurate variable BPM timing generator",
+        "enable_bf16": "BF16 Precision",
+        "enable_bf16_tooltip": "Use BF16 precision for ~15% faster inference on Ampere+ GPUs (RTX 30xx/40xx)"
+    },
+    "in_context_options": {
+        "TIMING": "Timing",
+        "KIAI": "Kiai",
+        "GD": "Guest Difficulty",
+        "NO_HS": "No Hitsound"
+    },
+    "progress": {
+        "title": "Progress",
+        "initializing": "Initializing process... This may take a moment.",
+        "generating_timing": "Generating Timing",
+        "generating_kiai": "Generating Kiai",
+        "generating_map": "Generating Map",
+        "refining_positions": "Refining Positions",
+        "processing_complete": "Processing Complete",
+        "processing_failed": "Processing Failed",
+        "error_detected": "Error Detected",
+        "connection_error": "Connection Error"
+    },
+    "messages": {
+        "success": {
+            "inference_started": "Inference started",
+            "inference_cancelled": "Inference cancelled successfully.",
+            "config_exported": "Configuration exported successfully",
+            "config_imported": "Configuration imported successfully!",
+            "settings_reset": "All settings reset to default values",
+            "folder_open_sent": "Folder open request sent."
+        },
+        "error": {
+            "process_running": "Process already running",
+            "start_failed": "Failed to start inference process. Check backend console.",
+            "validation_failed": "Error validating paths. Check console for details.",
+            "audio_not_found": "Audio file not found",
+            "beatmap_not_found": "Beatmap file not found",
+            "beatmap_invalid_ext": "Beatmap file must have .osu extension",
+            "audio_or_beatmap_required": "Either 'Beatmap Path' or 'Audio Path' are required for running inference",
+            "output_or_beatmap_required": "Either 'Output Path' or 'Beatmap Path' are required for running inference",
+            "browse_failed": "Could not browse. Ensure the backend API is running.",
+            "connection_lost": "Error: Connection to process stream lost.",
+            "file_not_found": "Error: A required file was not found.",
+            "generation_error": "There was an error while creating the beatmap. Check console/logs for details.",
+            "task_error": "There was an error starting or executing the generation task.",
+            "config_invalid": "Please select a valid JSON configuration file.",
+            "config_import_failed": "Error importing configuration",
+            "export_cancelled": "Export cancelled by user",
+            "save_failed": "Failed to save configuration",
+            "cancel_failed": "Failed to send cancel request. Unknown error.",
+            "open_folder_failed": "Failed to open folder via backend.",
+            "open_log_failed": "Failed to open log file via backend.",
+            "invalid_osu_file": "Please select a valid .osu file."
+        },
+        "confirm": {
+            "reset_settings": "Are you sure you want to reset all settings to default values? This cannot be undone."
+        }
+    },
+    "links": {
+        "open_folder": "Click here to open the folder containing your map.",
+        "open_log": "See why... (opens error log)",
+        "beatmap_created": "Click Here to go to the created beatmap..."
+    },
+    "descriptors": {
+        "groups": {
+            "general": "General",
+            "meta_information": "Meta Information",
+            "style": "Style",
+            "song_representation": "Song Representation",
+            "skillsets": "Skillsets",
+            "aim": "Aim",
+            "tap": "Tap",
+            "scene": "Scene"
+        },
+        "items": {
+            "gimmick": {
+                "label": "gimmick",
+                "tooltip": "Focused on a single unique design or gameplay idea."
+            },
+            "2B": {
+                "label": "2B",
+                "tooltip": "Includes gameplay elements with two or more objects placed simultaneously."
+            },
+            "slider only": {
+                "label": "slider only",
+                "tooltip": "Restricts object choice to sliders only."
+            },
+            "circle only": {
+                "label": "circle only",
+                "tooltip": "Restricts object choice to circles only."
+            },
+            "swing": {
+                "label": "swing",
+                "tooltip": "Uses 1/3, 1/6, and 1/12 snap divisors for most/all objects."
+            },
+            "collab": {
+                "label": "collab",
+                "tooltip": "A map with two or more associated mappers."
+            },
+            "megacollab": {
+                "label": "megacollab",
+                "tooltip": "A map with 8 or more associated mappers."
+            },
+            "marathon": {
+                "label": "marathon",
+                "tooltip": "A map with a drain time of over 5 minutes."
+            },
+            "gungathon": {
+                "label": "gungathon",
+                "tooltip": "A map with a drain time of over 10 minutes."
+            },
+            "multi-song": {
+                "label": "multi-song",
+                "tooltip": "Contains multiple songs within the audio."
+            },
+            "variable timing": {
+                "label": "variable timing",
+                "tooltip": "Contains multiple timing points, usually for non-metronome songs."
+            },
+            "accelerating bpm": {
+                "label": "accelerating bpm",
+                "tooltip": "Features progressively increasing tempo."
+            },
+            "time signatures": {
+                "label": "time signatures",
+                "tooltip": "Many changes or uncommon time signatures."
+            },
+            "storyboard": {
+                "label": "storyboard",
+                "tooltip": "Contains a storyboard that enhances gameplay experience."
+            },
+            "storyboard gimmick": {
+                "label": "storyboard gimmick",
+                "tooltip": "Uses storyboard elements that change how the map is played."
+            },
+            "keysounds": {
+                "label": "keysounds",
+                "tooltip": "Uses various pitched hitsounds to create a melody."
+            },
+            "download unavailable": {
+                "label": "download unavailable",
+                "tooltip": "Cannot be downloaded from the osu! website."
+            },
+            "custom skin": {
+                "label": "custom skin",
+                "tooltip": "Utilizes custom skin elements and graphics."
+            },
+            "featured artist": {
+                "label": "featured artist",
+                "tooltip": "Features song(s) from osu!'s Featured Artist listing."
+            },
+            "custom song": {
+                "label": "custom song",
+                "tooltip": "Maps a song made specifically for the map."
+            },
+            "messy": {
+                "label": "messy",
+                "tooltip": "Visually chaotic and disorganised patterns."
+            },
+            "geometric": {
+                "label": "geometric",
+                "tooltip": "Incorporates geometric shapes within the design."
+            },
+            "grid snap": {
+                "label": "grid snap",
+                "tooltip": "Objects are placed along a square grid."
+            },
+            "hexgrid": {
+                "label": "hexgrid",
+                "tooltip": "Objects are placed along a hexagonal grid."
+            },
+            "freeform": {
+                "label": "freeform",
+                "tooltip": "A loose approach to visual structure."
+            },
+            "symmetrical": {
+                "label": "symmetrical",
+                "tooltip": "Employs symmetry within the design."
+            },
+            "old-style revival": {
+                "label": "old-style revival",
+                "tooltip": "Emulates a style from early mapping."
+            },
+            "clean": {
+                "label": "clean",
+                "tooltip": "Visually uncluttered and organised patterns."
+            },
+            "slidershapes": {
+                "label": "slidershapes",
+                "tooltip": "Uses a variety of slider designs."
+            },
+            "distance snapped": {
+                "label": "distance snapped",
+                "tooltip": "Uses osu's built-in distance snap feature."
+            },
+            "iNiS-style": {
+                "label": "iNiS-style",
+                "tooltip": "Originates from the original DS games."
+            },
+            "avant-garde": {
+                "label": "avant-garde",
+                "tooltip": "Experimental design philosophies."
+            },
+            "perfect stacks": {
+                "label": "perfect stacks",
+                "tooltip": "Features perfectly overlapped stacked notes."
+            },
+            "ninja spinners": {
+                "label": "ninja spinners",
+                "tooltip": "Features very short spinners."
+            },
+            "simple": {
+                "label": "simple",
+                "tooltip": "Accessible and straightforward design."
+            },
+            "chaotic": {
+                "label": "chaotic",
+                "tooltip": "Unpredictable map design."
+            },
+            "repetition": {
+                "label": "repetition",
+                "tooltip": "Features recognizable identical patterns."
+            },
+            "progression": {
+                "label": "progression",
+                "tooltip": "Gradual advancement in difficulty."
+            },
+            "high contrast": {
+                "label": "high contrast",
+                "tooltip": "Uses flashy ideas to follow music changes."
+            },
+            "improvisation": {
+                "label": "improvisation",
+                "tooltip": "Uses patterns that do not directly match the music."
+            },
+            "playfield usage": {
+                "label": "playfield usage",
+                "tooltip": "Deliberate use of the playfield."
+            },
+            "playfield constraint": {
+                "label": "playfield constraint",
+                "tooltip": "Restricts object placement to a part of the playfield."
+            },
+            "video gimmick": {
+                "label": "video gimmick",
+                "tooltip": "References the background video in its patterning."
+            },
+            "difficulty spike": {
+                "label": "difficulty spike",
+                "tooltip": "A sudden, significant challenge increase."
+            },
+            "low sv": {
+                "label": "low sv",
+                "tooltip": "Prominent low slider velocity usage."
+            },
+            "high sv": {
+                "label": "high sv",
+                "tooltip": "Prominent high slider velocity usage."
+            },
+            "colorhax": {
+                "label": "colorhax",
+                "tooltip": "Intentional use of combo colors for immersion."
+            },
+            "tech": {
+                "label": "tech",
+                "tooltip": "Tests uncommon skills."
+            },
+            "slider tech": {
+                "label": "slider tech",
+                "tooltip": "Tests skills involving complex sliders."
+            },
+            "complex sv": {
+                "label": "complex sv",
+                "tooltip": "Large changes in slider velocity to test reading."
+            },
+            "reading": {
+                "label": "reading",
+                "tooltip": "Tests a player's reading skill."
+            },
+            "visually dense": {
+                "label": "visually dense",
+                "tooltip": "Patterns with many visible notes that make reading hard."
+            },
+            "overlap reading": {
+                "label": "overlap reading",
+                "tooltip": "Overlapped objects obscure note order."
+            },
+            "jump aim": {
+                "label": "jump aim",
+                "tooltip": "Focuses heavily on jumps."
+            },
+            "sharp aim": {
+                "label": "sharp aim",
+                "tooltip": "Heavy use of sharp angle movement."
+            },
+            "wide aim": {
+                "label": "wide aim",
+                "tooltip": "Uses wide angle movement patterns."
+            },
+            "linear aim": {
+                "label": "linear aim",
+                "tooltip": "Requires continuous straight movement."
+            },
+            "aim control": {
+                "label": "aim control",
+                "tooltip": "Features abrupt velocity or direction changes."
+            },
+            "flow aim": {
+                "label": "flow aim",
+                "tooltip": "Encourages fully continuous cursor movement."
+            },
+            "precision": {
+                "label": "precision",
+                "tooltip": "Requires fine, precise cursor movement."
+            },
+            "finger control": {
+                "label": "finger control",
+                "tooltip": "Tests complex tapping ability."
+            },
+            "complex snap divisors": {
+                "label": "complex snap divisors",
+                "tooltip": "Uses unusual snap divisors."
+            },
+            "bursts": {
+                "label": "bursts",
+                "tooltip": "Continuous alternating patterns, typically 9 notes or less."
+            },
+            "streams": {
+                "label": "streams",
+                "tooltip": "Continuous alternating patterns, typically more than 9 notes."
+            },
+            "spaced streams": {
+                "label": "spaced streams",
+                "tooltip": "Streams with large spacing between notes."
+            },
+            "cutstreams": {
+                "label": "cutstreams",
+                "tooltip": "Streams with very uneven spacing."
+            },
+            "stamina": {
+                "label": "stamina",
+                "tooltip": "Tests endurance over long periods."
+            },
+            "aspire": {
+                "label": "aspire",
+                "tooltip": "Uses glitches for unique effects."
+            },
+            "mapping contest": {
+                "label": "mapping contest",
+                "tooltip": "An entry for a mapping contest."
+            },
+            "tournament custom": {
+                "label": "tournament custom",
+                "tooltip": "A custom map for a tournament."
+            },
+            "tag": {
+                "label": "tag",
+                "tooltip": "Designed for multiplayer tag mode."
+            },
+            "port": {
+                "label": "port",
+                "tooltip": "Originally created for other media then imported."
+            }
+        }
+    }
+}

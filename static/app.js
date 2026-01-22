@@ -942,6 +942,24 @@ $(document).ready(function() {
 
     // Initialize all components
     function initializeApp() {
+        // Initialize language selector
+        const $langSelector = $('#language-selector');
+        if ($langSelector.length && typeof I18n !== 'undefined') {
+            // Set initial value from I18n
+            const currentLang = I18n.getCurrentLanguage();
+            $langSelector.val(currentLang);
+            
+            // Handle language change
+            $langSelector.on('change', async function() {
+                const newLang = $(this).val();
+                const success = await I18n.setLanguage(newLang);
+                if (!success) {
+                    // Revert to current language if failed
+                    $(this).val(I18n.getCurrentLanguage());
+                }
+            });
+        }
+
         // Check BF16 support on page load
         $.get("/check_bf16_support", function(data) {
             if (data.supported) {
