@@ -258,7 +258,7 @@
                 <div class="metadata-row">
                     <div class="metadata-group">
                         <div class="form-group conditional-field" id="group-year" data-hide-for-model="v30">
-                            <label for="year" data-i18n="labels.year" title="Year of the song (2007-2023)">Year (2007-2023):</label>
+                            <label for="year" data-i18n="labels.year" data-i18n-title="tooltips.year">Year (2007-2023):</label>
                             <input type="number" id="year" name="year" min="2007" max="2023" value="2023" />
                         </div>
                     </div>
@@ -500,7 +500,7 @@
                         {% for group in negative_descriptor_groups %}
                         <div class="descriptor-group">
                             {% set group_key = group.title|lower|replace(" ", "_") %}
-                            <h3 data-i18n="descriptors.groups.{{ group_key }}" data-i18n-suffix=" (排除)"> {{ group.title }} (Negative)</h3>
+                            <h3 data-i18n="descriptors.groups.{{ group_key }}_negative"> {{ group.title }} (Negative)</h3>
                             {% for item in group["items"] %}
                             <div class="descriptor-item">
                                 {% set item_id = "neg-desc-" ~ item.value|replace(" ", "-") %}

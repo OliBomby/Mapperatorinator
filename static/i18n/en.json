@@ -85,6 +85,7 @@
         "seed": "Random seed for generation",
         "mapper_id": "Mapper user ID for style",
         "cfg_scale": "Scale of the classifier-free guidance",
+        "year": "Year of the song (2007-2023)",
         "start_time": "Generation start time in milliseconds",
         "end_time": "Generation end time in milliseconds",
         "in_context_options": "List of additional context to provide to the model",
