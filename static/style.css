@@ -138,7 +138,7 @@ legend {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding-bottom: 4.29px;
+    padding-bottom: 10px;
 }
 
 /* Ensure the select doesn't stretch */
@@ -159,6 +159,7 @@ legend {
 .i18n-icon svg * {
     fill: currentColor;
     stroke: currentColor;
+    stroke-width: 0.5px;
 }
 
 input[type="text"],
