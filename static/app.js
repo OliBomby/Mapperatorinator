@@ -964,7 +964,6 @@ $(document).ready(function() {
         $.get("/check_bf16_support", function(data) {
             if (data.supported) {
                 $("#bf16-option").show();
-                $("#enable_bf16").prop("checked", true);
                 if (data.gpu_name) {
                     $("#bf16-gpu-info").text("(" + data.gpu_name + ")");
                 }
