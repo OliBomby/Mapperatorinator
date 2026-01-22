@@ -500,7 +500,7 @@
                         {% for group in negative_descriptor_groups %}
                         <div class="descriptor-group">
                             {% set group_key = group.title|lower|replace(" ", "_") %}
-                            <h3 data-i18n="descriptors.groups.{{ group_key }}_negative"> {{ group.title }} (Negative)</h3>
+                            <h3 data-i18n="descriptors.groups.{{ group_key }}"> {{ group.title }}</h3>
                             {% for item in group["items"] %}
                             <div class="descriptor-item">
                                 {% set item_id = "neg-desc-" ~ item.value|replace(" ", "-") %}
