@@ -1,11 +1,8 @@
 $(document).ready(function() {
     // Application state and configuration
     const AppState = {
-        evtSource: null,
-        isCancelled: false,
-        inferenceErrorOccurred: false,
-        accumulatedErrorMessages: [],
-        errorLogFilePath: null,
+        jobs: new Map(),
+        jobCounter: 0,
         animationSpeed: 300,
 
         modelCapabilities: {
@@ -626,7 +623,6 @@ $(document).ready(function() {
     const InferenceManager = {
         init() {
             $('#inferenceForm').submit((e) => this.handleSubmit(e));
-            $('#cancel-button').click(() => this.cancelInference());
         },
 
         async handleSubmit(e) {
@@ -635,8 +631,9 @@ $(document).ready(function() {
             // Apply placeholder values before validation
             if (!await this.validateForm()) return;
 
-            this.resetProgress();
-            this.startInference();
+            this.removeFinishedCards();
+            const job = this.createJobCard();
+            this.startInference(job);
         },
 
         async validateForm() {
@@ -677,26 +674,110 @@ $(document).ready(function() {
             return true;
         },
 
-        resetProgress() {
-            $('#flash-container').empty();
-            $("#progress_output").show();
+        createJobCard() {
+            AppState.jobCounter += 1;
+            const jobDisplayName = `Job ${AppState.jobCounter}`;
+            const tempKey = `temp-${Date.now()}-${AppState.jobCounter}`;
+
+            const $card = $(
+                `<div class="progress-card" data-status="running" data-job-key="${tempKey}">
+                    <div class="progress-card-header">
+                        <div class="progress-card-title">${jobDisplayName}</div>
+                        <button type="button" class="progress-card-close" title="Remove">×</button>
+                    </div>
+                    <div class="progress-card-status">Starting...</div>
+                    <div class="init-message" style="font-style: italic; color: #ccc; margin-bottom: 10px;">
+                        Initializing process... This may take a moment.
+                    </div>
+                    <div class="progressBarContainer">
+                        <div class="progressBar"></div>
+                    </div>
+                    <div class="progress-card-actions">
+                        <button type="button" class="cancel-button" style="display:none;">Cancel</button>
+                    </div>
+                    <div class="progress-card-links beatmap-link" style="display:none;">
+                        <a href="#" target="_blank">Click here to open the folder containing your map.</a>
+                    </div>
+                    <div class="progress-card-links error-log-link" style="display:none;">
+                        <a href="#">See why... (opens error log)</a>
+                    </div>
+                </div>`
+            );
+
+            $('#progressCards').prepend($card);
+            $('#progress_output').show();
             Utils.smoothScroll('#progress_output');
 
-            $("#progressBarContainer, #progressTitle").show();
-            $("#progressBar").css("width", "0%").removeClass('cancelled error');
-            $("#beatmapLink, #errorLogLink").hide();
-            $("#init_message").text("Initializing process... This may take a moment.").show();
-            $("#progressTitle").text("").css('color', '');
-            $("#cancel-button").hide().prop('disabled', false).text('Cancel');
-            $("button[type='submit']").prop("disabled", true);
+            const job = {
+                id: null,
+                tempKey,
+                displayName: jobDisplayName,
+                evtSource: null,
+                isCancelled: false,
+                inferenceErrorOccurred: false,
+                accumulatedErrorMessages: [],
+                errorLogFilePath: null,
+                elements: {
+                    $card,
+                    $status: $card.find('.progress-card-status'),
+                    $initMessage: $card.find('.init-message'),
+                    $progressBar: $card.find('.progressBar'),
+                    $progressBarContainer: $card.find('.progressBarContainer'),
+                    $cancelButton: $card.find('.cancel-button'),
+                    $beatmapLink: $card.find('.beatmap-link'),
+                    $beatmapLinkAnchor: $card.find('.beatmap-link a'),
+                    $errorLogLink: $card.find('.error-log-link'),
+                    $errorLogLinkAnchor: $card.find('.error-log-link a')
+                }
+            };
 
-            AppState.inferenceErrorOccurred = false;
-            AppState.accumulatedErrorMessages = [];
-            AppState.isCancelled = false;
+            $card.find('.progress-card-close').on('click', () => this.removeJob(job.id || job.tempKey, $card));
+            job.elements.$cancelButton.on('click', () => this.cancelInference(job));
 
-            if (AppState.evtSource) {
-                AppState.evtSource.close();
-                AppState.evtSource = null;
+            AppState.jobs.set(tempKey, job);
+            return job;
+        },
+
+        removeJob(jobId, $cardOverride = null) {
+            const job = this.getJob(jobId);
+            const $card = $cardOverride || job?.elements?.$card;
+            if (job?.evtSource) {
+                job.evtSource.close();
+            }
+            if ($card) {
+                const tempKey = $card.data('job-key');
+                $card.remove();
+                if (!jobId && tempKey) {
+                    AppState.jobs.delete(tempKey);
+                }
+            }
+            if (job) {
+                AppState.jobs.delete(job.id || job.tempKey);
+            }
+            this.updateProgressOutputVisibility();
+        },
+
+        removeFinishedCards() {
+            $('.progress-card').each((_, card) => {
+                const $card = $(card);
+                const status = $card.data('status');
+                if (status === 'completed' || status === 'error' || status === 'cancelled') {
+                    const jobId = $card.data('job-id');
+                    const tempKey = $card.data('job-key');
+                    $card.remove();
+                    if (jobId) {
+                        AppState.jobs.delete(jobId);
+                    } else if (tempKey) {
+                        AppState.jobs.delete(tempKey);
+                    }
+                }
+            });
+            this.updateProgressOutputVisibility();
+        },
+
+        updateProgressOutputVisibility() {
+            if ($('#progressCards').children().length === 0) {
+                $('#progress_output').hide();
             }
         },
 
@@ -728,16 +809,26 @@ $(document).ready(function() {
             return formData;
         },
 
-        startInference() {
+        startInference(job) {
             $.ajax({
                 url: "/start_inference",
                 method: "POST",
                 data: this.buildFormData(),
                 processData: false,
                 contentType: false,
-                success: () => {
-                    $("#cancel-button").show();
-                    this.connectToSSE();
+                success: (response) => {
+                    const jobId = response.job_id;
+                    if (!jobId) {
+                        Utils.showFlashMessage("Failed to start inference: missing job id.", 'error');
+                        this.removeJob(job.id || job.tempKey, job.elements.$card);
+                        return;
+                    }
+                    job.id = jobId;
+                    job.elements.$cancelButton.show().prop('disabled', false).text('Cancel');
+                    job.elements.$card.attr('data-job-id', jobId);
+                    AppState.jobs.delete(job.tempKey);
+                    AppState.jobs.set(jobId, job);
+                    this.connectToSSE(job);
                 },
                 error: (jqXHR, textStatus, errorThrown) => {
                     console.error("Failed to start inference:", textStatus, errorThrown);
@@ -751,29 +842,27 @@ $(document).ready(function() {
                         } catch(e) { /* ignore parsing error */ }
                     }
                     Utils.showFlashMessage(errorMsg, 'error');
-                    $("button[type='submit']").prop("disabled", false);
-                    $("#cancel-button").hide();
-                    $("#progress_output").hide();
+                    this.removeJob(job.id, job.elements.$card);
                 }
             });
         },
 
-        connectToSSE() {
-            console.log("Connecting to SSE stream...");
-            AppState.evtSource = new EventSource("/stream_output");
-            AppState.errorLogFilePath = null;
+        connectToSSE(job) {
+            console.log("Connecting to SSE stream...", job.id);
+            job.evtSource = new EventSource(`/stream_output?job_id=${encodeURIComponent(job.id)}`);
+            job.errorLogFilePath = null;
 
-            AppState.evtSource.onmessage = (e) => this.handleSSEMessage(e);
-            AppState.evtSource.onerror = (err) => this.handleSSEError(err);
-            AppState.evtSource.addEventListener("error_log", (e) => {
-                AppState.errorLogFilePath = e.data;
+            job.evtSource.onmessage = (e) => this.handleSSEMessage(job, e);
+            job.evtSource.onerror = (err) => this.handleSSEError(job, err);
+            job.evtSource.addEventListener("error_log", (e) => {
+                job.errorLogFilePath = e.data;
             });
-            AppState.evtSource.addEventListener("end", (e) => this.handleSSEEnd(e));
+            job.evtSource.addEventListener("end", (e) => this.handleSSEEnd(job, e));
         },
 
-        handleSSEMessage(e) {
-            if ($("#init_message").is(":visible")) $("#init_message").hide();
-            if (AppState.isCancelled) return;
+        handleSSEMessage(job, e) {
+            if (job.elements.$initMessage.is(":visible")) job.elements.$initMessage.hide();
+            if (job.isCancelled) return;
 
             const messageData = e.data;
             const errorIndicators = [
@@ -783,19 +872,19 @@ $(document).ready(function() {
 
             const isErrorMessage = errorIndicators.some(indicator => messageData.includes(indicator));
 
-            if (isErrorMessage && !AppState.inferenceErrorOccurred) {
-                AppState.inferenceErrorOccurred = true;
-                AppState.accumulatedErrorMessages.push(messageData);
-                $("#progressTitle").text("Error Detected").css('color', 'var(--accent-color)');
-                $("#progressBar").addClass('error');
-            } else if (AppState.inferenceErrorOccurred) {
-                AppState.accumulatedErrorMessages.push(messageData);
+            if (isErrorMessage && !job.inferenceErrorOccurred) {
+                job.inferenceErrorOccurred = true;
+                job.accumulatedErrorMessages.push(messageData);
+                job.elements.$status.text("Error Detected").css('color', 'var(--accent-color)');
+                job.elements.$progressBar.addClass('error');
+            } else if (job.inferenceErrorOccurred) {
+                job.accumulatedErrorMessages.push(messageData);
             } else {
-                this.updateProgress(messageData);
+                this.updateProgress(job, messageData);
             }
         },
 
-        updateProgress(messageData) {
+        updateProgress(job, messageData) {
             // Update progress title based on message content
             const lowerCaseMessage = messageData.toLowerCase();
             const progressTitles = {
@@ -807,7 +896,7 @@ $(document).ready(function() {
 
             Object.entries(progressTitles).forEach(([keyword, title]) => {
                 if (lowerCaseMessage.includes(keyword)) {
-                    $("#progressTitle").text(title);
+                    job.elements.$status.text(title);
                 }
             });
 
@@ -816,7 +905,7 @@ $(document).ready(function() {
             if (progressMatch) {
                 const currentPercent = parseInt(progressMatch[1].trim(), 10);
                 if (!isNaN(currentPercent)) {
-                    $("#progressBar").css("width", currentPercent + "%");
+                    job.elements.$progressBar.css("width", currentPercent + "%");
                 }
             }
 
@@ -827,7 +916,7 @@ $(document).ready(function() {
                     const fullPath = parts[1].trim().replace(/\\/g, "/");
                     const folderPath = fullPath.substring(0, fullPath.lastIndexOf("/"));
 
-                    $("#beatmapLinkAnchor")
+                    job.elements.$beatmapLinkAnchor
                         .attr("href", "#")
                         .text("Click here to open the folder containing your map.")
                         .off("click")
@@ -837,57 +926,56 @@ $(document).ready(function() {
                                 .done(response => console.log("Open folder response:", response))
                                 .fail(() => alert("Failed to open folder via backend."));
                         });
-                    $("#beatmapLink").show();
+                    job.elements.$beatmapLink.show();
                 }
             }
         },
 
-        handleSSEError(err) {
+        handleSSEError(job, err) {
             console.error("EventSource failed:", err);
-            if (AppState.evtSource) {
-                AppState.evtSource.close();
-                AppState.evtSource = null;
+            if (job.evtSource) {
+                job.evtSource.close();
+                job.evtSource = null;
             }
 
-            if (!AppState.isCancelled && !AppState.inferenceErrorOccurred) {
-                AppState.inferenceErrorOccurred = true;
-                AppState.accumulatedErrorMessages.push("Error: Connection to process stream lost.");
-                $("#progressTitle").text("Connection Error").css('color', 'var(--accent-color)');
-                $("#progressBar").addClass('error');
+            if (!job.isCancelled && !job.inferenceErrorOccurred) {
+                job.inferenceErrorOccurred = true;
+                job.accumulatedErrorMessages.push("Error: Connection to process stream lost.");
+                job.elements.$status.text("Connection Error").css('color', 'var(--accent-color)');
+                job.elements.$progressBar.addClass('error');
+                job.elements.$card.data('status', 'error');
                 Utils.showFlashMessage("Error: Connection to process stream lost.", "error");
             }
 
-            if (!AppState.isCancelled) {
-                $("button[type='submit']").prop("disabled", false);
-            }
-            $("#cancel-button").hide();
+            job.elements.$cancelButton.hide();
         },
 
-        handleSSEEnd(e) {
+        handleSSEEnd(job, e) {
             console.log("Received end event from server.", e.data);
-            if (AppState.evtSource) {
-                AppState.evtSource.close();
-                AppState.evtSource = null;
+            if (job.evtSource) {
+                job.evtSource.close();
+                job.evtSource = null;
             }
 
-            if (AppState.isCancelled) {
-                $("#progressTitle, #progressBarContainer, #beatmapLink, #errorLogLink").hide();
-                $("#progress_output").hide();
-            } else if (AppState.inferenceErrorOccurred) {
-                this.handleInferenceError();
+            if (job.isCancelled) {
+                job.elements.$status.text("Cancelled").css('color', 'var(--accent-color)');
+                job.elements.$progressBar.addClass('error');
+                job.elements.$card.data('status', 'cancelled');
+            } else if (job.inferenceErrorOccurred) {
+                this.handleInferenceError(job);
+                job.elements.$card.data('status', 'error');
             } else {
-                $("#progressTitle").show().text("Processing Complete").css('color', '');
-                $("#progressBarContainer").show();
-                $("#progressBar").css("width", "100%").removeClass('error');
+                job.elements.$status.text("Processing Complete").css('color', '');
+                job.elements.$progressBar.css("width", "100%").removeClass('error');
+                job.elements.$card.data('status', 'completed');
             }
 
-            $("button[type='submit']").prop("disabled", false);
-            $("#cancel-button").hide();
-            AppState.isCancelled = false;
+            job.elements.$cancelButton.hide();
+            job.isCancelled = false;
         },
 
-        handleInferenceError() {
-            const fullErrorText = AppState.accumulatedErrorMessages.join("\\n");
+        handleInferenceError(job) {
+            const fullErrorText = job.accumulatedErrorMessages.join("\\n");
             let specificError = "An error occurred during processing. Check console/logs.";
 
             if (fullErrorText.includes("FileNotFoundError:")) {
@@ -904,31 +992,31 @@ $(document).ready(function() {
             }
 
             Utils.showFlashMessage(specificError, "error");
-            $("#progressTitle").text("Processing Failed").css('color', 'var(--accent-color)').show();
-            $("#progressBar").css("width", "100%").addClass('error');
-            $("#progressBarContainer").show();
-            $("#beatmapLink").hide();
+            job.elements.$status.text("Processing Failed").css('color', 'var(--accent-color)').show();
+            job.elements.$progressBar.css("width", "100%").addClass('error');
+            job.elements.$beatmapLink.hide();
 
-            if (AppState.errorLogFilePath) {
-                $("#errorLogLinkAnchor").off("click").on("click", (e) => {
+            if (job.errorLogFilePath) {
+                job.elements.$errorLogLinkAnchor.off("click").on("click", (e) => {
                     e.preventDefault();
-                    $.get("/open_log_file", { path: AppState.errorLogFilePath })
+                    $.get("/open_log_file", { path: job.errorLogFilePath })
                         .done(response => console.log("Open log response:", response))
                         .fail(() => alert("Failed to open log file via backend."));
                 });
-                $("#errorLogLink").show();
+                job.elements.$errorLogLink.show();
             }
         },
 
-        cancelInference() {
-            const $cancelBtn = $("#cancel-button");
+        cancelInference(job) {
+            const $cancelBtn = job.elements.$cancelButton;
             $cancelBtn.prop('disabled', true).text('Cancelling...');
 
             $.ajax({
                 url: "/cancel_inference",
                 method: "POST",
+                data: { job_id: job.id },
                 success: (response) => { // Expecting JSON response
-                    AppState.isCancelled = true;
+                    job.isCancelled = true;
                     Utils.showFlashMessage(response.message || "Inference cancelled successfully.", "cancel-success");
                 },
                 error: (jqXHR) => {
@@ -937,6 +1025,10 @@ $(document).ready(function() {
                     $cancelBtn.prop('disabled', false).text('Cancel');
                 }
             });
+        },
+
+        getJob(jobId) {
+            return AppState.jobs.get(jobId) || null;
         }
     };
 
@@ -977,11 +1069,6 @@ $(document).ready(function() {
             dropdownCssClass: "select2-dropdown-dark",
             containerCssClass: "select2-container-dark"
         });
-
-        // Ensure progress title div exists
-        if (!$("#progressTitle").length) {
-            $("#progress_output h3").after("<div id='progressTitle' style='font-weight:bold; padding-bottom:5px;'></div>");
-        }
 
         // Initialize all managers
         FileBrowser.init();

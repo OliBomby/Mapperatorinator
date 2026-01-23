@@ -6,6 +6,7 @@ import os
 import platform
 import socket
 import subprocess
+import uuid
 import sys
 import threading
 import time
@@ -150,9 +151,9 @@ class Api:
         return parse_file_dialog_result(result)
 
 
-# --- Shared State for Inference Process ---
-current_process: subprocess.Popen | None = None
-process_lock = threading.Lock()  # Lock for accessing current_process safely
+# --- Shared State for Inference Processes ---
+processes: dict[str, subprocess.Popen] = {}
+process_lock = threading.Lock()  # Lock for accessing processes safely
 # Track PIDs for which a cancellation was requested, so their non-zero exit codes are expected and not logged
 cancelled_pids: set[int] = set()
 
@@ -230,206 +231,210 @@ def check_bf16_support():
 @app.route('/start_inference', methods=['POST'])
 def start_inference():
     """Starts the inference process based on form data."""
-    global current_process
-    with process_lock:
-        if current_process and current_process.poll() is None:
-            return jsonify({"status": "error", "message": "Process already running"}), 409  # Conflict
-        # When starting a new process, clear any previous cancellation flags
-        cancelled_pids.clear()
+    job_id = uuid.uuid4().hex
 
-        # --- Construct Command List (shell=False) ---
-        python_executable = sys.executable  # Get path to current Python interpreter
-        cmd = [python_executable, "inference.py", "-cn"]
+    # --- Construct Command List (shell=False) ---
+    python_executable = sys.executable  # Get path to current Python interpreter
+    cmd = [python_executable, "inference.py", "-cn"]
 
-        # Get the model name from the form
-        model_name = request.form.get('model')
-        config_name = model_name
-        cmd.append(config_name)  # Add the config name to the command
+    # Get the model name from the form
+    model_name = request.form.get('model')
+    config_name = model_name
+    cmd.append(config_name)  # Add the config name to the command
+    cmd.append("use_server=true")
 
-        # Helper to quote values for Hydra's command-line parser
-        def hydra_quote(value):
-            """Quotes a value for Hydra (handles Japanese characters and special chars).
+    # Helper to quote values for Hydra's command-line parser
+    def hydra_quote(value):
+        """Quotes a value for Hydra (handles Japanese characters and special chars).
 
-            Args:
-                value: The value to quote (can contain Japanese characters)
+        Args:
+            value: The value to quote (can contain Japanese characters)
 
-            Returns:
-                str: Properly quoted and escaped value for Hydra
-            """
-            if value is None:
-                return ""
+        Returns:
+            str: Properly quoted and escaped value for Hydra
+        """
+        if value is None:
+            return ""
 
-            value_str = str(value).strip()
-            if not value_str:
-                return '""'
+        value_str = str(value).strip()
+        if not value_str:
+            return '""'
 
-            # Check if value needs quoting (spaces, special chars, or non-ASCII characters)
-            needs_quoting = (
-                any(c in value_str for c in [' ', '!', '#', '$', '&', '*', '(', ')', '[', ']',
-                                             '{', '}', '|', '\\', ';', '"', "'", '<', '>', '?', '`', '\n', '\r', '\t']) or
-                not value_str.isascii() or
-                value_str.startswith('"') or value_str.startswith("'")
-            )
+        # Check if value needs quoting (spaces, special chars, or non-ASCII characters)
+        needs_quoting = (
+            any(c in value_str for c in [' ', '!', '#', '$', '&', '*', '(', ')', '[', ']',
+                                         '{', '}', '|', '\\', ';', '"', "'", '<', '>', '?', '`', '\n', '\r', '\t']) or
+            not value_str.isascii() or
+            value_str.startswith('"') or value_str.startswith("'")
+        )
 
-            if not needs_quoting:
-                return value_str
+        if not needs_quoting:
+            return value_str
 
-            # Escape backslashes first, then double quotes
-            escaped_value = value_str.replace('\\', '\\\\').replace('"', '\\"')
-            return f'"{escaped_value}"'
+        # Escape backslashes first, then double quotes
+        escaped_value = value_str.replace('\\', '\\\\').replace('"', '\\"')
+        return f'"{escaped_value}"'
 
-        # Set of keys known to be paths needing quoting for Hydra
-        path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path", "background_image_path"}
+    # Set of keys known to be paths needing quoting for Hydra
+    path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path", "background_image_path"}
 
-        # Set of keys that might contain Japanese characters
-        text_keys = {"title", "title_unicode", "artist", "artist_unicode", "creator", "version", "source", "tags", "background"}
+    # Set of keys that might contain Japanese characters
+    text_keys = {"title", "title_unicode", "artist", "artist_unicode", "creator", "version", "source", "tags", "background"}
 
-        # Helper to add argument if value exists
-        def add_arg(key, value):
-            if value is not None and value != '':  # Ensure value is not empty
-                if key in path_keys:
-                    # Quote path values for Hydra
-                    cmd.append(f"{key}={hydra_quote(value)}")
-                elif key in text_keys:
-                    # Quote text values that might contain Japanese characters
-                    cmd.append(f"{key}={hydra_quote(value)}")
-                else:
-                    # Other values usually don't need explicit Hydra quoting when passed via list
-                    cmd.append(f"{key}={value}")
+    # Helper to add argument if value exists
+    def add_arg(key, value):
+        if value is not None and value != '':  # Ensure value is not empty
+            if key in path_keys:
+                # Quote path values for Hydra
+                cmd.append(f"{key}={hydra_quote(value)}")
+            elif key in text_keys:
+                # Quote text values that might contain Japanese characters
+                cmd.append(f"{key}={hydra_quote(value)}")
+            else:
+                # Other values usually don't need explicit Hydra quoting when passed via list
+                cmd.append(f"{key}={value}")
 
-        # Helper for list arguments (Hydra format: key=['item1','item2',...])
-        def add_list_arg(key, items):
-            if items:
-                # Wrap each item in single quotes and join with comma
-                quoted_items = [f"'{str(item)}'" for item in items]
-                items_str = ",".join(quoted_items)
-                cmd.append(f"{key}=[{items_str}]")
+    # Helper for list arguments (Hydra format: key=['item1','item2',...])
+    def add_list_arg(key, items):
+        if items:
+            # Wrap each item in single quotes and join with comma
+            quoted_items = [f"'{str(item)}'" for item in items]
+            items_str = ",".join(quoted_items)
+            cmd.append(f"{key}=[{items_str}]")
 
-        # Required Paths
-        add_arg("audio_path", request.form.get('audio_path'))
-        add_arg("output_path", request.form.get('output_path'))
-        # Beatmap path
-        beatmap_path = request.form.get('beatmap_path')
-        add_arg("beatmap_path", beatmap_path)
+    # Required Paths
+    add_arg("audio_path", request.form.get('audio_path'))
+    add_arg("output_path", request.form.get('output_path'))
+    # Beatmap path
+    beatmap_path = request.form.get('beatmap_path')
+    add_arg("beatmap_path", beatmap_path)
 
-        # Optional LoRA path
-        if 'lora_path' in request.form:
-            add_arg("lora_path", request.form.get('lora_path'))
+    # Optional LoRA path
+    if 'lora_path' in request.form:
+        add_arg("lora_path", request.form.get('lora_path'))
 
-        # Basic settings
-        if 'gamemode' in request.form:
-            add_arg("gamemode", request.form.get('gamemode'))
-        else:
-            # Default to 0 if not provided
-            add_arg("gamemode", 0)
-        add_arg("difficulty", request.form.get('difficulty'))
-        add_arg("year", request.form.get('year'))
+    # Basic settings
+    if 'gamemode' in request.form:
+        add_arg("gamemode", request.form.get('gamemode'))
+    else:
+        # Default to 0 if not provided
+        add_arg("gamemode", 0)
+    add_arg("difficulty", request.form.get('difficulty'))
+    add_arg("year", request.form.get('year'))
 
-        # Numeric settings
-        for param in ['hp_drain_rate', 'circle_size', 'overall_difficulty', 'approach_rate', 'slider_multiplier',
-                      'slider_tick_rate', 'keycount', 'hold_note_ratio', 'scroll_speed_ratio',
-                      'cfg_scale', 'temperature', 'top_p', 'seed']:
-            add_arg(param, request.form.get(param))
-        # mapper_id
-        add_arg("mapper_id", request.form.get('mapper_id'))
+    # Numeric settings
+    for param in ['hp_drain_rate', 'circle_size', 'overall_difficulty', 'approach_rate', 'slider_multiplier',
+                  'slider_tick_rate', 'keycount', 'hold_note_ratio', 'scroll_speed_ratio',
+                  'cfg_scale', 'temperature', 'top_p', 'seed']:
+        add_arg(param, request.form.get(param))
+    # mapper_id
+    add_arg("mapper_id", request.form.get('mapper_id'))
 
-        # Song Metadata
-        for param in ['title', 'title_unicode', 'artist', 'artist_unicode', 'creator', 'version', 'source', 'tags', 'preview_time']:
-            add_arg(param, request.form.get(param))
+    # Song Metadata
+    for param in ['title', 'title_unicode', 'artist', 'artist_unicode', 'creator', 'version', 'source', 'tags', 'preview_time']:
+        add_arg(param, request.form.get(param))
 
-        # Background image
-        background_image = request.form.get('background_image')
-        if background_image:
-            # Extract just the filename from the full path for the background parameter
-            background_filename = os.path.basename(background_image)
-            add_arg("background", background_filename)
-            # Also pass the full path for processing
-            add_arg("background_image_path", background_image)
+    # Background image
+    background_image = request.form.get('background_image')
+    if background_image:
+        # Extract just the filename from the full path for the background parameter
+        background_filename = os.path.basename(background_image)
+        add_arg("background", background_filename)
+        # Also pass the full path for processing
+        add_arg("background_image_path", background_image)
 
-        # Timing and segmentation
-        for param in ['start_time', 'end_time']:
-            add_arg(param, request.form.get(param))
+    # Timing and segmentation
+    for param in ['start_time', 'end_time']:
+        add_arg(param, request.form.get(param))
 
-        # Checkboxes
-        if 'export_osz' in request.form:
-            cmd.append("export_osz=true")
-        else :
-            cmd.append("export_osz=false")
-        if 'add_to_beatmap' in request.form:
-            cmd.append("add_to_beatmap=true")
-        else:
-            cmd.append("add_to_beatmap=false")
-        if 'overwrite_reference_beatmap' in request.form:
-            cmd.append("overwrite_reference_beatmap=true")
-        else:
-            cmd.append("overwrite_reference_beatmap=false")
-        if 'hitsounded' in request.form:
-            cmd.append("hitsounded=true")
-        else:
-            cmd.append("hitsounded=false")
-        if 'super_timing' in request.form:
-            cmd.append("super_timing=true")
-        else:
-            cmd.append("super_timing=false")
+    # Checkboxes
+    if 'export_osz' in request.form:
+        cmd.append("export_osz=true")
+    else:
+        cmd.append("export_osz=false")
+    if 'add_to_beatmap' in request.form:
+        cmd.append("add_to_beatmap=true")
+    else:
+        cmd.append("add_to_beatmap=false")
+    if 'overwrite_reference_beatmap' in request.form:
+        cmd.append("overwrite_reference_beatmap=true")
+    else:
+        cmd.append("overwrite_reference_beatmap=false")
+    if 'hitsounded' in request.form:
+        cmd.append("hitsounded=true")
+    else:
+        cmd.append("hitsounded=false")
+    if 'super_timing' in request.form:
+        cmd.append("super_timing=true")
+    else:
+        cmd.append("super_timing=false")
 
-        # BF16 precision for faster inference on supported GPUs (Ampere+)
-        if 'enable_bf16' in request.form:
-            cmd.append("precision=bf16")
+    # BF16 precision for faster inference on supported GPUs (Ampere+)
+    if 'enable_bf16' in request.form:
+        cmd.append("precision=bf16")
 
-        # Descriptors
-        descriptors = request.form.getlist('descriptors')
-        add_list_arg("descriptors", descriptors)
+    # Descriptors
+    descriptors = request.form.getlist('descriptors')
+    add_list_arg("descriptors", descriptors)
 
-        # Negative Descriptors
-        negative_descriptors = request.form.getlist('negative_descriptors')
-        add_list_arg("negative_descriptors", negative_descriptors)
+    # Negative Descriptors
+    negative_descriptors = request.form.getlist('negative_descriptors')
+    add_list_arg("negative_descriptors", negative_descriptors)
 
-        # In-Context Options
-        in_context_options = request.form.getlist('in_context_options')
-        if in_context_options and beatmap_path:  # Only add if not empty
-            add_list_arg("in_context", in_context_options)
-        # --- End Command List Construction ---
+    # In-Context Options
+    in_context_options = request.form.getlist('in_context_options')
+    if in_context_options and beatmap_path:  # Only add if not empty
+        add_list_arg("in_context", in_context_options)
+    # --- End Command List Construction ---
 
-        print("Executing Command List (shell=False):", cmd)
+    print("Executing Command List (shell=False):", cmd)
 
-        try:
-            # Start the inference process without shell=True
-            current_process = subprocess.Popen(
-                cmd,  # Pass the list directly
-                shell=False,  # Explicitly False (default)
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,  # Combine stdout and stderr
-                bufsize=1,
-                universal_newlines=True,
-                encoding='utf-8',
-                errors='replace'
-            )
-            print(f"Started process with PID: {current_process.pid}")
-            # Return success to the AJAX call
-            return jsonify({"status": "success", "message": "Inference started"}), 202  # Accepted
+    try:
+        # Start the inference process without shell=True
+        process = subprocess.Popen(
+            cmd,  # Pass the list directly
+            shell=False,  # Explicitly False (default)
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Combine stdout and stderr
+            bufsize=1,
+            universal_newlines=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+        with process_lock:
+            processes[job_id] = process
+        print(f"Started process with PID: {process.pid} for job_id: {job_id}")
+        # Return success to the AJAX call
+        return jsonify({"status": "success", "message": "Inference started", "job_id": job_id}), 202  # Accepted
 
-        except Exception as e:
-            print(f"Error starting subprocess: {e}")
-            current_process = None
-            return jsonify({"status": "error", "message": f"Failed to start process: {e}"}), 500
+    except Exception as e:
+        print(f"Error starting subprocess: {e}")
+        return jsonify({"status": "error", "message": f"Failed to start process: {e}"}), 500
 
 
 @app.route('/stream_output')
 def stream_output():
     """Streams the output of the running inference process using SSE."""
 
+    job_id = request.args.get('job_id', '').strip()
+    if not job_id:
+        return Response("event: end\ndata: Missing job_id\n\n", mimetype='text/event-stream')
+
     def generate():
-        global current_process
         process_to_stream = None
 
         # Short lock to safely get the process object
         with process_lock:
-            if current_process and current_process.poll() is None:
-                process_to_stream = current_process
-                print(f"Attempting to stream output for PID: {process_to_stream.pid}")
+            process = processes.get(job_id)
+            if process and process.poll() is None:
+                process_to_stream = process
+                print(f"Attempting to stream output for PID: {process_to_stream.pid} (job_id: {job_id})")
             else:
                 # Handle case where process is already finished or never started
-                print("Stream requested but no active process found or process already finished.")
+                if process:
+                    processes.pop(job_id, None)
+                    cancelled_pids.discard(process.pid)
+                print(f"Stream requested but no active process found or process already finished for job_id: {job_id}.")
                 yield "event: end\ndata: No active process or process already finished\n\n"
                 return
 
@@ -495,13 +500,11 @@ def stream_output():
                 yield f"event: end\ndata: {completion_message}\n\n"
                 print(f"Finished streaming for PID: {process_to_stream.pid}. Sent 'end' event.")
 
-                # --- Cleanup global process reference ---
+                # --- Cleanup process reference ---
                 with process_lock:
-                    if current_process == process_to_stream:
-                        current_process = None
-                        print("Cleared global current_process reference.")
-                    else:
-                        print(f"Stale process {process_to_stream.pid} finished streaming, global reference was already updated/cleared.")
+                    processes.pop(job_id, None)
+                    cancelled_pids.discard(process_to_stream.pid)
+                    print(f"Cleared process reference for job_id: {job_id}.")
 
     return Response(generate(), mimetype='text/event-stream')
 
@@ -509,16 +512,20 @@ def stream_output():
 @app.route('/cancel_inference', methods=['POST'])
 def cancel_inference():
     """Attempts to terminate the currently running inference process."""
-    global current_process
     message = ""
     success = False
     status_code = 500
 
+    job_id = request.form.get('job_id', '').strip()
+    if not job_id:
+        return jsonify({"status": "error", "message": "Missing job_id"}), 400
+
     with process_lock:
-        if current_process and current_process.poll() is None:
+        process = processes.get(job_id)
+        if process and process.poll() is None:
             try:
-                pid = current_process.pid
-                print(f"Attempting to terminate process PID: {pid}...")
+                pid = process.pid
+                print(f"Attempting to terminate process PID: {pid} (job_id: {job_id})...")
                 # Mark this PID as cancelled so a subsequent non-zero exit is expected and not logged
                 cancelled_pids.add(pid)
 
@@ -526,23 +533,23 @@ def cancel_inference():
                 # This ensures child processes (like inference workers) are also killed
                 if sys.platform == 'win32':
                     try:
-                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], 
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)],
                                        capture_output=True, timeout=5)
                         print(f"Process PID: {pid} and children terminated via taskkill.")
                         message = "Cancel request sent, process terminated."
                     except Exception as taskkill_error:
                         print(f"taskkill failed: {taskkill_error}, falling back to terminate()")
                         # Only terminate if process is still running
-                        if current_process.poll() is None:
-                            current_process.terminate()
+                        if process.poll() is None:
+                            process.terminate()
                             message = "Cancel request sent. Process termination might take a moment."
                         else:
                             print(f"Process PID: {pid} is no longer running after failed taskkill.")
                             message = "Process was already terminated."
                 else:
-                    current_process.terminate()  # Send SIGTERM on Unix
+                    process.terminate()  # Send SIGTERM on Unix
                     try:
-                        current_process.wait(timeout=1)
+                        process.wait(timeout=1)
                         print(f"Process PID: {pid} terminated successfully after request.")
                         message = "Cancel request sent, process terminated."
                     except subprocess.TimeoutExpired:
@@ -551,18 +558,18 @@ def cancel_inference():
 
                 success = True
                 status_code = 200
-                # DO NOT set current_process = None here. Let the stream generator handle it.
+                # DO NOT remove process here. Let the stream generator handle it.
             except Exception as e:
                 print(f"Error terminating process: {e}")
                 message = f"Error occurred during cancellation: {e}"
                 success = False
                 status_code = 500
-        elif current_process:
+        elif process:
             message = "Process already finished."
             success = False  # Or True if you consider it 'cancelled' as it's done
             status_code = 409
         else:
-            message = "No process is currently running."
+            message = "No process is currently running for the provided job_id."
             success = False
             status_code = 404
 
