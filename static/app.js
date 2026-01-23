@@ -696,6 +696,9 @@ $(document).ready(function() {
                         <button type="button" class="progress-card-close" title="Remove">×</button>
                     </div>
                     <div class="progress-card-status">Starting...</div>
+                    <div class="warning-text" style="display:none; font-size: 12px; color: var(--accent-color); margin-top: 4px;">
+                        Warning on this job (Will continue to generate)
+                    </div>
                     <div class="init-message" style="font-style: italic; color: #ccc; margin-bottom: 10px;">
                         Initializing process... This may take a moment.
                     </div>
@@ -705,6 +708,10 @@ $(document).ready(function() {
                     <div class="progress-card-actions">
                         <button type="button" class="cancel-button" style="display:none;">Cancel</button>
                     </div>
+                    <div class="progress-card-links warning-log-link" style="display:none;">
+                        <a href="#">View warning log</a>
+                    </div>
+                    <pre class="warning-log" style="display:none; white-space: pre-wrap; background: #141414; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; margin-top: 8px;"></pre>
                     <div class="progress-card-links beatmap-link" style="display:none;">
                         <a href="#" target="_blank">Click here to open the folder containing your map.</a>
                     </div>
@@ -723,6 +730,11 @@ $(document).ready(function() {
                 tempKey,
                 displayName: jobDisplayName,
                 stage: 'starting',
+                errorIndicatorSeen: false,
+                warningMessages: [],
+                warningCaptureActive: false,
+                warningCaptureRemaining: 0,
+                warningSuppressed: false,
                 evtSource: null,
                 isCancelled: false,
                 inferenceErrorOccurred: false,
@@ -731,10 +743,14 @@ $(document).ready(function() {
                 elements: {
                     $card,
                     $status: $card.find('.progress-card-status'),
+                    $warningText: $card.find('.warning-text'),
                     $initMessage: $card.find('.init-message'),
                     $progressBar: $card.find('.progressBar'),
                     $progressBarContainer: $card.find('.progressBarContainer'),
                     $cancelButton: $card.find('.cancel-button'),
+                    $warningLogLink: $card.find('.warning-log-link'),
+                    $warningLogLinkAnchor: $card.find('.warning-log-link a'),
+                    $warningLog: $card.find('.warning-log'),
                     $beatmapLink: $card.find('.beatmap-link'),
                     $beatmapLinkAnchor: $card.find('.beatmap-link a'),
                     $errorLogLink: $card.find('.error-log-link'),
@@ -893,12 +909,50 @@ $(document).ready(function() {
             ];
 
             const isErrorMessage = errorIndicators.some(indicator => messageData.includes(indicator));
+            const isClientDisconnectTrace = messageData.includes("_client_handler") ||
+                messageData.includes("Exception in thread Thread-") ||
+                messageData.includes("GeneratorExit") ||
+                messageData.includes("connection_dropped") ||
+                messageData.includes("generator ignored GeneratorExit") ||
+                messageData.includes("BrokenPipeError") ||
+                messageData.includes("The pipe is being closed") ||
+                messageData.includes("[WinError 232]");
 
-            if (isErrorMessage && !job.inferenceErrorOccurred) {
-                job.inferenceErrorOccurred = true;
+            if (job.warningCaptureActive) {
+                job.warningMessages.push(messageData);
+                job.warningCaptureRemaining -= 1;
+                if (job.warningCaptureRemaining <= 0) {
+                    job.warningCaptureActive = false;
+                }
+                if (isClientDisconnectTrace) {
+                    job.warningSuppressed = true;
+                }
+                if (job.warningSuppressed) {
+                    job.warningMessages = [];
+                    job.warningCaptureActive = false;
+                    job.elements.$warningLog.hide().text('');
+                    job.elements.$warningLogLink.hide();
+                    job.elements.$warningText.hide();
+                    return;
+                }
+                job.elements.$warningLog.text(job.warningMessages.join("\n"));
+            }
+
+            if (isErrorMessage && !isClientDisconnectTrace) {
+                job.errorIndicatorSeen = true;
                 job.accumulatedErrorMessages.push(messageData);
-                job.elements.$status.text("Error Detected").css('color', 'var(--accent-color)');
-                job.elements.$progressBar.addClass('error');
+                job.warningMessages.push(messageData);
+                job.warningCaptureActive = true;
+                job.warningCaptureRemaining = 80;
+                job.elements.$warningText.show();
+                job.elements.$warningLog.text(job.warningMessages.join("\n"));
+                if (job.elements.$warningLogLink.is(':hidden')) {
+                    job.elements.$warningLogLinkAnchor.off("click").on("click", (event) => {
+                        event.preventDefault();
+                        job.elements.$warningLog.toggle();
+                    });
+                    job.elements.$warningLogLink.show();
+                }
             } else if (job.inferenceErrorOccurred) {
                 job.accumulatedErrorMessages.push(messageData);
             } else {
@@ -982,6 +1036,12 @@ $(document).ready(function() {
             if (job.evtSource) {
                 job.evtSource.close();
                 job.evtSource = null;
+            }
+
+            const endMessage = (e.data || '').toLowerCase();
+            const endWithErrors = endMessage.includes('with errors');
+            if (endWithErrors) {
+                job.inferenceErrorOccurred = true;
             }
 
             if (job.isCancelled) {
@@ -1068,7 +1128,14 @@ $(document).ready(function() {
                 this.removeJob(job.id || job.tempKey, $card);
                 return;
             }
-            this.scheduleCancelClose(() => this.removeJob(job.id || job.tempKey, $card));
+            if (job.stage !== 'generating' && job.stage !== 'finished') {
+                Utils.showFlashMessage(`Please wait until ${job.displayName} starts generating before cancelling.`, 'error');
+                return;
+            }
+            this.scheduleCancelClose(() => {
+                this.cancelInference(job);
+                this.removeJob(job.id || job.tempKey, $card);
+            });
         },
 
         scheduleCancelClose(action) {
