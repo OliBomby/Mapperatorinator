@@ -642,7 +642,9 @@ $(document).ready(function() {
                 return;
             }
 
-            const job = this.createJobCard();
+            // Determine job label suffix based on title/title_unicode/audio filename
+            const jobLabelSuffix = this.getJobLabelSuffix(formData);
+            const job = this.createJobCard(jobLabelSuffix);
             this.startInference(job, formData);
         },
 
@@ -684,9 +686,11 @@ $(document).ready(function() {
             return true;
         },
 
-        createJobCard() {
+        createJobCard(labelSuffix = "") {
             AppState.jobCounter += 1;
-            const jobDisplayName = `Job ${AppState.jobCounter}`;
+            // Build job display name with suffix when available
+            const baseName = `Job ${AppState.jobCounter}`;
+            const jobDisplayName = labelSuffix ? `${baseName} - ${labelSuffix}` : baseName;
             const tempKey = `temp-${Date.now()}-${AppState.jobCounter}`;
 
             const $card = $(
@@ -844,6 +848,34 @@ $(document).ready(function() {
             }
 
             return formData;
+        },
+
+        // Compute job label suffix from Title (Unicode), Title, or audio filename
+        getJobLabelSuffix(formData) {
+            const maxLength = 60;
+
+            const sanitizeLabel = (value) => {
+                const text = (value || '').toString().replace(/\s+/g, ' ').trim();
+                if (!text) return '';
+                return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+            };
+
+            const titleUnicode = sanitizeLabel(formData.get('title_unicode'));
+            if (titleUnicode) return titleUnicode;
+
+            const title = sanitizeLabel(formData.get('title'));
+            if (title) return title;
+
+            const audioPathRaw = (formData.get('audio_path') || '').toString().trim();
+            if (audioPathRaw) {
+                // Normalize path separators and strip any trailing separators
+                const normalized = audioPathRaw.replace(/\\/g, '/').replace(/\/+$/, '');
+                const filename = normalized.split('/').pop();
+                const safeFilename = sanitizeLabel(filename);
+                if (safeFilename) return safeFilename;
+            }
+
+            return '';
         },
 
         startInference(job, formData) {
