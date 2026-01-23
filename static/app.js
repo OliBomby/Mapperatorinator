@@ -1133,7 +1133,8 @@ $(document).ready(function() {
         },
 
         requestCancel(job) {
-            if (job.stage !== 'generating' && job.stage !== 'finished') {
+            const allowEarlyCancel = job.inferenceErrorOccurred || job.errorIndicatorSeen;
+            if (job.stage !== 'generating' && job.stage !== 'finished' && !allowEarlyCancel) {
                 Utils.showFlashMessage(`Please wait until ${job.displayName} starts generating before cancelling.`, 'error');
                 return;
             }
