@@ -1049,6 +1049,12 @@ $(document).ready(function() {
                 job.elements.$progressBar.addClass('error');
                 job.elements.$card.data('status', 'cancelled');
             } else if (job.inferenceErrorOccurred) {
+                job.warningMessages = [];
+                job.warningCaptureActive = false;
+                job.warningSuppressed = false;
+                job.elements.$warningLog.hide().text('');
+                job.elements.$warningLogLink.hide();
+                job.elements.$warningText.hide();
                 this.handleInferenceError(job);
                 job.elements.$card.data('status', 'error');
             } else {

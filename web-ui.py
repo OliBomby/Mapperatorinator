@@ -276,7 +276,7 @@ def start_inference():
         return f'"{escaped_value}"'
 
     # Set of keys known to be paths needing quoting for Hydra
-    path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path", "background_image_path"}
+    path_keys = {"audio_path", "output_path", "beatmap_path", "lora_path", "background"}
 
     # Set of keys that might contain Japanese characters
     text_keys = {"title", "title_unicode", "artist", "artist_unicode", "creator", "version", "source", "tags", "background"}
@@ -337,11 +337,8 @@ def start_inference():
     # Background image
     background_image = request.form.get('background_image')
     if background_image:
-        # Extract just the filename from the full path for the background parameter
-        background_filename = os.path.basename(background_image)
-        add_arg("background", background_filename)
-        # Also pass the full path for processing
-        add_arg("background_image_path", background_image)
+        # Pass the full path; downstream uses basename for .osu and full path for .osz
+        add_arg("background", background_image)
 
     # Timing and segmentation
     for param in ['start_time', 'end_time']:
