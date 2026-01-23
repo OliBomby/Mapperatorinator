@@ -3,6 +3,9 @@ $(document).ready(function() {
     const AppState = {
         jobs: new Map(),
         jobCounter: 0,
+        lastStartedJobId: null,
+        cancelCloseCooldownMs: 3000,
+        nextCancelCloseAt: 0,
         animationSpeed: 300,
 
         modelCapabilities: {
@@ -632,8 +635,15 @@ $(document).ready(function() {
             if (!await this.validateForm()) return;
 
             this.removeFinishedCards();
+            const formData = this.buildFormData();
+
+            if (this.shouldDelayStart()) {
+                Utils.showFlashMessage("Please wait until the previous job starts generating before starting a new one.", 'error');
+                return;
+            }
+
             const job = this.createJobCard();
-            this.startInference(job);
+            this.startInference(job, formData);
         },
 
         async validateForm() {
@@ -712,6 +722,7 @@ $(document).ready(function() {
                 id: null,
                 tempKey,
                 displayName: jobDisplayName,
+                stage: 'starting',
                 evtSource: null,
                 isCancelled: false,
                 inferenceErrorOccurred: false,
@@ -731,11 +742,18 @@ $(document).ready(function() {
                 }
             };
 
-            $card.find('.progress-card-close').on('click', () => this.removeJob(job.id || job.tempKey, $card));
-            job.elements.$cancelButton.on('click', () => this.cancelInference(job));
+            $card.find('.progress-card-close').on('click', () => this.requestClose(job, $card));
+            job.elements.$cancelButton.on('click', () => this.requestCancel(job));
 
             AppState.jobs.set(tempKey, job);
             return job;
+        },
+
+        shouldDelayStart() {
+            if (!AppState.lastStartedJobId) return false;
+            const lastJob = this.getJob(AppState.lastStartedJobId);
+            if (!lastJob) return false;
+            return lastJob.stage !== 'generating' && lastJob.stage !== 'finished';
         },
 
         removeJob(jobId, $cardOverride = null) {
@@ -753,6 +771,9 @@ $(document).ready(function() {
             }
             if (job) {
                 AppState.jobs.delete(job.id || job.tempKey);
+            }
+            if (AppState.lastStartedJobId && job && AppState.lastStartedJobId === job.id) {
+                AppState.lastStartedJobId = null;
             }
             this.updateProgressOutputVisibility();
         },
@@ -809,11 +830,11 @@ $(document).ready(function() {
             return formData;
         },
 
-        startInference(job) {
+        startInference(job, formData) {
             $.ajax({
                 url: "/start_inference",
                 method: "POST",
-                data: this.buildFormData(),
+                data: formData,
                 processData: false,
                 contentType: false,
                 success: (response) => {
@@ -828,6 +849,7 @@ $(document).ready(function() {
                     job.elements.$card.attr('data-job-id', jobId);
                     AppState.jobs.delete(job.tempKey);
                     AppState.jobs.set(jobId, job);
+                    AppState.lastStartedJobId = jobId;
                     this.connectToSSE(job);
                 },
                 error: (jqXHR, textStatus, errorThrown) => {
@@ -897,6 +919,9 @@ $(document).ready(function() {
             Object.entries(progressTitles).forEach(([keyword, title]) => {
                 if (lowerCaseMessage.includes(keyword)) {
                     job.elements.$status.text(title);
+                    if (job.stage !== 'generating') {
+                        job.stage = 'generating';
+                    }
                 }
             });
 
@@ -937,6 +962,8 @@ $(document).ready(function() {
                 job.evtSource.close();
                 job.evtSource = null;
             }
+
+            job.stage = 'finished';
 
             if (!job.isCancelled && !job.inferenceErrorOccurred) {
                 job.inferenceErrorOccurred = true;
@@ -1007,6 +1034,14 @@ $(document).ready(function() {
             }
         },
 
+        requestCancel(job) {
+            if (job.stage !== 'generating' && job.stage !== 'finished') {
+                Utils.showFlashMessage(`Please wait until ${job.displayName} starts generating before cancelling.`, 'error');
+                return;
+            }
+            this.scheduleCancelClose(() => this.cancelInference(job));
+        },
+
         cancelInference(job) {
             const $cancelBtn = job.elements.$cancelButton;
             $cancelBtn.prop('disabled', true).text('Cancelling...');
@@ -1025,6 +1060,27 @@ $(document).ready(function() {
                     $cancelBtn.prop('disabled', false).text('Cancel');
                 }
             });
+        },
+
+        requestClose(job, $card) {
+            const status = $card?.data('status');
+            if (job.stage === 'finished' || status === 'completed' || status === 'error' || status === 'cancelled') {
+                this.removeJob(job.id || job.tempKey, $card);
+                return;
+            }
+            this.scheduleCancelClose(() => this.removeJob(job.id || job.tempKey, $card));
+        },
+
+        scheduleCancelClose(action) {
+            const now = Date.now();
+            if (now < AppState.nextCancelCloseAt) {
+                const waitMs = AppState.nextCancelCloseAt - now;
+                Utils.showFlashMessage(`Please wait ${Math.ceil(waitMs / 1000)}s before trying again.`, 'error');
+                return;
+            }
+
+            action();
+            AppState.nextCancelCloseAt = now + AppState.cancelCloseCooldownMs;
         },
 
         getJob(jobId) {
