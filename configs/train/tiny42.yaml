@@ -84,7 +84,7 @@ optim:                  # Optimizer settings
   batch_size: 64
   grad_acc: 4
   total_steps: 35000
-  warmup_steps: 0
+  warmup_steps: 10
   sustain_steps: 10000      # Steps to sustain the learning rate after warmup
   weight_decay: 0.01
   lr_scheduler: linear
