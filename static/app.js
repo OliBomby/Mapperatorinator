@@ -4,8 +4,6 @@ $(document).ready(function() {
         jobs: new Map(),
         jobCounter: 0,
         lastStartedJobId: null,
-        cancelCloseCooldownMs: 3000,
-        nextCancelCloseAt: 0,
         animationSpeed: 300,
 
         modelCapabilities: {
@@ -637,11 +635,6 @@ $(document).ready(function() {
             this.removeFinishedCards();
             const formData = this.buildFormData();
 
-            if (this.shouldDelayStart()) {
-                Utils.showFlashMessage("Please wait until the previous job starts generating before starting a new one.", 'error');
-                return;
-            }
-
             // Determine job label suffix based on title/title_unicode/audio filename
             const jobLabelSuffix = this.getJobLabelSuffix(formData);
             const job = this.createJobCard(jobLabelSuffix);
@@ -767,13 +760,6 @@ $(document).ready(function() {
 
             AppState.jobs.set(tempKey, job);
             return job;
-        },
-
-        shouldDelayStart() {
-            if (!AppState.lastStartedJobId) return false;
-            const lastJob = this.getJob(AppState.lastStartedJobId);
-            if (!lastJob) return false;
-            return lastJob.stage !== 'generating' && lastJob.stage !== 'finished';
         },
 
         removeJob(jobId, $cardOverride = null) {
@@ -1133,12 +1119,7 @@ $(document).ready(function() {
         },
 
         requestCancel(job) {
-            const allowEarlyCancel = job.inferenceErrorOccurred || job.errorIndicatorSeen;
-            if (job.stage !== 'generating' && job.stage !== 'finished' && !allowEarlyCancel) {
-                Utils.showFlashMessage(`Please wait until ${job.displayName} starts generating before cancelling.`, 'error');
-                return;
-            }
-            this.scheduleCancelClose(() => this.cancelInference(job));
+            this.cancelInference(job);
         },
 
         cancelInference(job) {
@@ -1167,26 +1148,8 @@ $(document).ready(function() {
                 this.removeJob(job.id || job.tempKey, $card);
                 return;
             }
-            if (job.stage !== 'generating' && job.stage !== 'finished') {
-                Utils.showFlashMessage(`Please wait until ${job.displayName} starts generating before cancelling.`, 'error');
-                return;
-            }
-            this.scheduleCancelClose(() => {
-                this.cancelInference(job);
-                this.removeJob(job.id || job.tempKey, $card);
-            });
-        },
-
-        scheduleCancelClose(action) {
-            const now = Date.now();
-            if (now < AppState.nextCancelCloseAt) {
-                const waitMs = AppState.nextCancelCloseAt - now;
-                Utils.showFlashMessage(`Please wait ${Math.ceil(waitMs / 1000)}s before trying again.`, 'error');
-                return;
-            }
-
-            action();
-            AppState.nextCancelCloseAt = now + AppState.cancelCloseCooldownMs;
+            this.cancelInference(job);
+            this.removeJob(job.id || job.tempKey, $card);
         },
 
         getJob(jobId) {
