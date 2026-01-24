@@ -14,6 +14,8 @@ from accelerate.utils import set_seed
 from omegaconf import OmegaConf, DictConfig
 from slider import Beatmap
 from transformers.utils import cached_file, is_flash_attn_2_available
+from importlib import metadata
+from packaging.version import Version
 
 import osu_diffusion
 import routed_pickle
@@ -42,7 +44,28 @@ def get_default_logger():
     return logger
 
 
+def assert_package_version(package_name: str, required_version: str):
+    required_version = Version(required_version)
+    try:
+        installed_version = Version(metadata.version(package_name))
+    except metadata.PackageNotFoundError as e:
+        raise RuntimeError(
+            f"Missing dependency: '{package_name}' is not installed. "
+            "Please install requirements.txt."
+        ) from e
+
+    assert installed_version >= required_version, (
+        f"{package_name}>={required_version} is required, but {installed_version} is installed. "
+        f"Please install requirements.txt."
+    )
+
+
+def assert_package_versions():
+    assert_package_version("transformers", "4.57.3")
+
+
 def setup_inference_environment(seed: int):
+    assert_package_versions()
     torch.set_grad_enabled(False)
     torch.set_float32_matmul_precision('high')
     set_seed(seed)
