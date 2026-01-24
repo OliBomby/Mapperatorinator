@@ -535,21 +535,10 @@
 
         <!-- Progress Output -->
         <div id="progress_output" class="card" style="margin-top:20px; display:none;">
-            <h3 data-i18n="progress.title">Progress</h3>
-            <div id="init_message" data-i18n="progress.initializing">Initializing process... This may take a moment.</div>
-            <div id="progressTitle" style="font-weight:bold; padding-bottom:5px;"></div>
-            <div id="progressBarContainer">
-                <div id="progressBar"></div>
+            <div class="progress-header">
+                <h3 data-i18n="progress.title">Progress</h3>
             </div>
-            <div style="margin-top: 10px; text-align: center;">
-                <button type="button" id="cancel-button" class="cancel-button" style="display:none;" data-i18n="buttons.cancel">Cancel</button>
-            </div>
-            <div id="beatmapLink" style="display:none; margin-top:10px;">
-                <a id="beatmapLinkAnchor" href="#" target="_blank" data-i18n="links.open_folder">Click here to open the folder containing your map.</a>
-            </div>
-            <div id="errorLogLink" style="display:none; margin-top:10px;">
-                <a id="errorLogLinkAnchor" href="#" data-i18n="links.open_log">See why... (opens error log)</a>
-            </div>
+            <div id="progressCards"></div>
         </div>
     </main>
 </div>
