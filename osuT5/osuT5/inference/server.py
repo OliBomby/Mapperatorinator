@@ -253,7 +253,11 @@ class InferenceServer:
                     response_event.wait()
 
                     # Send back result
-                    conn.send(record['result'])
+                    try:
+                        conn.send(record['result'])
+                    except BrokenPipeError:
+                        # Client disconnected
+                        break
         finally:  # Ensure we always close the connection
             with self.lock:
                 self.connections -= 1
@@ -435,6 +439,26 @@ class InferenceClient:
                 return result
 
         raise RuntimeError(f"Failed to get a valid response after {max_retries} attempts.")
+
+    def ensure_server(self):
+        """Ensure the background inference server is running.
+
+        This is useful when an external owner (e.g., a web UI) wants to start the
+        server once and keep it alive independently of any per-job client
+        connections.
+        """
+        with Locker():
+            if not os.path.exists(self.socket_path):
+                # Start server in a dedicated (non-daemon) thread.
+                threading.Thread(
+                    target=self._start_server,
+                    args=(self.model_loader, self.tokenizer_loader),
+                    daemon=False,
+                ).start()
+
+        # Wait for server socket to appear.
+        while not os.path.exists(self.socket_path):
+            time.sleep(0.1)
 
 
 if __name__ == "__main__":
