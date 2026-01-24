@@ -131,6 +131,37 @@ def model_forward(model, model_kwargs, generate_kwargs):
     return logits
 
 
+if os.name == "nt":
+    import msvcrt
+
+    def portable_lock(fp):
+        fp.seek(0)
+        msvcrt.locking(fp.fileno(), msvcrt.LK_LOCK, 1)
+
+    def portable_unlock(fp):
+        fp.seek(0)
+        msvcrt.locking(fp.fileno(), msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    def portable_lock(fp):
+        fcntl.flock(fp.fileno(), fcntl.LOCK_EX)
+
+    def portable_unlock(fp):
+        fcntl.flock(fp.fileno(), fcntl.LOCK_UN)
+
+
+class Locker:
+    def __enter__(self):
+        self.fp = open("./lockfile.lck", 'w+')
+        portable_lock(self.fp)
+
+    def __exit__(self, _type, value, tb):
+        portable_unlock(self.fp)
+        self.fp.close()
+
+
+
 class InferenceServer:
     def __init__(
             self,
@@ -351,15 +382,16 @@ class InferenceClient:
         return self
 
     def _reconnect(self):
-        try:
-            self.conn = Client(self.socket_path)
-        except FileNotFoundError:
-            # No server: start one
-            threading.Thread(target=self._start_server, args=(self.model_loader, self.tokenizer_loader), daemon=False).start()
-            # Wait for server socket to appear
-            while not os.path.exists(self.socket_path):
-                time.sleep(0.1)
-            self.conn = Client(self.socket_path)
+        with Locker():
+            try:
+                self.conn = Client(self.socket_path)
+            except FileNotFoundError:
+                # No server: start one
+                threading.Thread(target=self._start_server, args=(self.model_loader, self.tokenizer_loader), daemon=False).start()
+                # Wait for server socket to appear
+                while not os.path.exists(self.socket_path):
+                    time.sleep(0.1)
+                self.conn = Client(self.socket_path)
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         if self.conn:

@@ -19,15 +19,64 @@ from transformers import AutoProcessor, AutoModel
 from classifier.classify import ExampleDataset
 from classifier.libs.model.model import OsuClassifierOutput
 from classifier.libs.utils import load_ckpt
-from config import FidConfig
+from config import FidConfig, InferenceConfig
 from inference import load_diff_model, generate, load_model_with_server, compile_device_and_seed, \
     setup_inference_environment
 from osuT5.osuT5.dataset.data_utils import load_audio_file, load_mmrs_metadata, filter_mmrs_metadata
 from osuT5.osuT5.inference import generation_config_from_beatmap, beatmap_config_from_beatmap
 from osuT5.osuT5.tokenizer import ContextType
-from multiprocessing import Manager, Process
+from multiprocessing import Process
+
+# Add imports for multiprocessing-safe logging
+import multiprocessing
+from logging.handlers import QueueHandler, QueueListener
 
 logger = logging.getLogger(__name__)
+
+
+def _configure_generation_log_parent(log_file: Path) -> tuple[QueueListener, multiprocessing.Queue]:
+    """Configure a QueueListener in the parent process that writes generation logs to a file."""
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    queue: multiprocessing.Queue = multiprocessing.Queue(-1)
+
+    file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(
+        logging.Formatter("[%(asctime)s][%(processName)s][%(name)s][%(levelname)s] - %(message)s")
+    )
+
+    listener = QueueListener(queue, file_handler, respect_handler_level=True)
+    listener.start()
+    return listener, queue
+
+
+def _configure_generation_log_worker(queue: multiprocessing.Queue) -> logging.Logger:
+    """Configure the current process to send generation logs to the parent via QueueHandler."""
+    if queue is None:
+        # Fallback: no queue provided (e.g., single-process mode). Log to a local file.
+        gen_logger = logging.getLogger("calc_fid.generation")
+        gen_logger.setLevel(logging.INFO)
+        if not any(isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", "").endswith("generation.log")
+                   for h in gen_logger.handlers):
+            fh = logging.FileHandler("generation.log", mode="a", encoding="utf-8")
+            fh.setFormatter(
+                logging.Formatter("[%(asctime)s][%(processName)s][%(name)s][%(levelname)s] - %(message)s")
+            )
+            gen_logger.addHandler(fh)
+        gen_logger.propagate = False
+        return gen_logger
+
+    gen_logger = logging.getLogger("calc_fid.generation")
+    gen_logger.setLevel(logging.INFO)
+
+    # Avoid duplicates if this function is called more than once in the same process.
+    if not any(isinstance(h, QueueHandler) for h in gen_logger.handlers):
+        gen_logger.addHandler(QueueHandler(queue))
+
+    # Prevent propagation into Hydra/root handlers (keeps calc_fid.log clean).
+    gen_logger.propagate = False
+    return gen_logger
 
 
 def get_beatmap_paths(args: FidConfig) -> list[Path]:
@@ -195,11 +244,11 @@ def get_rhythm(beatmap, passive=False):
     return rhythm
 
 
-def generate_beatmaps(beatmap_paths, fid_args: FidConfig, return_dict, idx):
-    args = fid_args.inference
-    args.device = fid_args.device
+def generate_beatmaps(beatmap_paths, args: InferenceConfig, dataset_type, idx, log_queue=None):
     torch.set_grad_enabled(False)
     torch.set_float32_matmul_precision('high')
+
+    gen_logger = _configure_generation_log_worker(log_queue)
 
     model, tokenizer, diff_model, diff_tokenizer, refine_model = None, None, None, None, None
     model, tokenizer = load_model_with_server(
@@ -229,15 +278,15 @@ def generate_beatmaps(beatmap_paths, fid_args: FidConfig, return_dict, idx):
             beatmap = Beatmap.from_path(beatmap_path)
             output_path = Path("generated") / beatmap_path.stem
 
-            if fid_args.dataset_type == "ors":
+            if dataset_type == "ors":
                 audio_path = beatmap_path.parents[1] / list(beatmap_path.parents[1].glob('audio.*'))[0]
             else:
                 audio_path = beatmap_path.parent / beatmap.audio_filename
 
-            if fid_args.skip_generation or (output_path.exists() and len(list(output_path.glob("*.osu"))) > 0):
+            if output_path.exists() and len(list(output_path.glob("*.osu"))) > 0:
                 if not output_path.exists() or len(list(output_path.glob("*.osu"))) == 0:
                     raise FileNotFoundError(f"Generated beatmap not found in {output_path}")
-                print(f"Skipping {beatmap_path.stem} as it already exists")
+                gen_logger.info("Skipping %s as it already exists", beatmap_path.stem)
             else:
                 if ContextType.GD in args.in_context:
                     other_beatmaps = [k for k in beatmap_path.parent.glob("*.osu") if k != beatmap_path]
@@ -267,12 +316,16 @@ def generate_beatmaps(beatmap_paths, fid_args: FidConfig, return_dict, idx):
                     diff_tokenizer=diff_tokenizer,
                     refine_model=refine_model,
                     verbose=False,
+                    logger=gen_logger,
                 )[0]
                 generated_beatmap = Beatmap.parse(result)
-                print(beatmap_path, "Generated %s hit objects" % len(generated_beatmap.hit_objects(stacking=False)))
-        except Exception as e:
-            print(f"Error processing {beatmap_path}: {e}")
-            traceback.print_exc()
+                gen_logger.info(
+                    "%s Generated %s hit objects",
+                    str(beatmap_path),
+                    len(generated_beatmap.hit_objects(stacking=False)),
+                )
+        except Exception:
+            gen_logger.exception("Error processing %s", beatmap_path)
         finally:
             torch.cuda.empty_cache()  # Clear any cached memory
 
@@ -292,7 +345,7 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
     cm3p_model, cm3p_processor = None, None
     if args.fid_cm3p:
         cm3p_processor = AutoProcessor.from_pretrained(args.cm3p_ckpt, trust_remote_code=True, revision="main")
-        cm3p_model = AutoModel.from_pretrained(args.cm3p_ckpt, device_map=args.device, torch_dtype=torch.bfloat16,
+        cm3p_model = AutoModel.from_pretrained(args.cm3p_ckpt, device_map=args.device, dtype=torch.bfloat16,
                                                trust_remote_code=True, revision="main")
 
     real_features = []
@@ -419,9 +472,10 @@ def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: 
 
 @hydra.main(config_path="configs", config_name="calc_fid", version_base="1.1")
 def main(args: FidConfig):
-    args = OmegaConf.to_object(args)
-    compile_device_and_seed(args)
-    setup_inference_environment(args)
+    args: FidConfig = OmegaConf.to_object(args)
+    compile_device_and_seed(args.inference)
+    setup_inference_environment(args.inference.seed)
+    args.device = args.inference.device
 
     print(f"Logging to directory: {os.getcwd()}")
 
@@ -433,26 +487,34 @@ def main(args: FidConfig):
 
     test_training_set_overlap(beatmap_paths, args.training_set_ids_path)
 
-    if not args.skip_generation:
-        # Assign beatmaps to processes in a round-robin fashion
-        num_processes = args.num_processes
-        chunks = [[] for _ in range(num_processes)]
-        for i, path in enumerate(beatmap_paths):
-            chunks[i % num_processes].append(path)
+    listener = None
+    try:
+        # Configure generation logger (writes to generation.log in the Hydra run dir)
+        listener, log_queue = _configure_generation_log_parent(Path(os.getcwd()) / "generation.log")
 
-        manager = Manager()
-        return_dict = manager.dict()
-        processes = []
+        if not args.skip_generation:
+            # Assign beatmaps to processes in a round-robin fashion
+            num_processes = max(args.num_processes, 1)
+            chunks = [[] for _ in range(num_processes)]
+            for i, path in enumerate(beatmap_paths):
+                chunks[i % num_processes].append(path)
 
-        for i in range(num_processes):
-            p = Process(target=generate_beatmaps, args=(chunks[i], args, return_dict, i))
-            processes.append(p)
-            p.start()
+            if args.num_processes <= 0:
+                generate_beatmaps(chunks[0], args.inference, args.dataset_type, 0, log_queue=log_queue)
+            else:
+                processes = []
+                for i in range(num_processes):
+                    p = Process(target=generate_beatmaps, args=(chunks[i], args.inference, args.dataset_type, i, log_queue))
+                    processes.append(p)
+                    p.start()
 
-        for p in processes:
-            p.join()
+                for p in processes:
+                    p.join()
 
-    calculate_metrics(args, beatmap_paths)
+        calculate_metrics(args, beatmap_paths)
+    finally:
+        if listener is not None:
+            listener.stop()
 
 
 if __name__ == "__main__":

@@ -217,7 +217,7 @@ def test(args: TrainConfig, accelerator: Accelerator, model, tokenizer, preprefi
         logger.info(averaged_stats)
 
 
-@hydra.main(config_path="../configs/osut5", config_name="train_tiny_dist", version_base="1.1")
+@hydra.main(config_path="../configs/train", config_name="tiny41", version_base="1.1")
 def main(args: TrainConfig):
     args = OmegaConf.to_object(args)
 
@@ -235,6 +235,7 @@ def main(args: TrainConfig):
             "wandb": {
                 "entity": "mappingtools",
                 "job_type": "testing",
+                "mode": args.logging.mode,
             }
         }
     )

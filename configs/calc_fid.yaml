@@ -1,11 +1,10 @@
 defaults:
   - base_fid
-  - inference: tiny_dist7
+  - inference: tiny42
   - _self_
 
-compile: false
 num_processes: 32
-seed: 0
+compile: false
 
 skip_generation: false
 fid: true
@@ -27,6 +26,8 @@ dataset_end: 106  # Contains 324 std beatmaps
 gamemodes: [0]  # List of gamemodes to include in the dataset
 
 inference:
+  seed: 0
+  compile: false
   super_timing: false
   temperature: 0.9        # Sampling temperature
   top_p: 0.9              # Top-p sampling threshold
@@ -41,8 +42,8 @@ hydra:
     chdir: True
     name: calc_fid
   run:
-    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-#    dir: ./logs_fid/sweeps/test_1/inference=inference_v30
+#    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ./logs_fid/sweeps/test_1/inference=tiny42
   sweep:
     dir: ./logs_fid/sweeps/test_1
     subdir: ${hydra.job.override_dirname}

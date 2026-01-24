@@ -34,6 +34,49 @@ def get_color_for_value(value, min_val, max_val, lower_is_better=False):
     return f"hsl({hue:.0f}, 70%, 60%)"
 
 
+def _model_sort_key(name: str):
+    """Create a sort key for model names following the order:
+    1) v* (numeric ascending)
+    2) tiny_dist (no number)
+    3) tiny_nodist (no number)
+    4) tiny_dist* (numeric ascending)
+    5) tiny* (numeric ascending)
+    6) anything else (alphabetical fallback)
+
+    The trailing * part is treated as a number and compared numerically, not lexicographically.
+    """
+    if name is None:
+        return 99, float('inf'), name or ''
+
+    s = name.strip()
+
+    # v<number>
+    m = re.fullmatch(r"v(\d+)", s)
+    if m:
+        return 0, int(m.group(1)), s
+
+    # exact tiny_dist
+    if s == "tiny_dist":
+        return 1, -1, s
+
+    # exact tiny_nodist
+    if s == "tiny_nodist":
+        return 2, -1, s
+
+    # tiny_dist<number> with optional separators
+    m = re.fullmatch(r"tiny_dist[-_]?(\d+)", s)
+    if m:
+        return 3, int(m.group(1)), s
+
+    # tiny<number> with optional separators
+    m = re.fullmatch(r"tiny[-_]?(\d+)", s)
+    if m:
+        return 4, int(m.group(1)), s
+
+    # Fallback: put others last, keep alphabetical within group
+    return 5, float('inf'), s
+
+
 def parse_log_files(root_dir):
     """
     Parses log files in subdirectories to extract metrics and format them
@@ -91,6 +134,9 @@ def parse_log_files(root_dir):
     if not results:
         return "<p>No results found. Check if <code>root_dir</code> is correct and log files exist.</p>"
 
+    # Sort by Model name
+    # The order is: v*, tiny_dist, tiny_nodist, tiny_dist*, tiny*
+
     # --- Pre-calculate Min/Max for coloring ---
     headers = ["Model name", "FCD", "FID", "AR Pr.", "AR Re.", "AR F1", "PR Pr.", "PR Re.", "PR F1"]
     min_max_vals = {}
@@ -111,7 +157,7 @@ def parse_log_files(root_dir):
 
     # Data rows
     html.append("  <tbody>")
-    for res in sorted(results, key=lambda x: x.get('Model name', '')):
+    for res in sorted(results, key=lambda x: _model_sort_key(x.get('Model name', ''))):
         row_html = "    <tr>"
         for header in headers:
             value = res.get(header)

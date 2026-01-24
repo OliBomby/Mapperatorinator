@@ -5,7 +5,6 @@ defaults:
 
 compile: true          # PyTorch 2.0 optimization
 precision: 'bf16'         # Enable mixed precision (no/fp16/bf16)
-flash_attention: false  # Enable Flash Attention
 
 model:
   do_difficulty_embed: false
@@ -25,7 +24,7 @@ data:                  # Data settings
   test_dataset_end: 36664  # End of ORS test dataset
   num_classes: 152680
   # All Special Prefix Tokens
-  add_out_context_types: false  # Add tokens indicating types of the out context
+  add_out_context_types: true  # Add tokens indicating types of the out context
   add_gamemode_token: false
   add_style_token: false
   add_diff_token: true
@@ -78,7 +77,7 @@ data:                  # Data settings
   normalize_audio: true  # Normalize audio data
   frame_offset_augment_prob: 0.5  # Probability of augmenting the dataset with frame offset
   cycle_length: 1
-  max_year: 2023  # Maximum year of the beatmap to include in the dataset
+  max_year: 2022  # Maximum year of the beatmap to include in the dataset
   slider_version: 2  # Slider version to use (1 or 2)
 
 dataloader:             # Dataloader settings

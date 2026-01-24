@@ -27,6 +27,7 @@ class ModelConfig:
     name: str = "openai/whisper-base"  # Model name
     config_base: str = ""  # Model base for config lookup
     input_features: bool = True
+    input_raw_wave: bool = False
     project_encoder_input: bool = True
     embed_decoder_input: bool = True
     manual_norm_weights: bool = False
@@ -39,6 +40,13 @@ class ModelConfig:
     rope_type: str = "dynamic"  # RoPE type (dynamic/static)
     rope_encoder_scaling_factor: float = 1.0
     rope_decoder_scaling_factor: float = 1.0
+    rope_scaling: dict = field(default_factory=lambda: { "factor": 1.0, "rope_type": "default" })
+    deterministic_flash_attn: bool = False
+    attention_bias: bool = False
+    global_attn_every_n_layers: int = 1
+    local_attention: int = 128
+    local_rope_theta: int = 10000
+    global_rope_theta: int = 10000
     spectrogram: SpectrogramConfig = field(default_factory=SpectrogramConfig)
     overwrite: dict = field(default_factory=lambda: {})  # Overwrite model config
     add_config: dict = field(default_factory=lambda: {})  # Add to model config
@@ -140,6 +148,7 @@ class DataConfig:
     frame_offset_augment_prob: float = 1.0  # Probability of augmenting beatmap sequences with frame offset
     normalize_audio: bool = True  # Normalize audio data
     slider_version: int = 1  # Slider version to use (1 or 2)
+    snapping_random_prob: float = 0.0  # Probability of randomizing hit object snapping in the dataset
 
 
 @dataclass

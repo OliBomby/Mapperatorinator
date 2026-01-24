@@ -4,13 +4,10 @@ from typing import Optional, Dict
 
 import torch
 import torch.nn as nn
-from transformers import T5Config, T5ForConditionalGeneration, WhisperForConditionalGeneration, WhisperConfig, \
-    PreTrainedModel, GenerationMixin
+from transformers import PreTrainedModel, GenerationMixin, WhisperForConditionalGeneration
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 
 from .configuration_mapperatorinator import MapperatorinatorConfig
-from .custom_transformers import NWhisperConfig, RoPEWhisperConfig, NWhisperForConditionalGeneration, \
-    RoPEWhisperForConditionalGeneration
 from .spectrogram import MelSpectrogram
 
 LABEL_IGNORE_ID = -100
@@ -21,26 +18,40 @@ def get_backbone_model(config: MapperatorinatorConfig):
     b_config = config.backbone_config
 
     if name.startswith("google/t5"):
+        from transformers import T5Config, T5ForConditionalGeneration
         if isinstance(b_config, dict):
             b_config = T5Config(**b_config)
         model_cls = T5ForConditionalGeneration
     elif name.startswith("OliBomby/nwhisper"):
+        from .custom_transformers import NWhisperConfig, NWhisperForConditionalGeneration
         if isinstance(b_config, dict):
             b_config = NWhisperConfig(**b_config)
         model_cls = NWhisperForConditionalGeneration
     elif name.startswith("Tiger14n/ropewhisper"):
+        from .custom_transformers import RoPEWhisperConfig, RoPEWhisperForConditionalGeneration
         if isinstance(b_config, dict):
             b_config = RoPEWhisperConfig(**b_config)
         model_cls = RoPEWhisperForConditionalGeneration
     elif name.startswith("openai/whisper"):
+        from transformers import WhisperConfig, WhisperForConditionalGeneration
         if isinstance(b_config, dict):
             b_config = WhisperConfig(**b_config)
         model_cls = WhisperForConditionalGeneration
+    elif name.startswith("UsefulSensors/moonshine-tiny"):
+        from .custom_transformers import MoonshineConfig, MoonshineForConditionalGeneration
+        if isinstance(b_config, dict):
+            b_config = MoonshineConfig(**b_config)
+        model_cls = MoonshineForConditionalGeneration
+    elif name.startswith("OliBomby/varwhisper"):
+        from .custom_transformers import VarWhisperConfig, VarWhisperForConditionalGeneration
+        if isinstance(b_config, dict):
+            b_config = VarWhisperConfig(**b_config)
+        model_cls = VarWhisperForConditionalGeneration
     else:
         raise NotImplementedError
 
     b_config._attn_implementation = config._attn_implementation
-    b_config.torch_dtype = config.torch_dtype
+    b_config.dtype = config.dtype
     model = model_cls(b_config)
 
     return model
@@ -60,22 +71,24 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
     def __init__(self, config: MapperatorinatorConfig):
         super().__init__(config)
 
-        self.spectrogram = MelSpectrogram(
-            config.spectrogram_implementation,
-            config.spectrogram_log_scale,
-            config.sample_rate,
-            config.n_fft,
-            config.n_mels,
-            config.hop_length,
-            config.f_min,
-            config.f_max,
-            config.pad_mode,
-        )
+        if not config.input_raw_wave:
+            self.spectrogram = MelSpectrogram(
+                config.spectrogram_implementation,
+                config.spectrogram_log_scale,
+                config.sample_rate,
+                config.n_fft,
+                config.n_mels,
+                config.hop_length,
+                config.f_min,
+                config.f_max,
+                config.pad_mode,
+            )
 
         self.transformer: WhisperForConditionalGeneration = get_backbone_model(config)
 
         self.num_classes = config.num_classes
         self.input_features = config.input_features
+        self.input_raw_wave = config.input_raw_wave
         self.project_encoder_input = config.project_encoder_input
         self.embed_decoder_input = config.embed_decoder_input
 
@@ -149,42 +162,45 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
             device = frames.device if frames is not None else decoder_input_ids.device
             beatmap_idx = torch.full([batch_size], self.num_classes, dtype=torch.long, device=device)
 
-        inputs_embeds = None
-        if encoder_outputs is None and frames is not None:
-            frames = self.spectrogram(frames)  # (N, L, M)
-            frames = frames.to(dtype=self.transformer.dtype)  # Ensure correct dtype for the model
-            conds = []
-
-            if self.do_style_embed:
-                style_embedding = self.style_embedder(beatmap_idx)  # (N, D)
-                style_embedding = style_embedding.unsqueeze(1).repeat((1, frames.shape[1], 1))
-                conds.append(style_embedding)
-            if self.do_difficulty_embed:
-                difficulty_embedding = self.difficulty_embedder(difficulty)
-                conds.append(difficulty_embedding)
-            if self.do_mapper_embed:
-                mapper_embedding = self.mapper_embedder(mapper_idx)
-                conds.append(mapper_embedding)
-            if self.do_song_position_embed:
-                song_position_embedding = self.song_pos_embedder(song_position)
-                conds.append(song_position_embedding)
-
-            conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
-            inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)
-
         inputs = dict(
-            inputs_embeds=inputs_embeds,
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,
-            encoder_outputs=encoder_outputs, labels=labels, **kwargs
+            encoder_outputs=encoder_outputs, **kwargs
         )
 
-        if self.project_encoder_input:
-            inputs_embeds = self.encoder_embedder(inputs_embeds) if inputs_embeds is not None else None
+        inputs_embeds = None
+        if encoder_outputs is None and frames is not None:
+            if not self.input_raw_wave:
+                frames = self.spectrogram(frames)  # (N, L, M)
+                frames = frames.to(dtype=self.transformer.dtype)  # Ensure correct dtype for the model
+                conds = []
 
-        if self.input_features:
-            inputs["input_features"] = torch.swapaxes(inputs_embeds, 1, 2) if inputs_embeds is not None else None
-            del inputs["inputs_embeds"]
+                if self.do_style_embed:
+                    style_embedding = self.style_embedder(beatmap_idx)  # (N, D)
+                    style_embedding = style_embedding.unsqueeze(1).repeat((1, frames.shape[1], 1))
+                    conds.append(style_embedding)
+                if self.do_difficulty_embed:
+                    difficulty_embedding = self.difficulty_embedder(difficulty)
+                    conds.append(difficulty_embedding)
+                if self.do_mapper_embed:
+                    mapper_embedding = self.mapper_embedder(mapper_idx)
+                    conds.append(mapper_embedding)
+                if self.do_song_position_embed:
+                    song_position_embedding = self.song_pos_embedder(song_position)
+                    conds.append(song_position_embedding)
+
+                conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
+                inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)
+
+            if self.project_encoder_input:
+                inputs_embeds = self.encoder_embedder(inputs_embeds) if inputs_embeds is not None else None
+
+            if self.input_raw_wave:
+                inputs["input_values"] = frames.reshape(frames.shape[0], -1)
+            elif self.input_features:
+                inputs["input_features"] = torch.swapaxes(inputs_embeds, 1, 2) if inputs_embeds is not None else None
+            else:
+                inputs["inputs_embeds"] = inputs_embeds
 
         if self.embed_decoder_input:
             inputs["decoder_inputs_embeds"] = self.decoder_embedder(decoder_input_ids)
@@ -192,13 +208,24 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
 
         output = self.transformer.forward(**inputs)
 
+        loss = None
         if labels is not None:
             unreduced_loss = self.loss_fn(torch.swapaxes(output.logits, 1, -1), labels)
             if sample_weights is not None:
                 unreduced_loss *= sample_weights.unsqueeze(1)
-            output.loss = unreduced_loss.sum() / (labels != LABEL_IGNORE_ID).sum()
+            loss = unreduced_loss.sum() / (labels != LABEL_IGNORE_ID).sum()
 
-        return output
+        return Seq2SeqLMOutput(
+            loss=loss,
+            logits=output.logits,
+            past_key_values=output.past_key_values,
+            decoder_hidden_states=output.decoder_hidden_states,
+            decoder_attentions=output.decoder_attentions,
+            cross_attentions=output.cross_attentions,
+            encoder_last_hidden_state=output.encoder_last_hidden_state,
+            encoder_hidden_states=output.encoder_hidden_states,
+            encoder_attentions=output.encoder_attentions,
+        )
 
     def prepare_inputs_for_generation(
         self,
@@ -286,7 +313,7 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
     def get_encoder(self):
         return OsuTEncoder(
             self.transformer.get_encoder(),
-            self.spectrogram,
+            self.spectrogram if not self.input_raw_wave else None,
             self.style_embedder if self.do_style_embed else None,
             self.difficulty_embedder if self.do_difficulty_embed else None,
             self.mapper_embedder if self.do_mapper_embed else None,
@@ -294,6 +321,7 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
             self.encoder_embedder if self.project_encoder_input else None,
             self.num_classes,
             self.input_features,
+            self.input_raw_wave,
             self.project_encoder_input,
             self.do_style_embed,
             self.do_difficulty_embed,
@@ -317,6 +345,7 @@ class OsuTEncoder(nn.Module):
             encoder_embedder: nn.Linear,
             num_classes: int,
             input_features: bool,
+            input_raw_wave: bool,
             project_encoder_input: bool,
             do_style_embed: bool,
             do_difficulty_embed: bool,
@@ -333,6 +362,7 @@ class OsuTEncoder(nn.Module):
         self.encoder_embedder = encoder_embedder
         self.num_classes = num_classes
         self.input_features = input_features
+        self.input_raw_wave = input_raw_wave
         self.project_encoder_input = project_encoder_input
         self.do_style_embed = do_style_embed
         self.do_difficulty_embed = do_difficulty_embed
@@ -355,32 +385,35 @@ class OsuTEncoder(nn.Module):
             device = frames.device
             beatmap_idx = torch.full([batch_size], self.num_classes, dtype=torch.long, device=device)
 
-        frames = self.spectrogram(frames)  # (N, L, M)
-        frames = frames.to(dtype=self.base.dtype)  # Ensure correct dtype for the model
-        conds = []
+        if self.input_raw_wave:
+            inputs_embeds = frames.reshape(frames.shape[0], -1)
+        else:
+            frames = self.spectrogram(frames)  # (N, L, M)
+            frames = frames.to(dtype=self.base.dtype)  # Ensure correct dtype for the model
+            conds = []
 
-        if self.do_style_embed:
-            style_embedding = self.style_embedder(beatmap_idx)  # (N, D)
-            style_embedding = style_embedding.unsqueeze(1).repeat((1, frames.shape[1], 1))
-            conds.append(style_embedding)
-        if self.do_difficulty_embed:
-            difficulty_embedding = self.difficulty_embedder(difficulty)
-            conds.append(difficulty_embedding)
-        if self.do_mapper_embed:
-            mapper_embedding = self.mapper_embedder(mapper_idx)
-            conds.append(mapper_embedding)
-        if self.do_song_position_embed:
-            song_position_embedding = self.song_pos_embedder(song_position)
-            conds.append(song_position_embedding)
+            if self.do_style_embed:
+                style_embedding = self.style_embedder(beatmap_idx)  # (N, D)
+                style_embedding = style_embedding.unsqueeze(1).repeat((1, frames.shape[1], 1))
+                conds.append(style_embedding)
+            if self.do_difficulty_embed:
+                difficulty_embedding = self.difficulty_embedder(difficulty)
+                conds.append(difficulty_embedding)
+            if self.do_mapper_embed:
+                mapper_embedding = self.mapper_embedder(mapper_idx)
+                conds.append(mapper_embedding)
+            if self.do_song_position_embed:
+                song_position_embedding = self.song_pos_embedder(song_position)
+                conds.append(song_position_embedding)
 
-        conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
-        inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)
+            conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
+            inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)
 
-        if self.project_encoder_input:
-            inputs_embeds = self.encoder_embedder(inputs_embeds) if inputs_embeds is not None else None
+            if self.project_encoder_input:
+                inputs_embeds = self.encoder_embedder(inputs_embeds) if inputs_embeds is not None else None
 
-        if self.input_features:
-            inputs_embeds = torch.swapaxes(inputs_embeds, 1, 2) if inputs_embeds is not None else None
+            if self.input_features:
+                inputs_embeds = torch.swapaxes(inputs_embeds, 1, 2) if inputs_embeds is not None else None
 
         return self.base.forward(
             inputs_embeds,

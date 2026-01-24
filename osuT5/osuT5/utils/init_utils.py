@@ -23,15 +23,14 @@ def opti_flags(args: TrainConfig) -> None:
 
 
 def update_args_with_env_info(args: TrainConfig) -> None:
-    with open_dict(args):
-        slurm_id = os.getenv("SLURM_JOB_ID")
+    slurm_id = os.getenv("SLURM_JOB_ID")
 
-        if slurm_id is not None:
-            args.slurm_id = slurm_id
-        else:
-            args.slurm_id = "none"
+    if slurm_id is not None:
+        args.slurm_id = slurm_id
+    else:
+        args.slurm_id = "none"
 
-        args.working_dir = os.getcwd()
+    args.working_dir = os.getcwd()
 
 
 def setup_args(args: TrainConfig) -> None:
