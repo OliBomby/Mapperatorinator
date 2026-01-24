@@ -341,7 +341,13 @@ def train(
         shared: Namespace,
         profiler=None,
 ):
+    eval_model = model.eval()
+    if args.compile:
+        eval_model = torch.compile(eval_model, mode="reduce-overhead")
+
     model.train()
+    if args.compile:
+        model = torch.compile(model)
 
     train_averager = Averager()
 
@@ -374,7 +380,7 @@ def train(
 
                 if accelerator.sync_gradients:
                     maybe_logging(model, accelerator, optimizer, train_averager, args, shared)
-                    maybe_eval(model, accelerator, test_dataloader, tokenizer, args, shared)
+                    maybe_eval(eval_model, accelerator, test_dataloader, tokenizer, args, shared)
                     maybe_save_checkpoint(model, accelerator, args, shared)
 
                     shared.current_train_step += 1
@@ -382,7 +388,7 @@ def train(
         shared.current_epoch += 1
 
     if not (args.profile.do_profile and args.profile.early_stop):
-        maybe_eval(model, accelerator, test_dataloader, tokenizer, args, shared)
+        maybe_eval(eval_model, accelerator, test_dataloader, tokenizer, args, shared)
         maybe_save_checkpoint(model, accelerator, args, shared)
 
     accelerator.end_training()
