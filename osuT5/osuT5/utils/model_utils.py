@@ -38,7 +38,7 @@ def get_shared_training_state() -> Namespace:
 def _get_model_config(
         args: TrainConfig,
         tokenizer: Tokenizer,
-        torch_dtype: torch.dtype,
+        dtype: torch.dtype,
         attn_implementation: str,
 ) -> MapperatorinatorConfig:
     return MapperatorinatorConfig(
@@ -50,6 +50,7 @@ def _get_model_config(
         num_classes=tokenizer.num_classes,
         num_mappers=tokenizer.num_mapper_classes,
         input_features=args.model.input_features,
+        input_raw_wave=args.model.input_raw_wave,
         project_encoder_input=args.model.project_encoder_input,
         embed_decoder_input=args.model.embed_decoder_input,
         do_style_embed=args.model.do_style_embed,
@@ -76,12 +77,19 @@ def _get_model_config(
         rope_type=args.model.rope_type,
         rope_encoder_scaling_factor=args.model.rope_encoder_scaling_factor,
         rope_decoder_scaling_factor=args.model.rope_decoder_scaling_factor,
+        rope_scaling=args.model.rope_scaling,
+        deterministic_flash_attn=args.model.deterministic_flash_attn,
+        attention_bias=args.model.attention_bias,
+        global_attn_every_n_layers=args.model.global_attn_every_n_layers,
+        local_attention=args.model.local_attention,
+        local_rope_theta=args.model.local_rope_theta,
+        global_rope_theta=args.model.global_rope_theta,
         pad_token_id=tokenizer.pad_id,
         bos_token_id=tokenizer.sos_id,
         eos_token_id=tokenizer.eos_id,
         decoder_start_token_id=tokenizer.sos_id,
         max_length=args.data.tgt_seq_len,
-        torch_dtype=torch_dtype,
+        dtype=dtype,
         attn_implementation=attn_implementation,
     )
 
@@ -89,13 +97,13 @@ def _get_model_config(
 def _get_model(
         args: TrainConfig,
         tokenizer: Tokenizer,
-        torch_dtype: torch.dtype,
+        dtype: torch.dtype,
         attn_implementation: str,
 ) -> Mapperatorinator:
     model = Mapperatorinator(_get_model_config(
         args,
         tokenizer,
-        torch_dtype,
+        dtype,
         attn_implementation,
     ))
     return model
@@ -169,19 +177,19 @@ def load_model_loaders(
     def model_loader():
         dtype = _precision_to_dtype(precision)
         if ckpt_path_str == "":
-            model = _get_model(t5_args, tokenizer, torch_dtype=dtype, attn_implementation=attn_implementation)
+            model = _get_model(t5_args, tokenizer, dtype=dtype, attn_implementation=attn_implementation)
             model.to(device=device, dtype=dtype)
         elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
             model = Mapperatorinator.from_pretrained(
                 ckpt_path_str,
-                torch_dtype=dtype,
+                dtype=dtype,
                 attn_implementation=attn_implementation,
                 device_map=device
             )
             model.generation_config.disable_compile = True
         else:
             model_state = torch.load(ckpt_path / "pytorch_model.bin", weights_only=True)
-            model = _get_model(t5_args, tokenizer, torch_dtype=dtype, attn_implementation=attn_implementation)
+            model = _get_model(t5_args, tokenizer, dtype=dtype, attn_implementation=attn_implementation)
             if t5_args.pretrained_t5_compat:
                 del model_state["shared.weight"]
                 del model_state["encoder.embed_tokens.weight"]

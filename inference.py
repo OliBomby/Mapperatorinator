@@ -1,3 +1,6 @@
+import logging
+import sys
+
 import excepthook  # noqa
 import os.path
 import uuid
@@ -11,10 +14,12 @@ from accelerate.utils import set_seed
 from omegaconf import OmegaConf, DictConfig
 from slider import Beatmap
 from transformers.utils import cached_file, is_flash_attn_2_available
+from importlib import metadata
+from packaging.version import Version
 
 import osu_diffusion
 import routed_pickle
-from config import InferenceConfig, FidConfig
+from config import InferenceConfig
 from diffusion_pipeline import DiffisionPipeline
 from osuT5.osuT5.config import TrainConfig
 from osuT5.osuT5.dataset.data_utils import events_of_type, TIMING_TYPES, merge_events
@@ -29,13 +34,44 @@ from osu_diffusion import DiT_models
 from osu_diffusion.config import DiffusionTrainConfig
 
 
+def get_default_logger():
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
+
+
+def assert_package_version(package_name: str, required_version: str):
+    required_version = Version(required_version)
+    try:
+        installed_version = Version(metadata.version(package_name))
+    except metadata.PackageNotFoundError as e:
+        raise RuntimeError(
+            f"Missing dependency: '{package_name}' is not installed. "
+            "Please install requirements.txt."
+        ) from e
+
+    assert installed_version >= required_version, (
+        f"{package_name}>={required_version} is required, but {installed_version} is installed. "
+        f"Please install requirements.txt."
+    )
+
+
+def assert_package_versions():
+    assert_package_version("transformers", "4.57.3")
+
+
 def setup_inference_environment(seed: int):
+    assert_package_versions()
     torch.set_grad_enabled(False)
     torch.set_float32_matmul_precision('high')
     set_seed(seed)
 
 
-def compile_device_and_seed(args: InferenceConfig | FidConfig, verbose=True):
+def compile_device_and_seed(args: InferenceConfig, verbose=True):
     message = None
     if args.device == "auto":
         if torch.cuda.is_available():
@@ -349,10 +385,12 @@ def generate(
         diff_tokenizer=None,
         refine_model=None,
         verbose=True,
+        logger=None,
 ):
     audio_path = args.audio_path if audio_path is None else audio_path
     beatmap_path = args.beatmap_path if beatmap_path is None else beatmap_path
     output_path = args.output_path if output_path is None else output_path
+    logger = get_default_logger() if logger is None else logger.getChild(__name__)
 
     # Do some validation
     if not Path(audio_path).exists() or not Path(audio_path).is_file():
@@ -367,7 +405,7 @@ def generate(
 
     preprocessor = Preprocessor(args, parallel=args.parallel)
     processor = Processor(args, model, tokenizer)
-    postprocessor = Postprocessor(args)
+    postprocessor = Postprocessor(args, logger=logger)
 
     audio = preprocessor.load(audio_path)
     sequences = preprocessor.segment(audio)
@@ -446,7 +484,7 @@ def generate(
     if args.add_to_beatmap:
         result = postprocessor.add_to_beatmap(result, beatmap_path)
         if verbose:
-            print(f"Merged generated content with reference beatmap")
+            logger.info(f"Merged generated content with reference beatmap")
 
     result_path = None
     osz_path = None
@@ -458,13 +496,13 @@ def generate(
             result_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osu")
         postprocessor.write_result(result, result_path)
         if verbose:
-            print(f"Generated beatmap saved to {result_path}")
+            logger.info(f"Generated beatmap saved to {result_path}")
 
     if args.export_osz:
         osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
         postprocessor.export_osz(result_path, audio_path, osz_path, args.background)
         if verbose:
-            print(f"Generated .osz saved to {osz_path}")
+            logger.info(f"Generated .osz saved to {osz_path}")
 
     return result, result_path, osz_path
 

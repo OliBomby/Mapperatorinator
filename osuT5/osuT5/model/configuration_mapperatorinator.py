@@ -1,6 +1,7 @@
-from transformers import PretrainedConfig, T5Config, WhisperConfig
+from transformers import PretrainedConfig, T5Config, WhisperConfig, MoonshineConfig
 
 from .custom_transformers import NWhisperConfig, RoPEWhisperConfig
+from .custom_transformers.configuration_varwhisper import VarWhisperConfig
 
 
 class MapperatorinatorConfig(PretrainedConfig):
@@ -17,6 +18,7 @@ class MapperatorinatorConfig(PretrainedConfig):
         num_classes: int = 0,
         num_mappers: int = 3731,
         input_features: bool = True,
+        input_raw_wave: bool = False,
         project_encoder_input: bool = True,
         embed_decoder_input: bool = True,
         do_style_embed: bool = False,
@@ -44,6 +46,13 @@ class MapperatorinatorConfig(PretrainedConfig):
         rope_type="dynamic",
         rope_encoder_scaling_factor=1.0,
         rope_decoder_scaling_factor=1.0,
+        rope_scaling=None,
+        deterministic_flash_attn=False,
+        attention_bias=True,
+        global_attn_every_n_layers=1,
+        local_attention=128,
+        local_rope_theta=10000,
+        global_rope_theta=10000,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -59,10 +68,14 @@ class MapperatorinatorConfig(PretrainedConfig):
             config = T5Config.from_pretrained(backbone_model_name)
         elif backbone_model_name.startswith("openai/whisper"):
             config = WhisperConfig.from_pretrained(backbone_model_name)
+        elif backbone_model_name.startswith("UsefulSensors/moonshine"):
+            config = MoonshineConfig.from_pretrained(backbone_model_name)
         elif backbone_model_name.startswith("OliBomby/nwhisper"):
             config = NWhisperConfig.from_pretrained("openai/whisper" + backbone_model_name[17:])
         elif backbone_model_name.startswith("Tiger14n/ropewhisper"):
             config = RoPEWhisperConfig.from_pretrained("openai/whisper" + backbone_model_name[20:])
+        elif backbone_model_name.startswith("OliBomby/varwhisper"):
+            config = VarWhisperConfig.from_pretrained("openai/whisper" + backbone_model_name[19:])
         else:
             raise NotImplementedError
 
@@ -97,19 +110,36 @@ class MapperatorinatorConfig(PretrainedConfig):
             config.rope_type = rope_type
             config.rope_encoder_scaling_factor = rope_encoder_scaling_factor
             config.rope_decoder_scaling_factor = rope_decoder_scaling_factor
+        if isinstance(config, VarWhisperConfig):
+            config.rope_scaling = rope_scaling or { "factor": 1.0, "rope_type": "default" }
+            config.deterministic_flash_attn = deterministic_flash_attn
+            config.attention_bias = attention_bias
+            config.global_attn_every_n_layers = global_attn_every_n_layers
+            config.local_attention = local_attention
+            config.local_rope_theta = local_rope_theta
+            config.global_rope_theta = global_rope_theta
+        if isinstance(config, MoonshineConfig):
+            config.pad_token_id = pad_token_id
+            config.bos_token_id = bos_token_id
+            config.eos_token_id = eos_token_id
+            config.max_position_embeddings  = tgt_seq_len
+            setattr(config, "max_source_positions", src_seq_len // 3 - 1)
+            setattr(config, "max_target_positions", tgt_seq_len)
+            config.decoder_start_token_id = bos_token_id
 
         self.backbone_model_name = backbone_model_name
         self.backbone_config = config
         self.hidden_size = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
         self.num_hidden_layers = config.num_hidden_layers
-        self.max_source_positions = config.max_source_positions
-        self.max_target_positions = config.max_target_positions
+        self.max_source_positions = config.max_source_positions if hasattr(config, 'max_source_positions') else src_seq_len
+        self.max_target_positions = config.max_target_positions if hasattr(config, 'max_target_positions') else tgt_seq_len
         self.vocab_size_in = vocab_size_in
         self.vocab_size = vocab_size_out
         self.num_classes = num_classes
         self.num_mappers = num_mappers
         self.input_features = input_features
+        self.input_raw_wave = input_raw_wave
         self.project_encoder_input = project_encoder_input
         self.embed_decoder_input = embed_decoder_input
         self.do_style_embed = do_style_embed

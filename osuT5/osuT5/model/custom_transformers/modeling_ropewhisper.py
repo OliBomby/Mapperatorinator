@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """PyTorch RoPEWhisper model."""
-
+import copy
 import math
 from typing import Optional, Tuple, Union
 
@@ -262,22 +262,16 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
 class LlamaRotaryEmbedding(nn.Module):
     def __init__(
             self,
-            dim=None,
+            config,
+            hidden_size=None,
+            num_attention_heads=None,
             max_position_embeddings=2048,
             base=10000,
             device=None,
             scaling_factor=1.0,
             rope_type="dynamic",
-            config=None,
     ):
         super().__init__()
-        self.rope_kwargs = {
-            "rope_type": rope_type,
-            "factor": scaling_factor,
-            "dim": dim,
-            "base": base,
-            "max_position_embeddings": max_position_embeddings,
-        }
         self.rope_type = rope_type
         self.max_seq_len_cached = max_position_embeddings
         self.original_max_seq_len = max_position_embeddings
@@ -286,7 +280,13 @@ class LlamaRotaryEmbedding(nn.Module):
 
         self.rope_init_fn = ROPE_INIT_FUNCTIONS[self.rope_type]
 
-        inv_freq, self.attention_scaling = self.rope_init_fn(self.config, device, **self.rope_kwargs)
+        self.rope_config = copy.deepcopy(config)
+        self.rope_config.hidden_size = hidden_size
+        self.rope_config.num_attention_heads = num_attention_heads
+        self.rope_config.max_position_embeddings = max_position_embeddings
+        self.rope_config.rope_theta = base
+        self.rope_config.rope_scaling = { "rope_type": rope_type, "factor": scaling_factor}
+        inv_freq, self.attention_scaling = self.rope_init_fn(self.rope_config, device)
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.original_inv_freq = self.inv_freq
 
@@ -299,7 +299,7 @@ class LlamaRotaryEmbedding(nn.Module):
         seq_len = torch.max(position_ids) + 1
         if seq_len > self.max_seq_len_cached:  # growth
             inv_freq, self.attention_scaling = self.rope_init_fn(
-                self.config, device, seq_len=seq_len, **self.rope_kwargs
+                self.rope_config, device, seq_len=seq_len
             )
             self.register_buffer("inv_freq", inv_freq, persistent=False)  # TODO joao: may break with compilation
             self.max_seq_len_cached = seq_len
@@ -533,7 +533,7 @@ class RoPEWhisperFlashAttention2(RoPEWhisperAttention):
         self,
         hidden_states: torch.Tensor,
         key_value_states: Optional[torch.Tensor] = None,
-        past_key_value: Optional[EncoderDecoderCache] = None,
+        past_key_value: Optional[EncoderDecoderCache | Cache] = None,
         attention_mask: Optional[torch.Tensor] = None,
         layer_head_mask: Optional[torch.Tensor] = None,
         output_attentions: bool = False,
@@ -567,8 +567,7 @@ class RoPEWhisperFlashAttention2(RoPEWhisperAttention):
         current_states = key_value_states if key_value_states is not None else hidden_states
         if is_cross_attention and past_key_value and is_updated:
             # reuse k,v, cross_attentions
-            key_states = past_key_value.key_cache[self.layer_idx]
-            value_states = past_key_value.value_cache[self.layer_idx]
+            key_states, value_states = past_key_value[self.layer_idx]
         else:
             key_states = self.k_proj(current_states).view(bsz, -1, self.num_heads, self.head_dim)
             value_states = self.v_proj(current_states).view(bsz, -1, self.num_heads, self.head_dim)
@@ -648,7 +647,7 @@ class RoPEWhisperSdpaAttention(RoPEWhisperAttention):
             self,
             hidden_states: torch.Tensor,
             key_value_states: Optional[torch.Tensor] = None,
-            past_key_value: Optional[EncoderDecoderCache] = None,
+            past_key_value: Optional[EncoderDecoderCache | Cache] = None,
             attention_mask: Optional[torch.Tensor] = None,
             layer_head_mask: Optional[torch.Tensor] = None,
             output_attentions: bool = False,
@@ -694,8 +693,7 @@ class RoPEWhisperSdpaAttention(RoPEWhisperAttention):
         current_states = key_value_states if key_value_states is not None else hidden_states
         if is_cross_attention and past_key_value and is_updated:
             # reuse k,v, cross_attentions
-            key_states = past_key_value.key_cache[self.layer_idx]
-            value_states = past_key_value.value_cache[self.layer_idx]
+            key_states, value_states = past_key_value[self.layer_idx]
         else:
             key_states = self.k_proj(current_states)
             key_states = key_states.view(bsz, -1, self.num_heads, self.head_dim).transpose(1, 2)
@@ -1140,10 +1138,12 @@ class RoPEWhisperEncoder(RoPEWhisperPreTrainedModel):
 
         # Replace positional embedding with rotary
         self.rotary_emb = LlamaRotaryEmbedding(
-            config.d_model // config.encoder_attention_heads,
+            config,
+            hidden_size=config.d_model,
+            num_attention_heads=config.encoder_attention_heads,
             max_position_embeddings=config.max_source_positions,
             rope_type=config.rope_type,
-            scaling_factor=config.rope_encoder_scaling_factor
+            scaling_factor=config.rope_encoder_scaling_factor,
         )
 
         self.layers = nn.ModuleList([RoPEWhisperEncoderLayer(config) for _ in range(config.encoder_layers)])
@@ -1299,7 +1299,9 @@ class RoPEWhisperDecoder(RoPEWhisperPreTrainedModel):
         self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model, self.padding_idx)
         # Replace positional embedding with rotary
         self.rotary_emb = LlamaRotaryEmbedding(
-            config.d_model // config.decoder_attention_heads,  # dim per head
+            config,
+            hidden_size=config.d_model,
+            num_attention_heads=config.decoder_attention_heads,
             max_position_embeddings=config.max_target_positions,
             rope_type=config.rope_type,
             scaling_factor=config.rope_decoder_scaling_factor,

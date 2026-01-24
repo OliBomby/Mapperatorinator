@@ -1,0 +1,9 @@
+defaults:
+  - default
+  - _self_
+
+name: 'UsefulSensors/moonshine-tiny'
+input_raw_wave: true
+project_encoder_input: false
+
+do_style_embed: false

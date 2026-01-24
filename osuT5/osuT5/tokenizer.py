@@ -164,7 +164,7 @@ class Tokenizer(PushToHubMixin):
                     self.input_event_ranges.append(EventRange(EventType.HOLD_NOTE_RATIO, -1, 12))
                 self.event_ranges.append(EventRange(EventType.MANIA_COLUMN, 0, 17))
 
-            if 1 in args.data.gamemodes or 3 in args.data.gamemodes:
+            if 1 in args.data.gamemodes or 3 in args.data.gamemodes or args.data.add_sv:
                 if args.data.add_scroll_speed_ratio_token:
                     self.input_event_ranges.append(EventRange(EventType.SCROLL_SPEED_RATIO, -1, 12))
                 self.event_ranges.append(EventRange(EventType.SCROLL_SPEED, 0, 1000))

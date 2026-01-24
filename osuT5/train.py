@@ -103,9 +103,6 @@ def main(args: TrainConfig):
         accelerator.load_state(args.checkpoint_path)
         shared.current_train_step = scheduler.scheduler.last_epoch // accelerator.num_processes + 1
 
-    if args.compile:
-        model = torch.compile(model)
-
     func = train_profiling if args.profile.do_profile else train
 
     func(

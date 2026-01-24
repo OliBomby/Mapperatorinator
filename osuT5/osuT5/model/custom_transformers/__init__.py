@@ -2,4 +2,6 @@ from .configuration_nwhisper import NWhisperConfig
 from .modeling_nwhisper import NWhisperModel, NWhisperForConditionalGeneration
 from .configuration_ropewhisper import RoPEWhisperConfig
 from .modeling_ropewhisper import RoPEWhisperModel, RoPEWhisperForConditionalGeneration
+from .configuration_varwhisper import VarWhisperConfig
+from .modeling_varwhisper import VarWhisperModel, VarWhisperForConditionalGeneration
 from .t5 import T5
