@@ -9,3 +9,4 @@ test
 test_inference.py
 test_inference_mai_mod.py
 *.lck
+.env
