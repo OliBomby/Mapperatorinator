@@ -1000,7 +1000,7 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
         repad = False
         cu_seqlens, max_seqlen = None, self.config.max_target_positions
         encoder_cu_seqlens, encoder_max_seqlen = None, None
-        if self.config._attn_implementation == "flash_attention_2" and not use_cache and self.training:
+        if self.config._attn_implementation == "flash_attention_2" and not use_cache:
             repad = True
             if inputs_embeds is None:
                 with torch.no_grad():
