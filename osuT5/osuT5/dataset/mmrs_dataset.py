@@ -113,7 +113,7 @@ class MmrsDataset(IterableDataset):
 
         if not self.test:
             subset_ids = filtered_metadata.index.get_level_values(0).unique().to_numpy()
-            np.random.shuffle(subset_ids)
+            subset_ids = np.random.permutation(subset_ids)
             filtered_metadata = filtered_metadata.loc[subset_ids]
 
         if self.args.cycle_length > 1 and not self.test:
