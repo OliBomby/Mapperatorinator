@@ -7,6 +7,7 @@ from typing import Optional, Tuple, Union
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
+import torch._dynamo as dynamo
 from torch import nn
 from torch.nn import CrossEntropyLoss
 from transformers import GradientCheckpointingLayer
@@ -32,7 +33,7 @@ from .configuration_varwhisper import VarWhisperConfig
 if is_flash_attn_2_available():
     from flash_attn.flash_attn_interface import flash_attn_varlen_kvpacked_func, flash_attn_varlen_qkvpacked_func, \
     flash_attn_qkvpacked_func, flash_attn_kvpacked_func
-    from flash_attn.layers.rotary import RotaryEmbedding, apply_rotary_emb_qkv_
+    from flash_attn.layers.rotary import RotaryEmbedding
     from flash_attn.ops.triton.rotary import apply_rotary
 else:
     RotaryEmbedding = object
@@ -146,6 +147,7 @@ class VarWhisperFlashRotaryEmbedding(RotaryEmbedding):
         if max_seqlen is not None and device is not None and dtype is not None:
             self._update_cos_sin_cache(max_seqlen, device=device, dtype=dtype)
 
+    @dynamo.disable
     def forward(
         self,
         qkv: torch.Tensor,
