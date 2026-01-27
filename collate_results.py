@@ -43,38 +43,48 @@ def _model_sort_key(name: str):
     5) tiny* (numeric ascending)
     6) anything else (alphabetical fallback)
 
-    The trailing * part is treated as a number and compared numerically, not lexicographically.
+    For tiny models, supports optional variant suffixes like:
+      - tiny41
+      - tiny41_2  (== tiny41 variant 2)
+      - tiny-41-2
+
+    Variants sort within the same base number:
+      tiny41 < tiny41_2 < tiny41_3 < tiny42
     """
     if name is None:
-        return 99, float('inf'), name or ''
+        return 99, float('inf'), float('inf'), name or ''
 
     s = name.strip()
 
     # v<number>
     m = re.fullmatch(r"v(\d+)", s)
     if m:
-        return 0, int(m.group(1)), s
+        return 0, int(m.group(1)), -1, s
 
     # exact tiny_dist
     if s == "tiny_dist":
-        return 1, -1, s
+        return 1, -1, -1, s
 
     # exact tiny_nodist
     if s == "tiny_nodist":
-        return 2, -1, s
+        return 2, -1, -1, s
 
-    # tiny_dist<number> with optional separators
-    m = re.fullmatch(r"tiny_dist[-_]?(\d+)", s)
+    # tiny_dist<number> with optional numeric suffixes (e.g. tiny_dist41_2)
+    m = re.fullmatch(r"tiny_dist[-_]?([0-9]+)(?:[-_]+([0-9]+))?", s)
     if m:
-        return 3, int(m.group(1)), s
+        base = int(m.group(1))
+        variant = int(m.group(2)) if m.group(2) is not None else -1
+        return 3, base, variant, s
 
-    # tiny<number> with optional separators
-    m = re.fullmatch(r"tiny[-_]?(\d+)", s)
+    # tiny<number> with optional variant suffixes (e.g. tiny41_2)
+    m = re.fullmatch(r"tiny[-_]?([0-9]+)(?:[-_]+([0-9]+))?", s)
     if m:
-        return 4, int(m.group(1)), s
+        base = int(m.group(1))
+        variant = int(m.group(2)) if m.group(2) is not None else -1
+        return 4, base, variant, s
 
     # Fallback: put others last, keep alphabetical within group
-    return 5, float('inf'), s
+    return 5, float('inf'), float('inf'), s
 
 
 def parse_log_files(root_dir):
