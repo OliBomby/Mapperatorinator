@@ -342,9 +342,6 @@ def train(
         profiler=None,
 ):
     model.train()
-    if args.compile:
-        model = torch.compile(model)
-
     train_averager = Averager()
 
     while shared.current_train_step <= args.optim.total_steps:
