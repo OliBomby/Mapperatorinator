@@ -148,6 +148,7 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
             encoder_outputs: Optional[torch.FloatTensor] = None,
             labels: Optional[torch.LongTensor] = None,
             sample_weights: Optional[torch.FloatTensor] = None,
+            cond: Optional[torch.Tensor] = None,
             **kwargs
     ) -> Seq2SeqLMOutput:
         """
@@ -188,6 +189,8 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
                 if self.do_song_position_embed:
                     song_position_embedding = self.song_pos_embedder(song_position)
                     conds.append(song_position_embedding)
+                if cond is not None:
+                    conds.append(cond)
 
                 conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
                 inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)

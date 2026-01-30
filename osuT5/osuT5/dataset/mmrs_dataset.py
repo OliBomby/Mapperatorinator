@@ -12,6 +12,7 @@ import torch
 from pandas import Series, DataFrame
 from slider import Beatmap
 from torch.utils.data import IterableDataset
+from transformers import AutoProcessor, AutoModel
 
 from .data_utils import load_audio_file, remove_events_of_type, get_hold_note_ratio, get_scroll_speed_ratio, \
     get_hitsounded_status, get_song_length, load_mmrs_metadata, filter_mmrs_metadata
@@ -191,6 +192,8 @@ class BeatmapDatasetIterable:
         "gen_start_frame",
         "gen_end_frame",
         "lookback_allowed",
+        "processor",
+        "metadata_model",
     )
 
     def __init__(
@@ -223,6 +226,11 @@ class BeatmapDatasetIterable:
         self.pre_token_len = args.tgt_seq_len // 2
         self.add_pre_tokens = args.add_pre_tokens
         self.add_empty_sequences = args.add_empty_sequences
+
+        repo_id = "OliBomby/CM3P"
+        self.processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True, revision="main")
+        model = AutoModel.from_pretrained(repo_id, trust_remote_code=True, revision="main")
+        self.metadata_model = model.metadata_model
 
     def _get_frames(self, samples: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
         """Segment audio samples into frames.
@@ -807,6 +815,7 @@ class BeatmapDatasetIterable:
         }
 
         add_special_data(extra_data["special"], beatmap_metadata, osu_beatmap)
+        special_data = extra_data["special"]
 
         if self.sample_weights is not None:
             extra_data["sample_weights"] = self.sample_weights.get(osu_beatmap.beatmap_id, 1.0)
@@ -825,7 +834,34 @@ class BeatmapDatasetIterable:
             extra_data,
         )
 
+        metadata = None
+        if self.args.cond:
+            metadata = dict(
+                difficulty=special_data["difficulty"],
+                year=special_data["year"],
+                mode=special_data["gamemode"],
+                status=beatmap_metadata["Status"],
+                mapper=beatmap_metadata["UserId"],
+                cs=special_data.get("circle_size", None),
+                hitsounded=special_data["hitsounded"],
+                song_length=special_data["song_length"] // MILISECONDS_PER_SECOND,
+                song_position=0,
+                global_sv=special_data.get("global_sv", None),
+                mania_keycount=special_data.get("keycount", None),
+                hold_note_ratio=special_data.get("hold_note_ratio", None),
+                scroll_speed_ratio=special_data.get("scroll_speed_ratio", None),
+                tags=beatmap_metadata["TopTagIds"],
+            )
+
         for sequence in sequences:
+            if self.args.cond == "cm3p":
+                metadata["song_position"] = sequence["song_position"][0].item()
+                meta_inputs = self.processor(metadata=metadata, metadata_dropout_prob=self.args.cm3p_metadata_dropout_prob)
+                with torch.no_grad():
+                    meta_emb = self.metadata_model(**meta_inputs)
+                    meta_emb = meta_emb.pooler_output  # (B, D_meta)
+                sequence["cond"] = meta_emb.squeeze(0)
+
             self.maybe_change_dataset()
             sequence = self._normalize_time_shifts(sequence, beatmap_path)
             sequence = self._tokenize_sequence(sequence)

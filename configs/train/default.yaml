@@ -107,6 +107,8 @@ data:                  # Data settings
   normalize_audio: true  # Normalize audio data
   slider_version: 1  # Slider version to use (1 or 2)
   snapping_random_prob: 0.0  # Probability of randomizing hit object snapping in the dataset
+  cond: null              # Conditioning method (none/cm3p)
+  cm3p_metadata_dropout_prob: 0.2 # Dropout probability for CM3P metadata keys
 
 
 dataloader:             # Dataloader settings

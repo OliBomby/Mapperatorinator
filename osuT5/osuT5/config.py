@@ -149,6 +149,8 @@ class DataConfig:
     normalize_audio: bool = True  # Normalize audio data
     slider_version: int = 1  # Slider version to use (1 or 2)
     snapping_random_prob: float = 0.0  # Probability of randomizing hit object snapping in the dataset
+    cond: Optional[str] = None
+    cm3p_metadata_dropout_prob: float = 0.2
 
 
 @dataclass
