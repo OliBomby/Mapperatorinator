@@ -19,3 +19,4 @@ flask==3.1.2
 audioop-lts; python_version>='3.13'
 rich==14.2.0
 peft==0.18.1
+soxr==1.0.0
