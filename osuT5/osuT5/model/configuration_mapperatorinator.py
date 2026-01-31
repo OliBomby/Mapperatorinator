@@ -118,6 +118,7 @@ class MapperatorinatorConfig(PretrainedConfig):
             config.local_attention = local_attention
             config.local_rope_theta = local_rope_theta
             config.global_rope_theta = global_rope_theta
+            config.cond_dim = cond_dim
         if isinstance(config, MoonshineConfig):
             config.pad_token_id = pad_token_id
             config.bos_token_id = bos_token_id

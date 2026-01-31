@@ -24,6 +24,7 @@ class VarWhisperConfig(WhisperConfig):
         local_attention=128,
         local_rope_theta=10000,
         global_rope_theta=10000,
+        cond_dim=256,
         use_cache=True,
         is_encoder_decoder=True,
         activation_function="gelu",
@@ -59,6 +60,7 @@ class VarWhisperConfig(WhisperConfig):
         self.local_attention = local_attention
         self.local_rope_theta = local_rope_theta
         self.global_rope_theta = global_rope_theta
+        self.cond_dim = cond_dim
 
         super().__init__(
             vocab_size=vocab_size,

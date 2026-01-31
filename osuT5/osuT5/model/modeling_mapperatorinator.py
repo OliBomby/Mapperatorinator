@@ -166,7 +166,9 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
         inputs = dict(
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,
-            encoder_outputs=encoder_outputs, **kwargs
+            encoder_outputs=encoder_outputs,
+            cond=cond,
+            **kwargs
         )
 
         inputs_embeds = None
@@ -189,8 +191,6 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
                 if self.do_song_position_embed:
                     song_position_embedding = self.song_pos_embedder(song_position)
                     conds.append(song_position_embedding)
-                if cond is not None:
-                    conds.append(cond)
 
                 conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
                 inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)

@@ -10,8 +10,8 @@ do_style_embed: false
 do_difficulty_embed: false
 do_mapper_embed: false
 do_song_position_embed: false
-cond_dim: 128
-cond_size: 0
+cond_dim: 128  # Dimensions of the conditioning embeddings
+cond_size: 0  # Dimensions added to the encoder input for conditioning
 
 spectrogram:
   implementation: 'torchaudio'

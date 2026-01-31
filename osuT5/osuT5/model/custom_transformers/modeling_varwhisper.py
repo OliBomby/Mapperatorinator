@@ -1250,6 +1250,8 @@ class VarWhisperModel(VarWhisperPreTrainedModel):
 
         self.encoder = VarWhisperEncoder(config)
         self.decoder = VarWhisperDecoder(config)
+        self.cond_proj = nn.Linear(config.cond_dim, config.d_model) if config.cond_dim is not None else None
+
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -1282,6 +1284,7 @@ class VarWhisperModel(VarWhisperPreTrainedModel):
             past_key_values: Optional[Union[EncoderDecoderCache, Tuple[torch.FloatTensor]]] = None,
             decoder_inputs_embeds: Optional[Tuple[torch.FloatTensor]] = None,
             decoder_position_ids: Optional[Tuple[torch.LongTensor]] = None,
+            cond: Optional[torch.FloatTensor] = None,
             use_cache: Optional[bool] = None,
             output_attentions: Optional[bool] = None,
             output_hidden_states: Optional[bool] = None,
@@ -1311,12 +1314,18 @@ class VarWhisperModel(VarWhisperPreTrainedModel):
                 attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
             )
 
+        encoder_hidden_states = encoder_outputs[0]
+        if cond is not None:
+            # Project and concatenate condition to encoder outputs
+            cond_embeds = self.cond_proj(cond).unsqueeze(1)  # (batch_size, 1, d_model)
+            encoder_hidden_states = torch.cat([cond_embeds, encoder_hidden_states], dim=1)
+
         # decoder outputs consists of (dec_features, past_key_value, dec_hidden, dec_attn)
 
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
-            encoder_hidden_states=encoder_outputs[0],
+            encoder_hidden_states=encoder_hidden_states,
             past_key_values=past_key_values,
             inputs_embeds=decoder_inputs_embeds,
             position_ids=decoder_position_ids,
@@ -1387,6 +1396,7 @@ class VarWhisperForConditionalGeneration(WhisperGenerationMixin, VarWhisperPreTr
             past_key_values: Optional[Union[EncoderDecoderCache, Tuple[torch.FloatTensor]]] = None,
             decoder_inputs_embeds: Optional[Tuple[torch.FloatTensor]] = None,
             decoder_position_ids: Optional[Tuple[torch.LongTensor]] = None,
+            cond: Optional[torch.FloatTensor] = None,
             labels: Optional[torch.LongTensor] = None,
             use_cache: Optional[bool] = None,
             output_attentions: Optional[bool] = None,
@@ -1405,6 +1415,7 @@ class VarWhisperForConditionalGeneration(WhisperGenerationMixin, VarWhisperPreTr
             past_key_values=past_key_values,
             decoder_inputs_embeds=decoder_inputs_embeds,
             decoder_position_ids=decoder_position_ids,
+            cond=cond,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
