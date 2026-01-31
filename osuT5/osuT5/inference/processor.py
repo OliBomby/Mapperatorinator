@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from slider import Beatmap, TimingPoint
 from tqdm import tqdm
+from transformers import AutoProcessor, AutoModel
 
 from config import InferenceConfig
 from .server import InferenceClient, model_generate, model_forward
@@ -154,6 +155,13 @@ class Processor(object):
         self.timeshift_bias = args.timeshift_bias
         self.types_first = args.train.data.types_first
 
+        self.cond = args.train.data.cond
+        if self.cond == "cm3p":
+            repo_id = "OliBomby/CM3P"
+            self.cm3p_processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True, revision="main")
+            cm3p_model = AutoModel.from_pretrained(repo_id, trust_remote_code=True, revision="main")
+            self.cm3p_metadata_model = cm3p_model.metadata_model
+
     def model_generate(self, model_kwargs, **generate_kwargs: Any) -> Any:
         generate_kwargs2 = generate_kwargs | dict(
             precision=self.precision,
@@ -237,6 +245,7 @@ class Processor(object):
             song_length=song_length,
             verbose=verbose,
         )
+        metadata = self.get_metadata(generation_config, song_length)
 
         # Start generation
         inputs = dict(
@@ -245,6 +254,7 @@ class Processor(object):
             out_context=out_context_data,
             model_kwargs=model_kwargs,
             req_special_tokens=req_special_tokens,
+            metadata=metadata,
             verbose=verbose,
         )
 
@@ -313,6 +323,7 @@ class Processor(object):
             out_context: list[dict[str, Any]],
             model_kwargs: dict[str, Any],
             req_special_tokens: list[str],
+            metadata: dict[str, Any],
             verbose: bool = True,
     ):
         song_length = sequences[2]
@@ -330,21 +341,18 @@ class Processor(object):
 
                 # noinspection PyUnresolvedReferences
                 frames = self.prepare_frames(frames)
-                frame_time = frame_time.item()
 
-                # Get relevant tokens for current frame
-                cond_prompt, uncond_prompt = self.get_prompts(
-                    self.prepare_context_sequences(in_context, frame_time, False, req_special_tokens),
-                    self.prepare_context_sequences(out_context[:i + 1], frame_time, True, req_special_tokens),
+                cond_prompt, uncond_prompt, kwargs = self._prepare_inputs(
+                    frame_time=frame_time,
+                    song_length=song_length,
+                    in_context=in_context,
+                    out_context=out_context[:i + 1],
+                    model_kwargs=model_kwargs,
+                    req_special_tokens=req_special_tokens,
+                    metadata=metadata,
                 )
 
                 [prompt, uncond_prompt], max_len = self.pad_prompts([cond_prompt, uncond_prompt])
-
-                # Prepare additional model kwargs
-                if self.do_song_position_embed:
-                    global_pos_start = frame_time / song_length
-                    global_pos_end = (frame_time + self.miliseconds_per_sequence) / song_length
-                    model_kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32).unsqueeze(0)
 
                 result = self.model_generate(
                     model_kwargs | dict(
@@ -371,6 +379,7 @@ class Processor(object):
             out_context: list[dict[str, Any]],
             model_kwargs: dict[str, Any],
             req_special_tokens: list[str],
+            metadata: dict[str, Any],
             verbose: bool = True,
     ):
         # Get relevant inputs
@@ -385,6 +394,7 @@ class Processor(object):
             out_context=out_context[:1],
             model_kwargs=model_kwargs,
             req_special_tokens=req_special_tokens,
+            metadata=metadata,
         )
         result = self._batched_inference(
             self.model_generate,
@@ -648,6 +658,61 @@ class Processor(object):
 
         return model_kwargs
 
+    def get_metadata(
+            self,
+            generation_config: GenerationConfig,
+            song_length: Optional[float] = None,
+    ) -> dict[str, Any]:
+        return dict(
+            difficulty=generation_config.difficulty,
+            year=generation_config.year,
+            mode=generation_config.gamemode,
+            status="ranked",
+            mapper=generation_config.mapper_id,
+            cs=generation_config.circle_size,
+            hitsounded=generation_config.hitsounded,
+            song_length=song_length / MILISECONDS_PER_SECOND,
+            song_position=0,
+            global_sv=generation_config.global_sv,
+            mania_keycount=generation_config.keycount,
+            hold_note_ratio=generation_config.hold_note_ratio,
+            scroll_speed_ratio=generation_config.scroll_speed_ratio,
+            tags=generation_config.descriptors,
+        )
+
+    def _prepare_input(
+            self,
+            frame_time: torch.Tensor,
+            song_length: float,
+            in_context: list[dict[str, Any]],
+            out_context: list[dict[str, Any]],
+            model_kwargs: dict[str, Any],
+            req_special_tokens: list[str],
+            metadata: dict[str, Any],
+    ):
+        frame_time = frame_time.item()
+        cond_prompt, uncond_prompt = self.get_prompts(
+            self.prepare_context_sequences(in_context, frame_time, False, req_special_tokens),
+            self.prepare_context_sequences(out_context, frame_time, True, req_special_tokens),
+        )
+
+        model_kwargs = model_kwargs.copy()
+        # Prepare additional model kwargs
+        if self.do_song_position_embed:
+            global_pos_start = frame_time / song_length
+            global_pos_end = (frame_time + self.miliseconds_per_sequence) / song_length
+            model_kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32).unsqueeze(0)
+
+        if self.cond == "cm3p":
+            metadata["song_position"] = frame_time / song_length
+            meta_inputs = self.cm3p_processor(metadata=metadata)
+            with torch.no_grad():
+                meta_emb = self.cm3p_metadata_model(**meta_inputs)
+                meta_emb = meta_emb.pooler_output  # (B, D_meta)
+            model_kwargs["cond"] = meta_emb.squeeze(0)
+
+        return cond_prompt, uncond_prompt, model_kwargs
+
     def _prepare_parallel_inputs(
             self,
             frame_times: torch.Tensor,
@@ -656,26 +721,25 @@ class Processor(object):
             out_context: list[dict[str, Any]],
             model_kwargs: dict[str, Any],
             req_special_tokens: list[str],
+            metadata: dict[str, Any],
     ):
         cond_prompts = []
         uncond_prompts = []
         model_kwargses = []
 
         for i in range(len(frame_times)):
-            frame_time = frame_times[i].item()
-            cond_prompt, uncond_prompt = self.get_prompts(
-                self.prepare_context_sequences(in_context, frame_time, False, req_special_tokens),
-                self.prepare_context_sequences(out_context, frame_time, True, req_special_tokens),
+            cond_prompt, uncond_prompt, kwargs = self._prepare_input(
+                frame_time=frame_times[i],
+                song_length=song_length,
+                in_context=in_context,
+                out_context=out_context,
+                model_kwargs=model_kwargs,
+                req_special_tokens=req_special_tokens,
+                metadata=metadata,
             )
+
             cond_prompts.append(cond_prompt)
             uncond_prompts.append(uncond_prompt)
-
-            kwargs = model_kwargs.copy()
-            # Prepare additional model kwargs
-            if self.do_song_position_embed:
-                global_pos_start = frame_time / song_length
-                global_pos_end = (frame_time + self.miliseconds_per_sequence) / song_length
-                kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32).unsqueeze(0)
             model_kwargses.append(kwargs)
 
         return cond_prompts, uncond_prompts, model_kwargses

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import random
 from multiprocessing.managers import Namespace
-from typing import Optional, Callable
+from typing import Optional, Callable, Any
 from pathlib import Path
 
 import numpy as np
@@ -158,7 +158,7 @@ class InterleavingBeatmapDatasetIterable:
     def __iter__(self) -> "InterleavingBeatmapDatasetIterable":
         return self
 
-    def __next__(self) -> tuple[any, int]:
+    def __next__(self) -> tuple[Any, int]:
         num = len(self.workers)
         for _ in range(num):
             try:
@@ -192,8 +192,8 @@ class BeatmapDatasetIterable:
         "gen_start_frame",
         "gen_end_frame",
         "lookback_allowed",
-        "processor",
-        "metadata_model",
+        "cm3p_processor",
+        "cm3p_metadata_model",
     )
 
     def __init__(
@@ -227,16 +227,17 @@ class BeatmapDatasetIterable:
         self.add_pre_tokens = args.add_pre_tokens
         self.add_empty_sequences = args.add_empty_sequences
 
-        repo_id = "OliBomby/CM3P"
-        self.processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True, revision="main")
-        model = AutoModel.from_pretrained(repo_id, trust_remote_code=True, revision="main")
-        self.metadata_model = model.metadata_model
+        if args.cond == "cm3p":
+            repo_id = "OliBomby/CM3P"
+            self.cm3p_processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True, revision="main")
+            cm3p_model = AutoModel.from_pretrained(repo_id, trust_remote_code=True, revision="main")
+            self.cm3p_metadata_model = cm3p_model.metadata_model
 
     def _get_frames(self, samples: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
         """Segment audio samples into frames.
 
         Each frame has `frame_size` audio samples.
-        It will also calculate and return the time of each audio frame, in miliseconds.
+        It will also calculate and return the time of each audio frame, in milliseconds.
 
         Args:
             samples: Audio time-series.
@@ -717,7 +718,7 @@ class BeatmapDatasetIterable:
             base = np.power(base, 0.5)
         return mi + (ma - mi) * base
 
-    def _get_next_tracks(self) -> dict:
+    def _get_next_tracks(self):
         for beatmapset_id in self.metadata.index.get_level_values(0).unique():
             metadata = self.metadata.loc[beatmapset_id]
 
@@ -738,8 +739,7 @@ class BeatmapDatasetIterable:
                 for sample in self._get_next_beatmap(audio_samples, i, beatmap_metadata, metadata, speed):
                     yield sample
 
-    def _get_next_beatmap(self, audio_samples, i, beatmap_metadata: Series, set_metadata: DataFrame,
-                          speed: float) -> dict:
+    def _get_next_beatmap(self, audio_samples, i, beatmap_metadata: Series, set_metadata: DataFrame, speed: float):
         context_info = None
         if len(self.args.context_types) > 0:
             # Randomly select a context type with probabilities of context_weights
@@ -805,7 +805,7 @@ class BeatmapDatasetIterable:
                 data["events"], data["event_times"] = self.parser.parse_scroll_speeds(osu_beatmap, speed)
             return data
 
-        extra_data = {
+        extra_data: dict[str, Any] = {
             "beatmap_idx": torch.tensor(beatmap_metadata["BeatmapIdx"]
                                         if self.test or random.random() >= self.args.class_dropout_prob else self.tokenizer.num_classes, dtype=torch.long),
             "mapper_idx": torch.tensor(self.tokenizer.get_mapper_idx(beatmap_metadata["UserId"])
@@ -844,7 +844,7 @@ class BeatmapDatasetIterable:
                 mapper=beatmap_metadata["UserId"],
                 cs=special_data.get("circle_size", None),
                 hitsounded=special_data["hitsounded"],
-                song_length=special_data["song_length"] // MILISECONDS_PER_SECOND,
+                song_length=special_data["song_length"] / MILISECONDS_PER_SECOND,
                 song_position=0,
                 global_sv=special_data.get("global_sv", None),
                 mania_keycount=special_data.get("keycount", None),
@@ -856,9 +856,9 @@ class BeatmapDatasetIterable:
         for sequence in sequences:
             if self.args.cond == "cm3p":
                 metadata["song_position"] = sequence["song_position"][0].item()
-                meta_inputs = self.processor(metadata=metadata, metadata_dropout_prob=self.args.cm3p_metadata_dropout_prob)
+                meta_inputs = self.cm3p_processor(metadata=metadata, metadata_dropout_prob=self.args.cm3p_metadata_dropout_prob)
                 with torch.no_grad():
-                    meta_emb = self.metadata_model(**meta_inputs)
+                    meta_emb = self.cm3p_metadata_model(**meta_inputs)
                     meta_emb = meta_emb.pooler_output  # (B, D_meta)
                 sequence["cond"] = meta_emb.squeeze(0)
 
