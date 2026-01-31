@@ -343,6 +343,7 @@ class Processor(object):
 
                 # noinspection PyUnresolvedReferences
                 frames = self.prepare_frames(frames)
+                frame_time = frame_time.item()
 
                 cond_prompt, uncond_prompt, kwargs = self._prepare_input(
                     frame_time=frame_time,
@@ -357,7 +358,7 @@ class Processor(object):
                 [prompt, uncond_prompt], max_len = self.pad_prompts([cond_prompt, uncond_prompt])
 
                 result = self.model_generate(
-                    model_kwargs | dict(
+                    kwargs | dict(
                         inputs=frames,
                         decoder_input_ids=prompt,
                         decoder_attention_mask=prompt.ne(self.tokenizer.pad_id),
@@ -685,7 +686,7 @@ class Processor(object):
 
     def _prepare_input(
             self,
-            frame_time: torch.Tensor,
+            frame_time: float,
             song_length: float,
             in_context: list[dict[str, Any]],
             out_context: list[dict[str, Any]],
@@ -693,7 +694,6 @@ class Processor(object):
             req_special_tokens: list[str],
             metadata: dict[str, Any],
     ):
-        frame_time = frame_time.item()
         cond_prompt, uncond_prompt = self.get_prompts(
             self.prepare_context_sequences(in_context, frame_time, False, req_special_tokens),
             self.prepare_context_sequences(out_context, frame_time, True, req_special_tokens),
@@ -712,7 +712,7 @@ class Processor(object):
             with torch.no_grad():
                 meta_emb = self.cm3p_metadata_model(**meta_inputs)
                 meta_emb = meta_emb.pooler_output  # (B, D_meta)
-            model_kwargs["cond"] = meta_emb.squeeze(0)
+            model_kwargs["cond"] = meta_emb
 
         return cond_prompt, uncond_prompt, model_kwargs
 
@@ -732,7 +732,7 @@ class Processor(object):
 
         for i in range(len(frame_times)):
             cond_prompt, uncond_prompt, kwargs = self._prepare_input(
-                frame_time=frame_times[i],
+                frame_time=frame_times[i].item(),
                 song_length=song_length,
                 in_context=in_context,
                 out_context=out_context,

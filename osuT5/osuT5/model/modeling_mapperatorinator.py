@@ -379,6 +379,7 @@ class OsuTEncoder(nn.Module):
             difficulty: Optional[torch.Tensor] = None,
             mapper_idx: Optional[torch.Tensor] = None,
             song_position: Optional[torch.Tensor] = None,
+            cond: Optional[torch.Tensor] = None,
             output_attentions: bool = False,
             output_hidden_states: bool = False,
             return_dict: bool = False
@@ -408,6 +409,8 @@ class OsuTEncoder(nn.Module):
             if self.do_song_position_embed:
                 song_position_embedding = self.song_pos_embedder(song_position)
                 conds.append(song_position_embedding)
+            if cond is not None:
+                conds.append(cond)
 
             conds_expanded = [c.unsqueeze(1).expand((-1, frames.shape[1], -1)) for c in conds]
             inputs_embeds = torch.concatenate([frames] + conds_expanded, dim=-1)
