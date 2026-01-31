@@ -334,7 +334,9 @@ class Processor(object):
 
             if verbose:
                 print(f"Generating {context['context_type'].value}")
-            iterator = tqdm(list(zip(*sequences[:2]))) if verbose else zip(*sequences[:2])
+
+            iterator = zip(sequences[0], sequences[1])
+            iterator = tqdm(list(iterator)) if verbose else iterator
             for sequence_index, (frames, frame_time) in enumerate(iterator):
                 trim_lookback = sequence_index != 0 and self.types_first and self.lookback_time > 0
                 trim_lookahead = sequence_index != len(sequences[0]) - 1
@@ -342,7 +344,7 @@ class Processor(object):
                 # noinspection PyUnresolvedReferences
                 frames = self.prepare_frames(frames)
 
-                cond_prompt, uncond_prompt, kwargs = self._prepare_inputs(
+                cond_prompt, uncond_prompt, kwargs = self._prepare_input(
                     frame_time=frame_time,
                     song_length=song_length,
                     in_context=in_context,
@@ -463,6 +465,7 @@ class Processor(object):
             out_context=out_context_data,
             model_kwargs=model_kwargs,
             req_special_tokens=req_special_tokens,
+            metadata={},
         )
 
         for context in out_context_data:
@@ -673,7 +676,7 @@ class Processor(object):
             hitsounded=generation_config.hitsounded,
             song_length=song_length / MILISECONDS_PER_SECOND,
             song_position=0,
-            global_sv=generation_config.global_sv,
+            global_sv=generation_config.slider_multiplier,
             mania_keycount=generation_config.keycount,
             hold_note_ratio=generation_config.hold_note_ratio,
             scroll_speed_ratio=generation_config.scroll_speed_ratio,
@@ -842,7 +845,7 @@ class Processor(object):
             if not beatmap_path.is_file():
                 raise FileNotFoundError(f"Beatmap file {beatmap_path} not found.")
 
-        data = {
+        data: dict[str, Any] = {
             "events": [],
             "event_times": [],
             "context_type": context,
@@ -941,7 +944,7 @@ class Processor(object):
     ) -> list[dict[str, Any]]:
         out = []
         for i, context in enumerate(out_context):
-            context_data = self.get_context(
+            context_data: dict[str, Any] = self.get_context(
                 context,
                 beatmap_path=beatmap_path,
                 extra_in_context=extra_in_context,
@@ -1286,7 +1289,7 @@ class Processor(object):
                 continue
 
             if event.type == EventType.TIME_SHIFT:
-                event.value = frame_time + event.value * MILISECONDS_PER_STEP
+                event.value = int(round(frame_time + event.value * MILISECONDS_PER_STEP))
 
             events.append(event)
 
