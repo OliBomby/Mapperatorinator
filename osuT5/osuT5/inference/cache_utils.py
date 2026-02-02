@@ -30,6 +30,6 @@ def get_cache(model: Mapperatorinator, batch_size: int, num_beams: int = 1, cfg_
     }
     decoder_cache = StaticCache(**cache_kwargs)
     encoder_kwargs = cache_kwargs.copy()
-    encoder_kwargs["max_cache_len"] = model.config.max_source_positions
+    encoder_kwargs["max_cache_len"] = model.config.max_source_positions + 1
     encoder_cache = StaticCache(**encoder_kwargs)
     return MapperatorinatorCache(decoder_cache, encoder_cache, cfg_scale)
