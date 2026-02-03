@@ -1,6 +1,6 @@
 defaults:
   - base_fid
-  - inference: tiny44
+  - inference: tiny45
   - _self_
 
 num_processes: 32
@@ -43,7 +43,7 @@ hydra:
     name: calc_fid
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/sweeps/test_1/inference=tiny44
+    dir: ./logs_fid/sweeps/test_1/inference=tiny45
   sweep:
     dir: ./logs_fid/sweeps/test_1
     subdir: ${hydra.job.override_dirname}

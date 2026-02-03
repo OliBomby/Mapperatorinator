@@ -658,6 +658,17 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
         self.fc2 = nn.Linear(config.decoder_ffn_dim, self.embed_dim)
         self.final_layer_norm = nn.RMSNorm(self.embed_dim)
 
+        # adaLN-zero conditioning (DiT-style): cond -> (shift, scale, gate) per sub-block.
+        # All parameters are initialized to 0 so the network is unchanged at init.
+        self.self_attn_adaln = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
+        self.cross_attn_adaln = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
+        self.mlp_adaln = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
+        # zero-init => shift=0, scale=0, gate=0 at start
+        for m in (self.self_attn_adaln, self.cross_attn_adaln, self.mlp_adaln):
+            nn.init.zeros_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+
     def forward(
             self,
             hidden_states: torch.Tensor,
@@ -666,28 +677,25 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
             past_key_value: Optional[EncoderDecoderCache] = None,
             cache_position: Optional[torch.LongTensor] = None,
             position_ids: Optional[torch.LongTensor] = None,
+            cond: Optional[torch.FloatTensor] = None,
             cu_seqlens: Optional[torch.LongTensor] = None,
             max_seqlen: Optional[int] = None,
             encoder_cu_seqlens: Optional[torch.LongTensor] = None,
             encoder_max_seqlen: Optional[int] = None,
             output_attentions: Optional[bool] = False,
     ) -> torch.Tensor:
-        """
-        Args:
-            hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
-            attention_mask (`torch.FloatTensor`): attention mask of size
-                `(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
-            encoder_hidden_states (`torch.FloatTensor`):
-                cross attention input to the layer of shape `(batch, seq_len, embed_dim)`
-            past_key_value (`Tuple(torch.FloatTensor)`): cached past key and value projection states
-            output_attentions (`bool`, *optional*):
-                Whether to return the attentions tensors of all attention layers. See `attentions` under
-                returned tensors for more detail.
-        """
-        residual = hidden_states
-        hidden_states = self.self_attn_layer_norm(hidden_states)
+        # Helper to compute adaLN-zero params with broadcastable shapes.
+        def _adaln(mod: nn.Linear, c: torch.FloatTensor):
+            # c: (batch, cond_dim)
+            shift, scale, gate = mod(c).chunk(3, dim=-1)  # each (batch, d_model)
+            return shift.unsqueeze(1), scale.unsqueeze(1), gate.unsqueeze(1)
 
         # Self Attention
+        residual = hidden_states
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+        shift, scale, gate_sa = _adaln(self.self_attn_adaln, cond)
+        hidden_states = hidden_states * (1.0 + scale) + shift
+
         self_attn_outputs = self.self_attn(
             hidden_states=hidden_states,
             past_key_value=past_key_value,
@@ -699,13 +707,16 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
             output_attentions=output_attentions
         )
         hidden_states = self_attn_outputs[0]
-        hidden_states = residual + hidden_states
+        hidden_states = residual + gate_sa * hidden_states
 
         # Cross-Attention Block
         cross_attn_outputs = ()
         if encoder_hidden_states is not None:
             residual = hidden_states
             hidden_states = self.cross_attn_layer_norm(hidden_states)
+            shift, scale, gate_ca = _adaln(self.cross_attn_adaln, cond)
+            hidden_states = hidden_states * (1.0 + scale) + shift
+
             cross_attn_outputs = self.cross_attn(
                 hidden_states=hidden_states,
                 key_value_states=encoder_hidden_states,
@@ -718,16 +729,19 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
                 output_attentions=output_attentions
             )
             hidden_states = cross_attn_outputs[0]
-            hidden_states = residual + hidden_states
+            hidden_states = residual + gate_ca * hidden_states
 
         # Fully Connected
         residual = hidden_states
         hidden_states = self.final_layer_norm(hidden_states)
+        shift, scale, gate_mlp = _adaln(self.mlp_adaln, cond)
+        hidden_states = hidden_states * (1.0 + scale) + shift
+
         hidden_states = self.activation_fn(self.fc1(hidden_states))
         hidden_states = nn.functional.dropout(hidden_states, p=self.activation_dropout, training=self.training)
         hidden_states = self.fc2(hidden_states)
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
-        hidden_states = residual + hidden_states
+        hidden_states = residual + gate_mlp * hidden_states
 
         outputs = (hidden_states,) + self_attn_outputs[1:] + cross_attn_outputs[1:]
 
@@ -757,11 +771,8 @@ class VarWhisperPreTrainedModel(PreTrainedModel):
                 module.weight.data[module.padding_idx].zero_()
 
     def _get_feat_extract_output_lengths(self, input_lengths: torch.LongTensor):
-        """
-        Computes the output length of the convolutional layers
-        """
+        """Computes the output length of the convolutional layers."""
         input_lengths = (input_lengths - 1) // 2 + 1
-
         return input_lengths
 
 
@@ -971,6 +982,7 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
             past_key_values=None,
             inputs_embeds=None,
             position_ids=None,
+            cond=None,
             use_cache=None,
             output_attentions=None,
             output_hidden_states=None,
@@ -1086,6 +1098,7 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
                 output_attentions=output_attentions,
                 cache_position=cache_position,
                 position_ids=position_ids,
+                cond=cond,
                 cu_seqlens=cu_seqlens,
                 max_seqlen=max_seqlen,
                 encoder_cu_seqlens=encoder_cu_seqlens,
@@ -1250,7 +1263,11 @@ class VarWhisperModel(VarWhisperPreTrainedModel):
 
         self.encoder = VarWhisperEncoder(config)
         self.decoder = VarWhisperDecoder(config)
-        self.cond_proj = nn.Linear(config.cond_dim, config.d_model) if config.cond_dim is not None else None
+        self.cond_proj = nn.Sequential(
+            nn.Linear(config.cond_dim, config.d_model),
+            nn.SiLU(),
+            nn.Linear(config.d_model, config.d_model),
+        )
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1314,21 +1331,18 @@ class VarWhisperModel(VarWhisperPreTrainedModel):
                 attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
             )
 
-        encoder_hidden_states = encoder_outputs[0]
-        if cond is not None:
-            # Project and concatenate condition to encoder outputs
-            cond_embeds = self.cond_proj(cond).unsqueeze(1)  # (batch_size, 1, d_model)
-            encoder_hidden_states = torch.cat([cond_embeds, encoder_hidden_states], dim=1)
-
         # decoder outputs consists of (dec_features, past_key_value, dec_hidden, dec_attn)
+
+        cond = self.cond_proj(cond)
 
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
-            encoder_hidden_states=encoder_hidden_states,
+            encoder_hidden_states=encoder_outputs[0],
             past_key_values=past_key_values,
             inputs_embeds=decoder_inputs_embeds,
             position_ids=decoder_position_ids,
+            cond=cond,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
