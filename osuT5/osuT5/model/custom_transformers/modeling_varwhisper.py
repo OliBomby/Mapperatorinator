@@ -645,7 +645,7 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
         self.activation_fn = ACT2FN[config.activation_function]
         self.activation_dropout: float = config.activation_dropout
 
-        self.self_attn_layer_norm = nn.RMSNorm(self.embed_dim)
+        self.self_attn_layer_norm = nn.RMSNorm(self.embed_dim, elementwise_affine=False)
         self.cross_attn = VarWhisperAttention(
             config=config,
             num_heads=config.decoder_attention_heads,
@@ -653,10 +653,10 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
             layer_idx=layer_idx,
             is_cross_attention=True,
         )
-        self.cross_attn_layer_norm = nn.RMSNorm(self.embed_dim)
+        self.cross_attn_layer_norm = nn.RMSNorm(self.embed_dim, elementwise_affine=False)
         self.fc1 = nn.Linear(self.embed_dim, config.decoder_ffn_dim)
         self.fc2 = nn.Linear(config.decoder_ffn_dim, self.embed_dim)
-        self.final_layer_norm = nn.RMSNorm(self.embed_dim)
+        self.final_layer_norm = nn.RMSNorm(self.embed_dim, elementwise_affine=False)
 
         # adaLN-zero conditioning (DiT-style): cond -> (shift, scale, gate) per sub-block.
         # All parameters are initialized to 0 so the network is unchanged at init.
