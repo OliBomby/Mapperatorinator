@@ -277,7 +277,8 @@ def eager_attention_forward(
     if local_attention != (-1, -1):
         attention_mask = sliding_window_mask
 
-    attn_weights = attn_weights + attention_mask
+    if attention_mask is not None:
+        attn_weights = attn_weights + attention_mask
 
     # upcast attention to fp32
     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query.dtype)
@@ -677,24 +678,38 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
             past_key_value: Optional[EncoderDecoderCache] = None,
             cache_position: Optional[torch.LongTensor] = None,
             position_ids: Optional[torch.LongTensor] = None,
-            cond: Optional[torch.FloatTensor] = None,
             cu_seqlens: Optional[torch.LongTensor] = None,
             max_seqlen: Optional[int] = None,
             encoder_cu_seqlens: Optional[torch.LongTensor] = None,
             encoder_max_seqlen: Optional[int] = None,
+            cond: Optional[torch.FloatTensor] = None,
+            cond_tokens: Optional[torch.FloatTensor] = None,
             output_attentions: Optional[bool] = False,
     ) -> torch.Tensor:
         # Helper to compute adaLN-zero params with broadcastable shapes.
-        def _adaln(mod: nn.Linear, c: torch.FloatTensor):
-            # c: (batch, cond_dim)
-            shift, scale, gate = mod(c).chunk(3, dim=-1)  # each (batch, d_model)
+        def _adaln_batched(mod: nn.Linear, c: torch.FloatTensor):
+            # c: (batch, cond_dim) -> (batch, 1, d_model)
+            shift, scale, gate = mod(c).chunk(3, dim=-1)
             return shift.unsqueeze(1), scale.unsqueeze(1), gate.unsqueeze(1)
+
+        def _adaln_tokens(mod: nn.Linear, c_tok: torch.FloatTensor):
+            # c_tok: (total_nnz, cond_dim) -> (total_nnz, d_model)
+            shift, scale, gate = mod(c_tok).chunk(3, dim=-1)
+            return shift, scale, gate
+
+        use_token_cond = cond_tokens is not None
+        use_batch_cond = (cond is not None) and not use_token_cond
 
         # Self Attention
         residual = hidden_states
         hidden_states = self.self_attn_layer_norm(hidden_states)
-        shift, scale, gate_sa = _adaln(self.self_attn_adaln, cond)
-        hidden_states = hidden_states * (1.0 + scale) + shift
+        gate_sa = None
+        if use_token_cond:
+            shift, scale, gate_sa = _adaln_tokens(self.self_attn_adaln, cond_tokens)
+            hidden_states = hidden_states * (1.0 + scale) + shift
+        elif use_batch_cond:
+            shift, scale, gate_sa = _adaln_batched(self.self_attn_adaln, cond)
+            hidden_states = hidden_states * (1.0 + scale) + shift
 
         self_attn_outputs = self.self_attn(
             hidden_states=hidden_states,
@@ -707,15 +722,23 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
             output_attentions=output_attentions
         )
         hidden_states = self_attn_outputs[0]
-        hidden_states = residual + gate_sa * hidden_states
+        if gate_sa is not None:
+            hidden_states = residual + gate_sa * hidden_states
+        else:
+            hidden_states = residual + hidden_states
 
         # Cross-Attention Block
         cross_attn_outputs = ()
         if encoder_hidden_states is not None:
             residual = hidden_states
             hidden_states = self.cross_attn_layer_norm(hidden_states)
-            shift, scale, gate_ca = _adaln(self.cross_attn_adaln, cond)
-            hidden_states = hidden_states * (1.0 + scale) + shift
+            gate_ca = None
+            if use_token_cond:
+                shift, scale, gate_ca = _adaln_tokens(self.cross_attn_adaln, cond_tokens)
+                hidden_states = hidden_states * (1.0 + scale) + shift
+            elif use_batch_cond:
+                shift, scale, gate_ca = _adaln_batched(self.cross_attn_adaln, cond)
+                hidden_states = hidden_states * (1.0 + scale) + shift
 
             cross_attn_outputs = self.cross_attn(
                 hidden_states=hidden_states,
@@ -729,19 +752,30 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
                 output_attentions=output_attentions
             )
             hidden_states = cross_attn_outputs[0]
-            hidden_states = residual + gate_ca * hidden_states
+            if gate_ca is not None:
+                hidden_states = residual + gate_ca * hidden_states
+            else:
+                hidden_states = residual + hidden_states
 
         # Fully Connected
         residual = hidden_states
         hidden_states = self.final_layer_norm(hidden_states)
-        shift, scale, gate_mlp = _adaln(self.mlp_adaln, cond)
-        hidden_states = hidden_states * (1.0 + scale) + shift
+        gate_mlp = None
+        if use_token_cond:
+            shift, scale, gate_mlp = _adaln_tokens(self.mlp_adaln, cond_tokens)
+            hidden_states = hidden_states * (1.0 + scale) + shift
+        elif use_batch_cond:
+            shift, scale, gate_mlp = _adaln_batched(self.mlp_adaln, cond)
+            hidden_states = hidden_states * (1.0 + scale) + shift
 
         hidden_states = self.activation_fn(self.fc1(hidden_states))
         hidden_states = nn.functional.dropout(hidden_states, p=self.activation_dropout, training=self.training)
         hidden_states = self.fc2(hidden_states)
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
-        hidden_states = residual + gate_mlp * hidden_states
+        if gate_mlp is not None:
+            hidden_states = residual + gate_mlp * hidden_states
+        else:
+            hidden_states = residual + hidden_states
 
         outputs = (hidden_states,) + self_attn_outputs[1:] + cross_attn_outputs[1:]
 
@@ -982,12 +1016,12 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
             past_key_values=None,
             inputs_embeds=None,
             position_ids=None,
-            cond=None,
-            use_cache=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None,
-            cache_position=None,
+            cond: Optional[torch.FloatTensor] = None,
+            use_cache: None = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
+            cache_position: Optional[torch.LongTensor] = None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1014,6 +1048,8 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
         repad = False
         cu_seqlens, max_seqlen = None, self.config.max_target_positions
         encoder_cu_seqlens, encoder_max_seqlen = None, None
+        indices = None
+        cond_tokens = None
         if self.config._attn_implementation == "flash_attention_2" and not use_cache:
             repad = True
             if inputs_embeds is None:
@@ -1025,6 +1061,12 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
                 inputs_embeds, indices, cu_seqlens, max_seqlen, *_ = _unpad_varwhisper_input(
                     inputs=inputs_embeds, attention_mask=attention_mask
                 )
+
+            # If we have conditioning, gather it per unpadded token so it stays aligned with varlen hidden states.
+            if cond is not None:
+                # cond: (batch, cond_dim) -> repeat to (batch*seqlen, cond_dim) then index_select to (total_nnz, cond_dim)
+                cond_tokens = cond.unsqueeze(1).expand(batch_size, seq_len, cond.shape[-1]).reshape(-1, cond.shape[-1])
+                cond_tokens = cond_tokens.index_select(0, indices)
 
             if encoder_hidden_states is not None:
                 encoder_hidden_states, encoder_cu_seqlens, encoder_max_seqlen = _unpad_encoder_hidden_states(
@@ -1098,11 +1140,12 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
                 output_attentions=output_attentions,
                 cache_position=cache_position,
                 position_ids=position_ids,
-                cond=cond,
                 cu_seqlens=cu_seqlens,
                 max_seqlen=max_seqlen,
                 encoder_cu_seqlens=encoder_cu_seqlens,
                 encoder_max_seqlen=encoder_max_seqlen,
+                cond=cond,
+                cond_tokens=cond_tokens,
             )
             hidden_states = layer_outputs[0]
 
@@ -1441,7 +1484,6 @@ class VarWhisperForConditionalGeneration(WhisperGenerationMixin, VarWhisperPreTr
         loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()
-            # move labels to correct device to enable PP
             labels = labels.to(lm_logits.device)
             loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.reshape(-1))
 
