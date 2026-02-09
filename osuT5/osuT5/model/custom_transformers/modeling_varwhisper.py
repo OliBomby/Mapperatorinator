@@ -664,11 +664,6 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
         self.self_attn_adaln = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
         self.cross_attn_adaln = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
         self.mlp_adaln = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
-        # zero-init => shift=0, scale=0, gate=0 at start
-        for m in (self.self_attn_adaln, self.cross_attn_adaln, self.mlp_adaln):
-            nn.init.zeros_(m.weight)
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
 
     def forward(
             self,
@@ -723,7 +718,7 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
         )
         hidden_states = self_attn_outputs[0]
         if gate_sa is not None:
-            hidden_states = residual + gate_sa * hidden_states
+            hidden_states = residual + (1.0 + gate_sa) * hidden_states
         else:
             hidden_states = residual + hidden_states
 
@@ -753,7 +748,7 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
             )
             hidden_states = cross_attn_outputs[0]
             if gate_ca is not None:
-                hidden_states = residual + gate_ca * hidden_states
+                hidden_states = residual + (1.0 + gate_ca) * hidden_states
             else:
                 hidden_states = residual + hidden_states
 
@@ -773,7 +768,7 @@ class VarWhisperDecoderLayer(GradientCheckpointingLayer):
         hidden_states = self.fc2(hidden_states)
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         if gate_mlp is not None:
-            hidden_states = residual + gate_mlp * hidden_states
+            hidden_states = residual + (1.0 + gate_mlp) * hidden_states
         else:
             hidden_states = residual + hidden_states
 
@@ -1001,6 +996,13 @@ class VarWhisperDecoder(VarWhisperPreTrainedModel):
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
         self.post_init()
+
+        # Set AdaLN-zero weights to zero so that conditioning has no effect at the start of training.
+        for layer in self.layers:
+            for m in (layer.self_attn_adaln, layer.cross_attn_adaln, layer.mlp_adaln):
+                nn.init.zeros_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def get_input_embeddings(self):
         return self.embed_tokens
