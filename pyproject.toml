@@ -28,6 +28,15 @@ dependencies = [
 
 [tool.uv.sources]
 slider = { git = "https://github.com/OliBomby/slider.git", rev = "gedagedigedagedaoh" }
+# Optional: pin PyTorch packages to the CUDA wheel index (used only when installing torch/torchaudio).
+# See README for the recommended post-`uv sync` install command.
+torch = [{ index = "pytorch-cu128", marker = "sys_platform != 'darwin'" }]
+torchaudio = [{ index = "pytorch-cu128", marker = "sys_platform != 'darwin'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
