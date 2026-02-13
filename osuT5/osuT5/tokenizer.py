@@ -198,16 +198,26 @@ class Tokenizer(PushToHubMixin):
             if args.data.add_kiai_special_token or args.data.add_kiai or any(ContextType.KIAI in c["out"] for c in args.data.context_types):
                 self.event_ranges.append(EventRange(EventType.KIAI, 0, 1))
 
+            if args.data.sustain_interval:
+                self.event_ranges.append(EventRange(EventType.SLIDER_SUSTAIN, 0, 0))
+                self.event_ranges.append(EventRange(EventType.SLIDER_REPEAT_SUSTAIN, 0, 0))
+                self.event_ranges.append(EventRange(EventType.SPINNER_SUSTAIN, 0, 0))
+
             if 3 in args.data.gamemodes:
                 self.event_ranges.append(EventRange(EventType.HOLD_NOTE, 0, 0))
                 self.event_ranges.append(EventRange(EventType.HOLD_NOTE_END, 0, 0))
                 self.event_ranges.append(EventRange(EventType.SCROLL_SPEED_CHANGE, 0, 0))
+                if args.data.sustain_interval:
+                    self.event_ranges.append(EventRange(EventType.HOLD_NOTE_SUSTAIN, 0, 0))
 
             if 1 in args.data.gamemodes:
                 self.event_ranges.append(EventRange(EventType.DRUMROLL, 0, 0))
                 self.event_ranges.append(EventRange(EventType.DRUMROLL_END, 0, 0))
                 self.event_ranges.append(EventRange(EventType.DENDEN, 0, 0))
                 self.event_ranges.append(EventRange(EventType.DENDEN_END, 0, 0))
+                if args.data.sustain_interval:
+                    self.event_ranges.append(EventRange(EventType.DRUMROLL_SUSTAIN, 0, 0))
+                    self.event_ranges.append(EventRange(EventType.DENDEN_SUSTAIN, 0, 0))
 
         self.event_range: dict[EventType, EventRange] = {er.type: er for er in self.event_ranges} | {er.type: er for er in self.input_event_ranges}
 

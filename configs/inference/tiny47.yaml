@@ -1,0 +1,15 @@
+defaults:
+  - default
+  - ../train@train: tiny47
+  - ../diffusion@diffusion: v1
+  - _self_
+
+model_path: './test/tiny47/'  # Path to trained model
+diff_ckpt: 'OliBomby/osu-diffusion-v2'
+version: 'Mapperatorinator tiny47'
+in_context: []
+output_type: [TIMING, MAP]    # Output type (map, timing)
+temperature: 0.9        # Sampling temperature
+top_p: 0.9              # Top-p sampling threshold
+max_batch_size: 32       # Maximum batch size for inference
+generate_positions: false

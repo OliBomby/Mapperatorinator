@@ -51,7 +51,7 @@ def play_hs(audio, tokens, sr, tokenizer):
     sd.play(audio_with_hits, samplerate=sr)
 
 
-@hydra.main(config_path="../configs/osut5", config_name="train_tiny_dist3", version_base="1.1")
+@hydra.main(config_path="../configs/train", config_name="v30", version_base="1.1")
 def main(args: TrainConfig):
     args = OmegaConf.to_object(args)
     setup_args(args)

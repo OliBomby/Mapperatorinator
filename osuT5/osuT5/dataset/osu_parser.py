@@ -35,6 +35,7 @@ class OsuParser:
             self.dist_min = dist_range.min_value
             self.dist_max = dist_range.max_value
         self.slider_version = args.data.slider_version
+        self.sustain_interval = args.data.sustain_interval
 
     def parse(self, beatmap: Beatmap, speed: float = 1.0, song_length: Optional[float] = None) -> tuple[list[Event], list[int]]:
         # noinspection PyUnresolvedReferences
@@ -346,7 +347,7 @@ class OsuParser:
             beatmap: Beatmap,
             *,
             time_event: bool = False,
-            add_snap=True,
+            add_snap: bool=True,
             pos: npt.NDArray = None,
             last_pos: npt.NDArray = None,
             new_combo: bool = False,
@@ -385,6 +386,22 @@ class OsuParser:
             event_times.append(time_ms)
 
         return last_pos
+
+    def _add_sustain_groups(self, start_time: timedelta, end_time: timedelta, add_group_kwargs):
+        if not self.sustain_interval:
+            return
+
+        # Adds sustain groups every sustain_interval after start_time until end_time
+        interval = timedelta(milliseconds=self.sustain_interval)
+        time = start_time + interval
+        while time < end_time - timedelta(milliseconds=10):
+            self._add_group(
+                time=time,
+                time_event=True,
+                add_snap=False,
+                **add_group_kwargs,
+            )
+            time += interval
 
     def _parse_circle(self, circle: Circle, events: list[Event], event_times: list[int], last_pos: npt.NDArray, beatmap: Beatmap) -> npt.NDArray:
         """Parse a circle hit object.
@@ -489,6 +506,17 @@ class OsuParser:
                 last_pos=last_pos,
             )
 
+            self._add_sustain_groups(
+                slider.time,
+                slider.time + duration,
+                dict(
+                    event=EventType.SLIDER_SUSTAIN,
+                    events=events,
+                    event_times=event_times,
+                    beatmap=beatmap,
+                )
+            )
+
         # Add body hitsounds and remaining edge hitsounds
         last_pos = self._add_group(
             EventType.LAST_ANCHOR,
@@ -502,6 +530,17 @@ class OsuParser:
             hitsound_ref_times=[slider.time + timedelta(milliseconds=1)] + [slider.time + i * duration for i in range(1, slider.repeat)],
             hitsounds=[slider.hitsound] + [slider.edge_sounds[i] if len(slider.edge_sounds) > i else 0 for i in range(1, slider.repeat)],
             additions=[slider.addition] + [slider.edge_additions[i] if len(slider.edge_additions) > i else '0:0' for i in range(1, slider.repeat)],
+        )
+
+        self._add_sustain_groups(
+            slider.time + duration,
+            slider.end_time,
+            dict(
+                event=EventType.SLIDER_REPEAT_SUSTAIN,
+                events=events,
+                event_times=event_times,
+                beatmap=beatmap,
+            )
         )
 
         return self._add_group(
@@ -535,6 +574,17 @@ class OsuParser:
             event_times,
             beatmap,
             time_event=True,
+        )
+
+        self._add_sustain_groups(
+            spinner.time,
+            spinner.end_time,
+            dict(
+                event=EventType.SPINNER_SUSTAIN,
+                events=events,
+                event_times=event_times,
+                beatmap=beatmap,
+            )
         )
 
         self._add_group(
@@ -576,6 +626,18 @@ class OsuParser:
             additions=[hold_note.addition],
         )
 
+        self._add_sustain_groups(
+            hold_note.time,
+            hold_note.end_time,
+            dict(
+                event=EventType.HOLD_NOTE_SUSTAIN,
+                events=events,
+                event_times=event_times,
+                beatmap=beatmap,
+                pos=pos,
+            )
+        )
+
         self._add_group(
             EventType.HOLD_NOTE_END,
             hold_note.end_time,
@@ -608,6 +670,17 @@ class OsuParser:
             scroll_speed=self.scroll_speed_at(slider.time, beatmap),
         )
 
+        self._add_sustain_groups(
+            slider.time,
+            slider.end_time,
+            dict(
+                event=EventType.DRUMROLL_SUSTAIN,
+                events=events,
+                event_times=event_times,
+                beatmap=beatmap,
+            )
+        )
+
         self._add_group(
             EventType.DRUMROLL_END,
             slider.end_time,
@@ -635,6 +708,17 @@ class OsuParser:
             hitsounds=[spinner.hitsound],
             additions=[spinner.addition],
             scroll_speed=self.scroll_speed_at(spinner.time, beatmap),
+        )
+
+        self._add_sustain_groups(
+            spinner.time,
+            spinner.end_time,
+            dict(
+                event=EventType.DENDEN_SUSTAIN,
+                events=events,
+                event_times=event_times,
+                beatmap=beatmap,
+            )
         )
 
         self._add_group(
