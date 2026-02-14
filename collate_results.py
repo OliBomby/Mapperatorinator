@@ -1,5 +1,8 @@
 import os
 import re
+import sys
+import argparse
+import subprocess
 
 
 def get_color_for_value(value, min_val, max_val, lower_is_better=False):
@@ -204,12 +207,158 @@ def parse_log_files(root_dir):
     return "\n".join(html)
 
 
+def _copy_text_clipboard_windows(text: str) -> None:
+    """Copy plain text to Windows clipboard via clip.exe."""
+    # clip.exe expects UTF-16LE when stdin is a pipe.
+    p = subprocess.run(
+        ["clip"],
+        input=text.encode("utf-16le"),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+
+
+def _copy_html_clipboard_windows(html: str) -> None:
+    """Copy HTML to Windows clipboard in CF_HTML format.
+
+    Many targets (Outlook, Word, some editors) will preserve formatting.
+    Falls back to text copy if the HTML clipboard format can't be set.
+    """
+    import ctypes
+
+    CF_UNICODETEXT = 13
+
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+
+    # Register HTML clipboard format.
+    CF_HTML = user32.RegisterClipboardFormatW("HTML Format")
+
+    def build_cf_html(fragment: str) -> bytes:
+        # Per CF_HTML spec: https header with byte offsets.
+        start_html = 0
+        end_html = 0
+        start_fragment = 0
+        end_fragment = 0
+
+        prefix = (
+            "Version:0.9\r\n"
+            "StartHTML:{:010d}\r\n"
+            "EndHTML:{:010d}\r\n"
+            "StartFragment:{:010d}\r\n"
+            "EndFragment:{:010d}\r\n"
+        )
+
+        html_doc_prefix = "<html><body><!--StartFragment-->"
+        html_doc_suffix = "<!--EndFragment--></body></html>"
+        html_doc = html_doc_prefix + fragment + html_doc_suffix
+
+        # We'll fill offsets after assembling the full text.
+        header_placeholder = prefix.format(0, 0, 0, 0)
+        full = header_placeholder + html_doc
+
+        # Offsets are byte offsets in UTF-8.
+        start_html = len(header_placeholder.encode("utf-8"))
+        end_html = len(full.encode("utf-8"))
+        start_fragment = start_html + len(html_doc_prefix.encode("utf-8"))
+        end_fragment = start_fragment + len(fragment.encode("utf-8"))
+
+        header = prefix.format(start_html, end_html, start_fragment, end_fragment)
+        full = header + html_doc
+        return full.encode("utf-8")
+
+    def set_clipboard_data(fmt: int, data: bytes) -> None:
+        GMEM_MOVEABLE = 0x0002
+
+        hglobal = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data) + 1)
+        if not hglobal:
+            raise OSError("GlobalAlloc failed")
+
+        locked = kernel32.GlobalLock(hglobal)
+        if not locked:
+            kernel32.GlobalFree(hglobal)
+            raise OSError("GlobalLock failed")
+
+        ctypes.memmove(locked, data, len(data))
+        ctypes.memset(locked + len(data), 0, 1)
+        kernel32.GlobalUnlock(hglobal)
+
+        if not user32.SetClipboardData(fmt, hglobal):
+            # If SetClipboardData fails, we must free.
+            kernel32.GlobalFree(hglobal)
+            raise OSError("SetClipboardData failed")
+
+    if not user32.OpenClipboard(None):
+        raise OSError("OpenClipboard failed")
+
+    try:
+        if not user32.EmptyClipboard():
+            raise OSError("EmptyClipboard failed")
+
+        cf_html_bytes = build_cf_html(html)
+        set_clipboard_data(CF_HTML, cf_html_bytes)
+
+        # Also set Unicode text, so paste targets without CF_HTML still work.
+        # Use UTF-16LE without BOM for CF_UNICODETEXT with terminating null.
+        text_bytes = (html).encode("utf-16le")
+        set_clipboard_data(CF_UNICODETEXT, text_bytes + b"\x00\x00")
+    finally:
+        user32.CloseClipboard()
+
+
+def copy_to_clipboard(content: str, *, prefer_html: bool = True) -> bool:
+    """Copy content to clipboard.
+
+    Returns True if copied successfully, False otherwise.
+    Currently supports Windows; other OSes will return False.
+    """
+    if os.name != "nt":
+        return False
+
+    if prefer_html:
+        try:
+            _copy_html_clipboard_windows(content)
+            return True
+        except Exception:
+            # fall back to text
+            pass
+
+    try:
+        _copy_text_clipboard_windows(content)
+        return True
+    except Exception:
+        return False
+
+
 if __name__ == '__main__':
-    # --- IMPORTANT ---
-    # Change this to the path of your main results folder.
-    # You can use "." if the script is in the same parent folder as the "inference=..." folders.
-    logs_directory = './logs_fid/sweeps/test_1'
+    parser = argparse.ArgumentParser(description="Collate calc_fid.log metrics into an HTML table.")
+    parser.add_argument(
+        "--root-dir",
+        default="./logs_fid/sweeps/test_1",
+        help="Path to folder containing inference=* subfolders (default: ./logs_fid/sweeps/test_1)",
+    )
+    parser.add_argument(
+        "--copy",
+        action="store_true",
+        help="Copy the generated HTML to clipboard (Windows only).",
+    )
+    parser.add_argument(
+        "--copy-text",
+        action="store_true",
+        help="Copy as plain text only (Windows only).",
+    )
 
-    markdown_table = parse_log_files(logs_directory)
-    print(markdown_table)
+    args = parser.parse_args()
 
+    logs_directory = args.root_dir
+
+    html_table = parse_log_files(logs_directory)
+    print(html_table)
+
+    if args.copy or args.copy_text:
+        ok = copy_to_clipboard(html_table, prefer_html=not args.copy_text)
+        if ok:
+            print("\n[collate_results] Copied to clipboard.", file=sys.stderr)
+        else:
+            print("\n[collate_results] Clipboard copy failed (or unsupported OS).", file=sys.stderr)
