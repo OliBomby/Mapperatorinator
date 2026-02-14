@@ -58,6 +58,7 @@ class EventType(Enum):
     HOLD_NOTE_SUSTAIN = "hold_note_sustain"
     DRUMROLL_SUSTAIN = "drumroll_sustain"
     DENDEN_SUSTAIN = "denden_sustain"
+    POS_REFINE = "pos_refine"
 
 
 class ContextType(Enum):

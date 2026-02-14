@@ -157,6 +157,10 @@ class Tokenizer(PushToHubMixin):
                     y_count = y_max - y_min + 1
                     self.event_ranges.append(EventRange(EventType.POS, 0, x_count * y_count - 1))
 
+                    if args.data.position_refinement:
+                        ref_count = p // args.data.position_refinement
+                        self.event_ranges.append(EventRange(EventType.POS_REFINE, 0, ref_count * ref_count - 1))
+
             if 3 in args.data.gamemodes:
                 if args.data.add_keycount_token:
                     self.input_event_ranges.append(EventRange(EventType.MANIA_KEYCOUNT, 1, 18))

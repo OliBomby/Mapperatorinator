@@ -29,6 +29,7 @@ class OsuParser:
         self.mania_bpm_normalized_scroll_speed = args.data.mania_bpm_normalized_scroll_speed
         self.position_precision = args.data.position_precision
         self.position_split_axes = args.data.position_split_axes
+        self.position_refinement = args.data.position_refinement
         self.x_min, self.x_max, self.y_min, self.y_max = args.data.position_range
         if self.add_distances:
             dist_range = tokenizer.event_range[EventType.DISTANCE]
@@ -329,6 +330,11 @@ class OsuParser:
                                                        ((self.x_max - self.x_min) / self.position_precision + 1))
                                     ))
                 event_times.append(time_ms)
+
+                if self.position_refinement:
+                    p_ref = (pos % self.position_precision) // self.position_refinement
+                    events.append(Event(EventType.POS_REFINE, int(p_ref[0] + p_ref[1] * (self.position_precision // self.position_refinement))))
+                    event_times.append(time_ms)
 
         return pos
 

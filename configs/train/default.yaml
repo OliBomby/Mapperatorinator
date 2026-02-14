@@ -108,6 +108,7 @@ data:                  # Data settings
   slider_version: 1  # Slider version to use (1 or 2)
   snapping_random_prob: 0.0  # Probability of randomizing hit object snapping in the dataset
   sustain_interval: null  # Time in milliseconds between sustain tokens for held notes. Should be shorter than the lookback window.
+  position_refinement: null  # Add a second pass of position tokens with higher precision
 
 
 dataloader:             # Dataloader settings

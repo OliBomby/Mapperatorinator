@@ -132,6 +132,7 @@ class Processor(object):
 
         if self.add_positions:
             self.position_precision = args.train.data.position_precision
+            self.position_refinement = args.train.data.position_refinement
             x_min, x_max, y_min, y_max = args.train.data.position_range
             self.x_min = x_min // self.position_precision
             self.x_max = x_max // self.position_precision
@@ -1231,14 +1232,25 @@ class Processor(object):
     def _rescale_positions(self, events: list[Event], event_times: list[int]) -> tuple[list[Event], list[int]]:
         new_events = []
         new_event_times = []
-        offset = self.position_precision // 2 if self.position_precision > 1 else 0
+        default_offset = self.position_precision // 2 if self.position_precision > 1 else 0
+        default_offset = np.array([default_offset, default_offset], dtype=np.int32)
         for i, event in enumerate(events):
             if event.type == EventType.POS_X or event.type == EventType.POS_Y:
                 new_events.append(Event(type=event.type, value=event.value * self.position_precision))
                 new_event_times.append(event_times[i])
             elif event.type == EventType.POS:
-                new_events.append(Event(type=EventType.POS_X, value=((event.value % self.x_count) + self.x_min) * self.position_precision + offset))
-                new_events.append(Event(type=EventType.POS_Y, value=((event.value // self.x_count) + self.y_min) * self.position_precision + offset))
+                if i + 1 < len(events) and events[i + 1].type == EventType.POS_REFINE and self.position_refinement:
+                    refinement_range = self.position_precision // self.position_refinement
+                    refinement = events[i + 1].value
+                    offset = np.array([refinement % refinement_range, refinement // refinement_range], dtype=np.int32) * self.position_refinement
+                else:
+                    offset = default_offset
+
+                p = np.array([event.value % self.x_count + self.x_min, event.value // self.x_count + self.y_min], dtype=np.int32)
+                p *= self.position_precision
+                p += offset
+                new_events.append(Event(type=EventType.POS_X, value=p[0]))
+                new_events.append(Event(type=EventType.POS_Y, value=p[1]))
                 new_event_times.append(event_times[i])
                 new_event_times.append(event_times[i])
             else:
