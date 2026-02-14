@@ -332,8 +332,9 @@ class OsuParser:
                 event_times.append(time_ms)
 
                 if self.position_refinement:
-                    p_ref = (pos % self.position_precision) // self.position_refinement
-                    events.append(Event(EventType.POS_REFINE, int(p_ref[0] + p_ref[1] * (self.position_precision // self.position_refinement))))
+                    refinement_range = self.position_precision // self.position_refinement
+                    p_ref = np.clip((pos % self.position_precision) // self.position_refinement, 0, refinement_range - 1)
+                    events.append(Event(EventType.POS_REFINE, int(p_ref[0] + p_ref[1] * refinement_range)))
                     event_times.append(time_ms)
 
         return pos
