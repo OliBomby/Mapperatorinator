@@ -132,7 +132,7 @@ def main(args: TrainConfig):
             mels = transform(b["frames"])
             # [tokenizer.decode(t) if t > 16 else t for t in b['decoder_input_ids'][3].cpu().numpy()]
             # plot the melspectrogram
-            play_hs(audio, labels, args, tokenizer)
+            # play_hs(audio, labels, args, tokenizer)
             for i in range(len(mels)):
                 fig, ax = plt.subplots(figsize=(12, 6), dpi=200)
                 ax.imshow(mels[i].numpy().T, aspect="auto", origin="lower", norm="log")

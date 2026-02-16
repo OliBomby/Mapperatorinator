@@ -151,6 +151,9 @@ class DataConfig:
     snapping_random_prob: float = 0.0  # Probability of randomizing hit object snapping in the dataset
     sustain_interval: Optional[int] = None
     position_refinement: Optional[int] = None
+    descriptor_source: str = 'omdb'
+    min_top_tag_count: int = 2
+    tags_metadata_path: str = ''
 
 
 @dataclass

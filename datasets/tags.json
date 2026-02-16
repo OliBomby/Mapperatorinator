@@ -1,0 +1,772 @@
+{
+    "tags": [
+        {
+            "id": 1,
+            "name": "style/messy",
+            "ruleset_id": 0,
+            "description": "Visually chaotic and intentionally disorganised patterns, often involving many overlaps and unequal visual spacing between objects."
+        },
+        {
+            "id": 2,
+            "name": "rhythm/simple",
+            "ruleset_id": null,
+            "description": "Accessible and straightforward map design."
+        },
+        {
+            "id": 3,
+            "name": "rhythm/chaotic",
+            "ruleset_id": 0,
+            "description": "Unpredictable map design, often testing unusual skillsets."
+        },
+        {
+            "id": 4,
+            "name": "style/geometric",
+            "ruleset_id": 0,
+            "description": "Incorporates geometric shapes within the map's visual design."
+        },
+        {
+            "id": 5,
+            "name": "style/freeform",
+            "ruleset_id": 0,
+            "description": "An unrestrained and loose approach towards visual structure."
+        },
+        {
+            "id": 6,
+            "name": "geometric/grid snap",
+            "ruleset_id": 0,
+            "description": "Objects are placed along a square grid, typically using osu!'s in-built grid snap feature."
+        },
+        {
+            "id": 7,
+            "name": "geometric/hexgrid",
+            "ruleset_id": 0,
+            "description": "Objects are placed along a hexagonal grid."
+        },
+        {
+            "id": 8,
+            "name": "style/symmetrical",
+            "ruleset_id": 0,
+            "description": "Employs symmetry within the map design, often mirroring elements along the horizontal centreline."
+        },
+        {
+            "id": 9,
+            "name": "gimmick/playfield constraint",
+            "ruleset_id": 0,
+            "description": "Restricts object placement to a certain part of the playfield."
+        },
+        {
+            "id": 10,
+            "name": "style/old-style revival",
+            "ruleset_id": 0,
+            "description": "Emulates a style closely associated with early mapping, typically to pay homage or invoke nostalgia."
+        },
+        {
+            "id": 11,
+            "name": "rhythm/repetition",
+            "ruleset_id": null,
+            "description": "Features the use of recognizable identical patterns or gameplay elements."
+        },
+        {
+            "id": 12,
+            "name": "rhythm/progression",
+            "ruleset_id": null,
+            "description": "Contains a gradual advancement in difficulty or concept across the map."
+        },
+        {
+            "id": 13,
+            "name": "style/high contrast",
+            "ruleset_id": null,
+            "description": "Uses flashy ideas to follow changes in the music, creating stark differences between different sections of the song."
+        },
+        {
+            "id": 14,
+            "name": "rhythm/improvisation",
+            "ruleset_id": 0,
+            "description": "Uses patterns that do not correspond to sounds in the music, often using hitsounds to add sounds in."
+        },
+        {
+            "id": 15,
+            "name": "skillset/tech",
+            "ruleset_id": 0,
+            "description": "Tests uncommon skills."
+        },
+        {
+            "id": 16,
+            "name": "tech/slider tech",
+            "ruleset_id": 0,
+            "description": "Tests uncommon skills involving sliders, such as heavy use of kicksliders or aim on complex slidershapes."
+        },
+        {
+            "id": 17,
+            "name": "tap/finger control",
+            "ruleset_id": 0,
+            "description": "Uses complex applications of rhythms in order to test the player's tapping ability."
+        },
+        {
+            "id": 18,
+            "name": "tech/complex sv",
+            "ruleset_id": 0,
+            "description": "Changes slider velocity by large amounts in order to test the player's reading and aim ability."
+        },
+        {
+            "id": 19,
+            "name": "aim/jump",
+            "ruleset_id": 0,
+            "description": "Focuses heavily on jumps, i.e. circles spaced far apart that require the player to move towards, slow down to hit, then speed up to move towards the next object."
+        },
+        {
+            "id": 20,
+            "name": "aim/sharp",
+            "ruleset_id": 0,
+            "description": "Patterns with heavy use of sharp angle movement, either between circles or into sliders."
+        },
+        {
+            "id": 21,
+            "name": "aim/wide",
+            "ruleset_id": 0,
+            "description": "Patterns, usually jumps, with heavy use of wide angle movement."
+        },
+        {
+            "id": 22,
+            "name": "aim/linear",
+            "ruleset_id": 0,
+            "description": "Patterns, usually jumps, that require the player to move continuously in a straight or nearly straight line."
+        },
+        {
+            "id": 23,
+            "name": "aim/aim control",
+            "ruleset_id": 0,
+            "description": "Patterns with velocity or direction changes which strongly go against a player's natural movement pattern."
+        },
+        {
+            "id": 24,
+            "name": "aim/flow",
+            "ruleset_id": 0,
+            "description": "Patterns with fully continuous cursor movement, usually due to a combination of wide angles and little time between objects."
+        },
+        {
+            "id": 25,
+            "name": "tap/bursts",
+            "ruleset_id": null,
+            "description": "Patterns requiring continuous movement and alternating, typically 9 notes or less."
+        },
+        {
+            "id": 26,
+            "name": "tap/streams",
+            "ruleset_id": null,
+            "description": "Patterns requiring continuous note hits, typically more than 9 notes."
+        },
+        {
+            "id": 27,
+            "name": "streams/spaced streams",
+            "ruleset_id": 0,
+            "description": "Streams with large spacing, typically ones where the notes don't overlap."
+        },
+        {
+            "id": 28,
+            "name": "tap/stamina",
+            "ruleset_id": 0,
+            "description": "Tests a player's ability to tap dense rhythms over long periods of time."
+        },
+        {
+            "id": 29,
+            "name": "streams/cutstreams",
+            "ruleset_id": 0,
+            "description": "Streams in which the spacing of certain notes is much larger than the rest of the stream."
+        },
+        {
+            "id": 30,
+            "name": "skillset/reading",
+            "ruleset_id": null,
+            "description": "Tests a player's reading skill, i.e. patterns that obfuscate note order and/or timing."
+        },
+        {
+            "id": 31,
+            "name": "reading/visually dense",
+            "ruleset_id": 0,
+            "description": "Contains patterns where the amount of visible notes makes determining note order and/or timing difficult."
+        },
+        {
+            "id": 32,
+            "name": "reading/overlap reading",
+            "ruleset_id": 0,
+            "description": "Contains patterns where overlapped objects make determining note order and/or timing difficult."
+        },
+        {
+            "id": 33,
+            "name": "aim/precision",
+            "ruleset_id": 0,
+            "description": "Colloquial term for maps which require fine, precise movement to aim correctly. Typically refers to maps with circle sizes above and including 6."
+        },
+        {
+            "id": 34,
+            "name": "skillset/alt",
+            "ruleset_id": 0,
+            "description": "Colloquial term for maps which use rhythms that encourage the player to alternate notes. Typically distinct from burst or stream maps."
+        },
+        {
+            "id": 35,
+            "name": "meta/collab",
+            "ruleset_id": null,
+            "description": "A map with two or more associated mappers."
+        },
+        {
+            "id": 36,
+            "name": "meta/marathon",
+            "ruleset_id": null,
+            "description": "A map with a drain time of over 5 minutes."
+        },
+        {
+            "id": 37,
+            "name": "meta/mega marathon",
+            "ruleset_id": null,
+            "description": "A map with a drain time of over 10 minutes."
+        },
+        {
+            "id": 38,
+            "name": "meta/multi-song",
+            "ruleset_id": null,
+            "description": "Contains multiple songs within the audio."
+        },
+        {
+            "id": 39,
+            "name": "meta/variable timing",
+            "ruleset_id": null,
+            "description": "Contains multiple timing points, usually required for songs not recorded to a metronome."
+        },
+        {
+            "id": 40,
+            "name": "meta/time signatures",
+            "ruleset_id": null,
+            "description": "Audio contains many changes in time signature or uses an uncommon time signature."
+        },
+        {
+            "id": 41,
+            "name": "style/clean",
+            "ruleset_id": 0,
+            "description": "Visually uncluttered and organised patterns, often involving few overlaps and equal visual spacing between objects."
+        },
+        {
+            "id": 42,
+            "name": "style/slidershapes",
+            "ruleset_id": 0,
+            "description": "Uses a large variety of slider designs."
+        },
+        {
+            "id": 43,
+            "name": "scene/aspire",
+            "ruleset_id": 0,
+            "description": "Uses glitches to provide gameplay or visual effects that are otherwise impossible to achieve, originating from the annual Aspire mapping contest."
+        },
+        {
+            "id": 44,
+            "name": "style/distance snapped",
+            "ruleset_id": 0,
+            "description": "Uses osu's in-built distance snap feature for most/all of the map."
+        },
+        {
+            "id": 45,
+            "name": "scene/mapping contest",
+            "ruleset_id": null,
+            "description": "An entry for a mapping contest."
+        },
+        {
+            "id": 46,
+            "name": "scene/tournament custom",
+            "ruleset_id": null,
+            "description": "A custom map for a playing tournament."
+        },
+        {
+            "id": 48,
+            "name": "tech/complex snap",
+            "ruleset_id": null,
+            "description": "Maps that feature prominent usage of mixed or unusual snap divisors."
+        },
+        {
+            "id": 49,
+            "name": "style/iNiS-style",
+            "ruleset_id": 0,
+            "description": "A style originating from the original DS games, recognizable by it's emphasis on vocal rhythm, constant slider velocity, and easily understandable grid-snapped patterns."
+        },
+        {
+            "id": 50,
+            "name": "gimmick/2B",
+            "ruleset_id": null,
+            "description": "Includes gameplay elements with two or more objects placed simultaneously. The term originates from a Chinese transliteration of 'idiot'."
+        },
+        {
+            "id": 51,
+            "name": "design/playfield usage",
+            "ruleset_id": 0,
+            "description": "Includes deliberate use of the playfield within the map design."
+        },
+        {
+            "id": 52,
+            "name": "scene/tag",
+            "ruleset_id": null,
+            "description": "Includes gameplay designed for the multiplayer tag mode, where multiple players complete a map co-operatively."
+        },
+        {
+            "id": 53,
+            "name": "style/difficulty spike",
+            "ruleset_id": null,
+            "description": "Contains a sudden and significant increase in challenge within the map's gameplay."
+        },
+        {
+            "id": 54,
+            "name": "style/avant-garde",
+            "ruleset_id": null,
+            "description": "Employs boundary-pushing and experimental philosophies to map design, often foregoing gameplay and aesthetic conventions to extreme measures."
+        },
+        {
+            "id": 55,
+            "name": "meta/keysounds",
+            "ruleset_id": null,
+            "description": "Contains hitsounds that use various pitched samples to create a melody, typically following one within the song."
+        },
+        {
+            "id": 56,
+            "name": "gimmick/storyboard",
+            "ruleset_id": null,
+            "description": "Includes a storyboard that changes how the map is played, usually by changing a map's visuals by using storyboard elements in place of showing the map's hitobjects."
+        },
+        {
+            "id": 57,
+            "name": "style/low sv",
+            "ruleset_id": null,
+            "description": "Features prominent low slider velocity usage as a key part of map design."
+        },
+        {
+            "id": 58,
+            "name": "style/high sv",
+            "ruleset_id": null,
+            "description": "Features prominent high slider velocity usage as a key part of map design."
+        },
+        {
+            "id": 59,
+            "name": "meta/mega collab",
+            "ruleset_id": null,
+            "description": "A map with 8 or more associated mappers."
+        },
+        {
+            "id": 60,
+            "name": "gimmick/slider only",
+            "ruleset_id": 0,
+            "description": "Restricts object choice to sliders only."
+        },
+        {
+            "id": 61,
+            "name": "gimmick/circle only",
+            "ruleset_id": 0,
+            "description": "Restricts object choice to circles only."
+        },
+        {
+            "id": 63,
+            "name": "meta/custom skin",
+            "ruleset_id": null,
+            "description": "Utilizes custom skin elements and graphics."
+        },
+        {
+            "id": 64,
+            "name": "gimmick/video",
+            "ruleset_id": null,
+            "description": "Employs patterning that closely references the included background video."
+        },
+        {
+            "id": 66,
+            "name": "style/perfect stacks",
+            "ruleset_id": 0,
+            "description": "Features perfectly overlapped stacked notes using low stack leniency."
+        },
+        {
+            "id": 67,
+            "name": "style/ninja spinners",
+            "ruleset_id": 0,
+            "description": "Features spinners that are very short in duration."
+        },
+        {
+            "id": 70,
+            "name": "tech/accelerating bpm",
+            "ruleset_id": null,
+            "description": "Features progressively increasing tempo."
+        },
+        {
+            "id": 71,
+            "name": "meta/custom song",
+            "ruleset_id": null,
+            "description": "Maps a song made specifically for the map. This includes songs created for a mapping contest which the map participated in."
+        },
+        {
+            "id": 72,
+            "name": "gimmick/mirrored",
+            "ruleset_id": 1,
+            "description": "A map that features patterns that are mirrored on an axes in quick successions."
+        },
+        {
+            "id": 73,
+            "name": "style/vocal",
+            "ruleset_id": 1,
+            "description": "Patterning that focuses mainly on vocals."
+        },
+        {
+            "id": 74,
+            "name": "style/tnt",
+            "ruleset_id": 1,
+            "description": "A map that imitates the mapping style in Taiko No Tatsujin."
+        },
+        {
+            "id": 75,
+            "name": "tech/speed",
+            "ruleset_id": null,
+            "description": "A map that require constant tapping at high BPMs."
+        },
+        {
+            "id": 76,
+            "name": "style/double bpm",
+            "ruleset_id": 1,
+            "description": "A map that plays at double the speed than what the BPM indicates."
+        },
+        {
+            "id": 77,
+            "name": "style/finisher-heavy",
+            "ruleset_id": 1,
+            "description": "Features finishers used in an unconventional manner or in large amounts."
+        },
+        {
+            "id": 78,
+            "name": "style/mono-heavy",
+            "ruleset_id": 1,
+            "description": "Features monos used in large amounts."
+        },
+        {
+            "id": 79,
+            "name": "gimmick/reversed",
+            "ruleset_id": 1,
+            "description": "A map using reversed patterns in a regularly consecutive manner."
+        },
+        {
+            "id": 80,
+            "name": "gimmick/yellow notes",
+            "ruleset_id": 1,
+            "description": "A map featuring frequent use of extremely short sliders to simulate ghost notes."
+        },
+        {
+            "id": 81,
+            "name": "tech/accuracy",
+            "ruleset_id": 1,
+            "description": "A map featuring a very high OD that tests a player's accuracy."
+        },
+        {
+            "id": 82,
+            "name": "gimmick/barlines",
+            "ruleset_id": 1,
+            "description": "A map that makes use of barlines to enhance visuals or replace notes."
+        },
+        {
+            "id": 83,
+            "name": "gimmick/memory",
+            "ruleset_id": null,
+            "description": "A map designed around a memorization concept."
+        },
+        {
+            "id": 84,
+            "name": "style/taikosu",
+            "ruleset_id": 1,
+            "description": "A map designed with both osu! and osu!taiko in mind."
+        },
+        {
+            "id": 85,
+            "name": "rhythm/swing",
+            "ruleset_id": null,
+            "description": "Features a prominent use of swing rhythms."
+        },
+        {
+            "id": 86,
+            "name": "rhythm/improvisation",
+            "ruleset_id": 1,
+            "description": "A map that's based on full improvisation that works as additional layer to the song."
+        },
+        {
+            "id": 87,
+            "name": "skillset/tech",
+            "ruleset_id": 1,
+            "description": "A map that frequently makes use of complex snaps."
+        },
+        {
+            "id": 88,
+            "name": "style/convert",
+            "ruleset_id": 1,
+            "description": "A map that imitates the converted maps from osu!."
+        },
+        {
+            "id": 89,
+            "name": "meta/hitsounds",
+            "ruleset_id": 1,
+            "description": "A map that makes use of non-default hitsound samplesets."
+        },
+        {
+            "id": 90,
+            "name": "skillset/tech",
+            "ruleset_id": 2,
+            "description": "A map with the focus on lots of 1/4 sliders, hypersliders and stacks."
+        },
+        {
+            "id": 91,
+            "name": "tech/flow",
+            "ruleset_id": 2,
+            "description": "A map focused on natural and intuitive movement patterns."
+        },
+        {
+            "id": 92,
+            "name": "tech/antiflow",
+            "ruleset_id": 2,
+            "description": "A map focused on strong direction or velocity changes that go against a player's natural movement pattern."
+        },
+        {
+            "id": 93,
+            "name": "tech/jump",
+            "ruleset_id": 2,
+            "description": "A map that focuses on 1/2 constant dashes or hyperdashes."
+        },
+        {
+            "id": 94,
+            "name": "gimmick/no hyperdashes",
+            "ruleset_id": 2,
+            "description": "A map that doesn’t use hyperdashes even if allowed for its respective difficulty."
+        },
+        {
+            "id": 95,
+            "name": "gimmick/long sliders",
+            "ruleset_id": 2,
+            "description": "A map that uses sliders for an extended period of time, having regular gameplay around catching juice drops and droplets instead of fruits."
+        },
+        {
+            "id": 96,
+            "name": "gimmick/spinner-heavy",
+            "ruleset_id": 2,
+            "description": "A map that features heavy usage of spinners."
+        },
+        {
+            "id": 97,
+            "name": "style/convert",
+            "ruleset_id": 2,
+            "description": "A map that imitates the converted maps from osu!, where the structure and distances are irregular."
+        },
+        {
+            "id": 98,
+            "name": "aim/precision",
+            "ruleset_id": 2,
+            "description": "Colloquial term for maps which require fine, precise movement to catch fruits. Typically refers to maps with circle sizes above and including 6."
+        },
+        {
+            "id": 99,
+            "name": "tech/wiggles",
+            "ruleset_id": 2,
+            "description": "A map with a focus on quick directional changes."
+        },
+        {
+            "id": 100,
+            "name": "tech/hyperwalks",
+            "ruleset_id": 2,
+            "description": "A map which makes use of hyperdashes that require the player to walk, as otherwise, you will overshoot them."
+        },
+        {
+            "id": 101,
+            "name": "gimmick/dodge the beat",
+            "ruleset_id": 2,
+            "description": "A map where the player needs to avoid every object."
+        },
+        {
+            "id": 102,
+            "name": "style/jumpstream",
+            "ruleset_id": 3,
+            "description": "Stream with a mix of 2-note sized chords"
+        },
+        {
+            "id": 103,
+            "name": "style/handstream",
+            "ruleset_id": 3,
+            "description": "Stream with a mix of 3-note sized chords"
+        },
+        {
+            "id": 104,
+            "name": "style/quadstream",
+            "ruleset_id": 3,
+            "description": "Stream with a mix of 4-note sized chords"
+        },
+        {
+            "id": 105,
+            "name": "style/chordjack",
+            "ruleset_id": 3,
+            "description": "Maps that feature evenly spaced chords, with several consecutive notes stacked on the same columns."
+        },
+        {
+            "id": 106,
+            "name": "style/longjack",
+            "ruleset_id": 3,
+            "description": "Maps that feature long chains of consecutive notes on the same column."
+        },
+        {
+            "id": 107,
+            "name": "skillset/speedjack",
+            "ruleset_id": 3,
+            "description": "Maps that feature shorter jack sequences, characterized by the faster timeframe between consecutive stacked notes."
+        },
+        {
+            "id": 108,
+            "name": "skillset/wristjack",
+            "ruleset_id": 3,
+            "description": "Fast and/or fairly dense chordjack maps, whose optimal playing technique involves the use of the player’s wrist movements."
+        },
+        {
+            "id": 109,
+            "name": "style/chordstream",
+            "ruleset_id": 3,
+            "description": "Maps that make use of streams with a mix of differently-sized chords"
+        },
+        {
+            "id": 110,
+            "name": "gimmick/delay",
+            "ruleset_id": 3,
+            "description": "Maps that feature high snap streams based on the song’s delayed sound effect. "
+        },
+        {
+            "id": 111,
+            "name": "skillset/tech",
+            "ruleset_id": 3,
+            "description": "A map that frequently makes use of complex snaps."
+        },
+        {
+            "id": 112,
+            "name": "style/mixed rice",
+            "ruleset_id": 3,
+            "description": "Maps that make use of multiple rice patterning styles."
+        },
+        {
+            "id": 113,
+            "name": "style/LN coordination",
+            "ruleset_id": 3,
+            "description": "Maps which require holding multiple long notes simultaneously while hitting other patterns."
+        },
+        {
+            "id": 114,
+            "name": "style/LN release",
+            "ruleset_id": 3,
+            "description": "Maps that make use of different long note holds ending."
+        },
+        {
+            "id": 115,
+            "name": "gimmick/LN inverse",
+            "ruleset_id": 3,
+            "description": "Maps that feature long note holds that emphasize constant holds and releases in quick succession. Most distinct feature of Inverse is the “negative spaces” in the patterning."
+        },
+        {
+            "id": 116,
+            "name": "style/LN density",
+            "ruleset_id": 3,
+            "description": "Maps that feature dense long note streams without breaks."
+        },
+        {
+            "id": 117,
+            "name": "style/LN mixed ",
+            "ruleset_id": 3,
+            "description": "Maps that make use of multiple long note patterning styles."
+        },
+        {
+            "id": 118,
+            "name": "style/generic hybrid",
+            "ruleset_id": 3,
+            "description": "Maps that feature the combination of both straightforward rice and Long Notes patterning."
+        },
+        {
+            "id": 119,
+            "name": "tech/technical hybrid",
+            "ruleset_id": 3,
+            "description": "Maps that feature the combination of both technical rice and Long Notes patterning."
+        },
+        {
+            "id": 120,
+            "name": "style/tiebreaker",
+            "ruleset_id": 3,
+            "description": "Maps that contain most of the skill sets from different categories, and are usually longer than 5 minutes."
+        },
+        {
+            "id": 121,
+            "name": "style/o2jam",
+            "ruleset_id": 3,
+            "description": "Map that mimics traditional mapping techniques usually found in O2jam charts."
+        },
+        {
+            "id": 122,
+            "name": "style/N+1",
+            "ruleset_id": 3,
+            "description": "A specific type of playstyle where the leftmost column is mapped independently from the rest of the columns, which otherwise form a standard playstyle."
+        },
+        {
+            "id": 123,
+            "name": "style/dump",
+            "ruleset_id": 3,
+            "description": "Maps that use groups of objects focusing more on the extension and intensity of the sounds, in contrast with using individual notes to follow each's sound timing accurately."
+        },
+        {
+            "id": 124,
+            "name": "tech/complex sv",
+            "ruleset_id": 1,
+            "description": "Changes slider velocity by large amounts in order to test the player's reading ability."
+        },
+        {
+            "id": 125,
+            "name": "tech/complex sv",
+            "ruleset_id": 3,
+            "description": "Changes slider velocity by large amounts in order to test the player's reading ability."
+        },
+        {
+            "id": 126,
+            "name": "tech/accuracy",
+            "ruleset_id": 0,
+            "description": "A map featuring a very high OD that tests a player's accuracy."
+        },
+        {
+            "id": 127,
+            "name": "tech/accuracy",
+            "ruleset_id": 3,
+            "description": "A map featuring a very high OD that tests a player's accuracy."
+        },
+        {
+            "id": 128,
+            "name": "tap/stamina",
+            "ruleset_id": 1,
+            "description": "Tests a player's ability to tap dense rhythms over long periods of time."
+        },
+        {
+            "id": 129,
+            "name": "tap/stamina",
+            "ruleset_id": 3,
+            "description": "Tests a player's ability to tap dense rhythms over long periods of time."
+        },
+        {
+            "id": 130,
+            "name": "aim/squares",
+            "ruleset_id": 0,
+            "description": "Focuses heavily on jumps that follow square patterns."
+        },
+        {
+            "id": 131,
+            "name": "aim/triangles",
+            "ruleset_id": 0,
+            "description": "Focuses heavily on jumps that follow triangular patterns."
+        },
+        {
+            "id": 132,
+            "name": "aim/spaced jumps",
+            "ruleset_id": 0,
+            "description": "Focuses heavily on jumps with a lot of spacing."
+        },
+        {
+            "id": 133,
+            "name": "aim/stamina",
+            "ruleset_id": 0,
+            "description": "Tests a player's ability to aim spaced jumps over long periods of time."
+        }
+    ]
+}

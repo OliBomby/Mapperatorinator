@@ -109,6 +109,9 @@ data:                  # Data settings
   snapping_random_prob: 0.0  # Probability of randomizing hit object snapping in the dataset
   sustain_interval: null  # Time in milliseconds between sustain tokens for held notes. Should be shorter than the lookback window.
   position_refinement: null  # Add a second pass of position tokens with higher precision
+  descriptor_source: 'omdb'  # Source of beatmap descriptors (omdb/user_tags)
+  min_top_tag_count: 2  # Minimum count of a tag in the dataset to be included as a descriptor
+  tags_metadata_path: ''  # Path to file with all user tags metadata
 
 
 dataloader:             # Dataloader settings
