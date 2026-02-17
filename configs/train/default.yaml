@@ -110,8 +110,8 @@ data:                  # Data settings
   sustain_interval: null  # Time in milliseconds between sustain tokens for held notes. Should be shorter than the lookback window.
   position_refinement: null  # Add a second pass of position tokens with higher precision
   descriptor_source: 'omdb'  # Source of beatmap descriptors (omdb/user_tags)
-  min_top_tag_count: 2  # Minimum count of a tag in the dataset to be included as a descriptor
-  tags_metadata_path: ''  # Path to file with all user tags metadata
+  min_top_tag_count: 1  # Minimum count of a tag in the dataset to be included as a descriptor
+  tags_metadata_path: "../../../datasets/tags.json"       # Path to file with all beatmap mappers
 
 
 dataloader:             # Dataloader settings
