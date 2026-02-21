@@ -73,13 +73,29 @@ source .venv/bin/activate
 - [Git](https://git-scm.com/downloads)
 - [ffmpeg](http://www.ffmpeg.org/)
 - [CUDA](https://developer.nvidia.com/cuda-zone) (For NVIDIA GPUs) or [ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html) (For AMD GPUs on linux)
-- [PyTorch](https://pytorch.org/get-started/locally/): Make sure to follow the Get Started guide so you install `torch` and `torchaudio` with GPU support. Select the correct Compute Platform version that you have installed in the previous step.
+- [PyTorch](https://pytorch.org/get-started/locally/): Make sure you install `torch` and `torchaudio` with GPU support (if applicable). Select the correct Compute Platform version that you have installed in the previous step.
 
-- and the remaining Python dependencies:
+#### Option A: Install Python deps with pip
 
 ```sh
 pip install -r requirements.txt
 ```
+
+#### Option B: Install Python deps with uv
+
+```sh
+uv sync
+```
+
+If you are using an NVIDIA GPU and want the CUDA wheels, run this after `uv sync`:
+
+```sh
+uv pip uninstall torch torchaudio
+uv pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+```
+
+Notes:
+- `cu128` is for CUDA 12.8. If you have a different CUDA version, use the matching index URL from the PyTorch "Get Started" page.
 
 ## Web GUI (Recommended)
 
@@ -91,6 +107,12 @@ Navigate to the cloned `Mapperatorinator` directory in your terminal and run:
 
 ```sh
 python web-ui.py
+```
+
+If you use uv, run:
+
+```sh
+uv run python web-ui.py
 ```
 
 This will start a local web server and automatically open the UI in a new window.
