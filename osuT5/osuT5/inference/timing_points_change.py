@@ -1,3 +1,4 @@
+from datetime import timedelta
 from functools import cmp_to_key
 
 from slider import TimingPoint
@@ -81,15 +82,22 @@ class TimingPointsChange:
 
         if not self.uninherited and (not on_timing_points or (self.ms_per_beat and not on_has_green)):
             # Make new greenline (based on prev)
+            #
+            # Greenlines must always inherit from an actual redline in the timing list. If we're about to place
+            # a greenline before any redline exists, create a redline (or move the first redline backwards) so
+            # the parent relationship and SV sign are valid.
+
+            # If we don't have any previous timing point, we're inserting at/near the beginning.
+            # Ensure a redline exists before this greenline and use it as parent.
             if prev_timing_point is None:
-                adding_timing_point = copy(self.my_tp)
-                adding_timing_point.parent = self.my_tp
-            else:
-                adding_timing_point = copy(prev_timing_point)
-                adding_timing_point.offset = self.my_tp.offset
-                adding_timing_point.parent = prev_timing_point if prev_timing_point.parent is None else prev_timing_point.parent
-                if prev_timing_point.parent is None:
-                    adding_timing_point.ms_per_beat = -100
+                prev_timing_point = self._ensure_redline_before(self.my_tp.offset, timing)
+
+            # Now create the greenline.
+            adding_timing_point = copy(prev_timing_point)
+            adding_timing_point.offset = self.my_tp.offset
+            adding_timing_point.parent = prev_timing_point if prev_timing_point.parent is None else prev_timing_point.parent
+            if prev_timing_point.parent is None:
+                adding_timing_point.ms_per_beat = -100
             on_timing_points.append(adding_timing_point)
 
         for on in on_timing_points:
@@ -131,6 +139,33 @@ class TimingPointsChange:
         for change in timing_points_changes:
             timing = change.add_change(timing, all_after)
         return timing
+
+    def _first_redline(self, tps: List[TimingPoint]):
+        reds = [tp for tp in tps if tp is not None and tp.parent is None]
+        if not reds:
+            return None
+        return min(reds, key=lambda t: t.offset)
+
+    def _ensure_redline_before(self, time_offset, tps: List[TimingPoint]) -> TimingPoint:
+        """Ensure there is a redline at or before time_offset.
+
+        If the earliest redline exists but is after time_offset, move it backwards by enough measures.
+        If there is no redline at all, insert a new default redline.
+
+        Returns the redline to use as parent.
+        """
+        first = self._first_redline(tps)
+        if first is None:
+            new_red = TimingPoint(time_offset, 1000, 4, 2, -1, 100, None, False)
+            tps.append(new_red)
+            return new_red
+
+        if first.offset > time_offset:
+            measure_ms = first.ms_per_beat * first.meter
+            back_ms = first.offset - time_offset
+            n_measures = math.ceil(back_ms / measure_ms)
+            first.offset -= timedelta(milliseconds=n_measures * measure_ms)
+        return first
 
     def debug(self):
         print(self.my_tp.__dict__)
