@@ -296,7 +296,7 @@ def generate_beatmaps(beatmap_paths, args: InferenceConfig, dataset_type, idx, l
                 else:
                     other_beatmap_path = beatmap_path
 
-                generation_config = generation_config_from_beatmap(beatmap, tokenizer)
+                generation_config = generation_config_from_beatmap(beatmap, beatmap_path, tokenizer)
                 beatmap_config = beatmap_config_from_beatmap(beatmap)
                 beatmap_config.version = args.version
 

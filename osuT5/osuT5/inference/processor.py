@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
+import rosu_pp_py as rosu
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -44,14 +45,18 @@ class GenerationConfig:
 
 
 # noinspection PyProtectedMember
-def generation_config_from_beatmap(beatmap: Beatmap, tokenizer: Optional[Tokenizer] = None) -> GenerationConfig:
+def generation_config_from_beatmap(beatmap: Beatmap, beatmap_path, tokenizer: Optional[Tokenizer] = None) -> GenerationConfig:
     gamemode = int(beatmap.mode)
+
     difficulty = None
-    if gamemode == 0 and len(beatmap._hit_objects) > 0:  # We don't have diffcalc for other gamemodes
-        try:
-            difficulty = round(float(beatmap.stars()), 2)
-        except Exception:
-            pass
+    try:
+        rosu_map = rosu.Beatmap(path=str(beatmap_path))
+        rosu_diff = rosu.Difficulty()
+        rosu_attrs = rosu_diff.calculate(rosu_map)
+        difficulty = round(rosu_attrs.stars, 2)
+    except Exception as e:
+        print(f"Failed to calculate difficulty for beatmap {beatmap_path}: {e}")
+
     return GenerationConfig(
         gamemode=gamemode,
         beatmap_id=beatmap.beatmap_id,
@@ -812,7 +817,8 @@ class Processor(object):
                 beatmap = Beatmap.from_path(beatmap_path)
                 data["events"], data["event_times"] = parser.parse(beatmap, song_length=song_length)
                 if add_class:
-                    data["class"] = self.get_class_vector(generation_config_from_beatmap(beatmap, self.tokenizer), song_length)
+                    data["class"] = self.get_class_vector(
+                        generation_config_from_beatmap(beatmap, beatmap_path, self.tokenizer), song_length)
             elif context == ContextType.NO_HS:
                 beatmap = Beatmap.from_path(beatmap_path)
                 hs_events, hs_event_times = parser.parse(beatmap, song_length=song_length)
@@ -822,7 +828,8 @@ class Processor(object):
                 beatmap = Beatmap.from_path(beatmap_path)
                 data["events"], data["event_times"] = parser.parse(beatmap, song_length=song_length)
                 if add_class:
-                    data["class"] = self.get_class_vector(generation_config_from_beatmap(beatmap, self.tokenizer), song_length)
+                    data["class"] = self.get_class_vector(
+                        generation_config_from_beatmap(beatmap, beatmap_path, self.tokenizer), song_length)
             elif context == ContextType.KIAI:
                 beatmap = Beatmap.from_path(beatmap_path)
                 data["events"], data["event_times"] = parser.parse_kiai(beatmap)

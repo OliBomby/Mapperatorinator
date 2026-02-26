@@ -183,7 +183,7 @@ def compile_args_from_beatmap(args: InferenceConfig, verbose=True):
 
     if verbose:
         print(f"Using metadata from beatmap: {beatmap.display_name}")
-    generation_config = generation_config_from_beatmap(beatmap)
+    generation_config = generation_config_from_beatmap(beatmap, beatmap_path)
     beatmap_config = beatmap_config_from_beatmap(beatmap)
 
     beatmap_args = {
