@@ -256,7 +256,7 @@ class Postprocessor(object):
                 control_points = "|".join(f"{cp[0]}:{cp[1]}" for cp in anchor_info)
 
                 hit_object_strings.append(
-                    f"{start_pos[0]},{start_pos[1]},{drumroll_start_time},{2},{hitsound},L|{control_points},{1},{length},0:0,0:0|0:0,{sampleset}:{addition}:-1:0:"
+                    f"{start_pos[0]},{start_pos[1]},{drumroll_start_time},{2},{hitsound},L|{control_points},{1},{length},0|0,0:0|0:0,{sampleset}:{addition}:-1:0:"
                 )
 
                 drumroll_start = None
