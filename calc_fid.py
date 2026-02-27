@@ -34,6 +34,125 @@ from logging.handlers import QueueHandler, QueueListener
 logger = logging.getLogger(__name__)
 
 
+# --- Extra metrics helpers (Drain/BPM/SR) ---
+
+def _drain_time_seconds(beatmap: Beatmap, *, break_threshold_seconds: float = 8.0) -> float:
+    """Drain time in seconds.
+
+    Defined as the time between the first and last hit object minus any breaks.
+    Breaks are gaps between consecutive hit object start times larger than `break_threshold_seconds`.
+    """
+    times_ms = [int(obj.time.total_seconds() * 1000) for obj in beatmap.hit_objects(stacking=False)]
+    if len(times_ms) < 2:
+        return 0.0
+
+    times_ms.sort()
+    span_ms = times_ms[-1] - times_ms[0]
+    if span_ms <= 0:
+        return 0.0
+
+    thresh_ms = int(break_threshold_seconds * 1000)
+    break_ms = 0
+    for a, b in zip(times_ms, times_ms[1:]):
+        gap = b - a
+        if gap > thresh_ms:
+            break_ms += gap
+
+    return max(0.0, (span_ms - break_ms) / 1000.0)
+
+
+def _song_length_seconds(beatmap: Beatmap) -> float:
+    """Integration domain length in seconds.
+
+    Uses the last hit object's start time as a proxy for song length.
+    """
+    times = [obj.time.total_seconds() for obj in beatmap.hit_objects(stacking=False)]
+    if not times:
+        return 0.0
+    return max(times)
+
+
+def _timing_points_sorted(beatmap: Beatmap):
+    tps = list(getattr(beatmap, "timing_points", []) or [])
+    tps.sort(key=lambda tp: float(tp.offset.total_seconds()))
+    return tps
+
+
+def _bpm_segments(beatmap: Beatmap) -> list[tuple[float, float]]:
+    """Piecewise-constant BPM segments from uninherited timing points.
+
+    Returns [(start_time_seconds, bpm), ...] sorted by start time.
+    """
+    segs: list[tuple[float, float]] = []
+    for tp in _timing_points_sorted(beatmap):
+        ms_per_beat = getattr(tp, "ms_per_beat", None)
+        if ms_per_beat is None or ms_per_beat <= 0:
+            # ignore inherited/invalid timing points
+            continue
+        bpm = 60000.0 / float(ms_per_beat)
+        segs.append((float(tp.offset.total_seconds()), bpm))
+
+    if not segs:
+        return [(0.0, 0.0)]
+
+    segs.sort(key=lambda x: x[0])
+
+    # If multiple points share the same timestamp, keep the last one.
+    deduped: list[tuple[float, float]] = []
+    for s, bpm in segs:
+        if deduped and abs(deduped[-1][0] - s) < 1e-12:
+            deduped[-1] = (s, bpm)
+        else:
+            deduped.append((s, bpm))
+    return deduped
+
+
+def _bpm_at(segments: list[tuple[float, float]], t: float) -> float:
+    """BPM at time t given piecewise segments [(start, bpm), ...]."""
+    current = segments[0][1]
+    for s, bpm in segments:
+        if s <= t + 1e-12:
+            current = bpm
+        else:
+            break
+    return current
+
+
+def _bpm_mse_for_pair(real: Beatmap, generated: Beatmap) -> tuple[float, float]:
+    """Return (integral_0^L (r(t)-g(t))^2 dt, L) for one pair."""
+    length_s = max(_song_length_seconds(real), _song_length_seconds(generated))
+    if length_s <= 0:
+        return 0.0, 0.0
+
+    r_segs = _bpm_segments(real)
+    g_segs = _bpm_segments(generated)
+
+    change_points = {0.0, float(length_s)}
+    change_points.update(s for s, _ in r_segs if 0.0 <= s <= length_s)
+    change_points.update(s for s, _ in g_segs if 0.0 <= s <= length_s)
+    cps = sorted(change_points)
+
+    integrated = 0.0
+    for a, b in zip(cps, cps[1:]):
+        if b <= a:
+            continue
+        mid = (a + b) / 2.0
+        diff = _bpm_at(r_segs, mid) - _bpm_at(g_segs, mid)
+        integrated += (diff * diff) * (b - a)
+
+    return integrated, float(length_s)
+
+
+def _sr_stars(beatmap_path: Path) -> Optional[float]:
+    """Star rating via rosu_pp_py."""
+    import rosu_pp_py as rosu
+
+    rosu_map = rosu.Beatmap(path=str(beatmap_path))
+    rosu_diff = rosu.Difficulty()
+    attrs = rosu_diff.calculate(rosu_map)
+    return attrs.stars
+
+
 def _configure_generation_log_parent(log_file: Path) -> tuple[QueueListener, multiprocessing.Queue]:
     """Configure a QueueListener in the parent process that writes generation logs to a file."""
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -355,6 +474,16 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
     active_rhythm_stats = {}
     passive_rhythm_stats = {}
 
+    # Extra metrics accumulators
+    drain_se_sum = 0.0
+    drain_n = 0
+
+    bpm_integrated_se_sum = 0.0
+    bpm_length_sum = 0.0
+
+    sr_se_sum = 0.0
+    sr_n = 0
+
     for beatmap_path in tqdm(beatmap_paths, desc=f"Metrics"):
         try:
             beatmap = Beatmap.from_path(beatmap_path)
@@ -366,7 +495,8 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
                 audio_path = beatmap_path.parent / beatmap.audio_filename
 
             if generated_path.exists() and len(list(generated_path.glob("*.osu"))) > 0:
-                generated_beatmap = Beatmap.from_path(list(generated_path.glob("*.osu"))[0])
+                generated_osu_path = list(generated_path.glob("*.osu"))[0]
+                generated_beatmap = Beatmap.from_path(generated_osu_path)
             else:
                 logger.warning(f"Skipping {beatmap_path.stem} as no generated beatmap found")
                 continue
@@ -411,6 +541,28 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
                 real_passive_rhythm = get_rhythm(beatmap, passive=True)
                 generated_passive_rhythm = get_rhythm(generated_beatmap, passive=True)
                 add_to_dict(calculate_rhythm_stats(real_passive_rhythm, generated_passive_rhythm), passive_rhythm_stats)
+
+            if args.extra_stats:
+                # --- Extra metrics per pair ---
+                # Drain time MSE
+                real_drain = _drain_time_seconds(beatmap)
+                gen_drain = _drain_time_seconds(generated_beatmap)
+                drain_diff = real_drain - gen_drain
+                drain_se_sum += float(drain_diff * drain_diff)
+                drain_n += 1
+
+                # BPM MSE (accumulate integral and length so final is sum(integrals)/sum(lengths)
+                integ, length_s = _bpm_mse_for_pair(beatmap, generated_beatmap)
+                bpm_integrated_se_sum += float(integ)
+                bpm_length_sum += float(length_s)
+
+                # SR MSE (rosu)
+                real_sr = _sr_stars(beatmap_path)
+                gen_sr = _sr_stars(generated_osu_path)
+                sr_diff = float(real_sr - gen_sr)
+                sr_se_sum += sr_diff * sr_diff
+                sr_n += 1
+
         except Exception as e:
             print(f"Error processing {beatmap_path}: {e}")
             traceback.print_exc()
@@ -445,6 +597,17 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
         logger.info(f"Passive Rhythm Precision: {passive_precision}")
         logger.info(f"Passive Rhythm Recall: {passive_recall}")
         logger.info(f"Passive Rhythm F1: {passive_f1}")
+
+    if args.extra_stats:
+        # --- Log extra metrics ---
+        if drain_n > 0:
+            logger.info(f"Drain RMSE: {np.sqrt(drain_se_sum / drain_n)}")
+
+        if bpm_length_sum > 0:
+            logger.info(f"BPM RMSE: {np.sqrt(bpm_integrated_se_sum / bpm_length_sum)}")
+
+        if sr_n > 0:
+            logger.info(f"SR RMSE: {np.sqrt(sr_se_sum / sr_n)}")
 
 
 def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: Optional[str]):

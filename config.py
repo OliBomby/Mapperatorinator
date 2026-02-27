@@ -119,6 +119,7 @@ class FidConfig:
     fid: bool = True
     fid_cm3p: bool = True
     rhythm_stats: bool = True
+    extra_stats: bool = True
 
     dataset_type: str = 'ors'
     dataset_path: str = '/workspace/datasets/ORS16291'

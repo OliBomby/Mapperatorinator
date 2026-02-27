@@ -10,6 +10,7 @@ skip_generation: false
 fid: true
 fid_cm3p: true
 rhythm_stats: true
+extra_stats: true
 
 classifier_ckpt: 'OliBomby/osu-classifier'
 classifier_batch_size: 32
