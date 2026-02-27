@@ -162,7 +162,7 @@ class TimingPointsChange:
 
         if first.offset > time_offset:
             measure_ms = first.ms_per_beat * first.meter
-            back_ms = first.offset - time_offset
+            back_ms = (first.offset - time_offset).total_seconds() * 1000
             n_measures = math.ceil(back_ms / measure_ms)
             first.offset -= timedelta(milliseconds=n_measures * measure_ms)
         return first
