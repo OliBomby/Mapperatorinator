@@ -412,6 +412,7 @@ class Processor(object):
                             sequence,
                             self.tokenizer.context_sos[context["context_type"]],
                             self.tokenizer.context_eos[context["context_type"]],
+                            strict=True,
                         )
                         self.add_predicted_tokens_to_context(context, sequence[start:end], frame_time)
                 else:
@@ -503,6 +504,7 @@ class Processor(object):
                             seq_prompt,
                             self.tokenizer.context_sos[context["context_type"]],
                             self.tokenizer.context_eos[context["context_type"]],
+                            strict=True,
                         )
                     else:
                         start, end = self._get_token_context(seq_prompt, self.tokenizer.sos_id, self.tokenizer.eos_id)
@@ -729,12 +731,14 @@ class Processor(object):
 
         torch.cuda.empty_cache()
 
-    def _get_token_context(self, tokens: torch.Tensor, sos, eos):
+    def _get_token_context(self, tokens: torch.Tensor, sos, eos, strict=False):
         """Get the start and end indices of the token context in the given tokens."""
         start = (tokens == sos).nonzero(as_tuple=True)[0]
-        start = start[0] + 1 if len(start) > 0 else 1
+        start = start[0] + 1 if len(start) > 0 else (None if strict else 0)
         end = (tokens == eos).nonzero(as_tuple=True)[0]
-        end = end[0] if len(end) > 0 else len(tokens)
+        end = end[0] if len(end) > 0 else (None if strict else len(tokens))
+        if start is None or end is None:
+            return 0, 0
         return start, end
 
     def split_into_batches(self, tensor, max_batch_size, batch_size=1):
