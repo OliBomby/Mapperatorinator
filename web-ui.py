@@ -28,6 +28,7 @@ from flask import Flask, render_template, request, Response, jsonify
 
 import routed_pickle
 from config import InferenceConfig
+from osuT5.osuT5.event import ContextType
 from osuT5.osuT5.inference.server import InferenceClient
 from osuT5.osuT5.utils import load_model_loaders
 from inference import compile_args, get_server_address, main
@@ -379,15 +380,10 @@ def start_inference():
     in_context_options = request.form.getlist('in_context_options')
     if in_context_options and cfg.beatmap_path:
         try:
-            from osuT5.osuT5.tokenizer import ContextType
-            cfg.in_context = [ContextType(opt) for opt in in_context_options]
-        except Exception:
-            # Fall back to no in-context rather than storing invalid values.
-            try:
-                from osuT5.osuT5.tokenizer import ContextType
-                cfg.in_context = [ContextType.NONE]
-            except Exception:
-                pass
+            cfg.in_context = [ContextType[opt] for opt in in_context_options]
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"status": "error", "message": f"Invalid in-context options: {e}"}), 400
 
     # Validate and compile args
     try:
