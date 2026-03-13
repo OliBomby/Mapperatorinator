@@ -690,7 +690,7 @@ class Processor(object):
 
     def _batched_inference(
             self,
-            genereate_func,
+            generate_func,
             cond_prompts: list[torch.Tensor],
             uncond_prompts: list[torch.Tensor],
             frames: torch.Tensor,
@@ -716,7 +716,7 @@ class Processor(object):
                                   model_kwarg_keys}
 
             # Start generation
-            result = genereate_func(
+            result = generate_func(
                 model_kwargs_batch | dict(
                     inputs=frames_batch,
                     decoder_input_ids=cond_prompt_batch,
