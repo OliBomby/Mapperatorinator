@@ -7,7 +7,7 @@ hydra-core==1.3.2
 tensorboard==2.20.0
 slider @ git+https://github.com/OliBomby/slider.git@gedagedigedagedaoh
 torch_tb_profiler==0.4.3
-wandb==0.23.1
+wandb==0.24.2
 matplotlib==3.10.8
 pandas==2.3.3
 pyarrow==22.0.0
