@@ -433,7 +433,7 @@ def get_hold_note_ratio(beatmap: Beatmap) -> Optional[float]:
     return hold_note_count / len(notes)
 
 
-def get_scroll_speed_ratio(beatmap: Beatmap) -> Optional[float]:
+def get_scroll_speed_ratio(beatmap: Beatmap, mania_normalized: bool = True) -> Optional[float]:
     # Number of scroll speed changes divided by number of distinct hit object times
     notes = beatmap.hit_objects(stacking=False)
 
@@ -446,16 +446,26 @@ def get_scroll_speed_ratio(beatmap: Beatmap) -> Optional[float]:
         if note.time != last_time:
             num_note_times += 1
             last_time = note.time
-    last_scroll_speed = -1
+
+    normalized = mania_normalized and beatmap.mode == 3
+    median_mpb = get_median_mpb_beatmap(beatmap)
+    mpb = median_mpb
+    last_normalized_scroll_speed = 1
     num_scroll_speed_changes = 0
-    for timing_point in beatmap.timing_points:
-        if timing_point.parent is None:
-            last_scroll_speed = 1
+    for i, tp in enumerate(beatmap.timing_points):
+        if tp.parent is None:
+            mpb = tp.ms_per_beat
+            scroll_speed = 1
         else:
-            scroll_speed = -100 / timing_point.ms_per_beat
-            if scroll_speed != last_scroll_speed and last_scroll_speed != -1:
+            scroll_speed = -100 / tp.ms_per_beat
+
+        if i == len(beatmap.timing_points) - 1 or beatmap.timing_points[i + 1].offset > tp.offset:
+            normalized_scroll_speed = scroll_speed * median_mpb / mpb if normalized else scroll_speed
+
+            if abs(normalized_scroll_speed - last_normalized_scroll_speed) > 1e-3:
                 num_scroll_speed_changes += 1
-            last_scroll_speed = scroll_speed
+            last_normalized_scroll_speed = normalized_scroll_speed
+
     return num_scroll_speed_changes / num_note_times
 
 

@@ -770,7 +770,7 @@ class BeatmapDatasetIterable:
                 data["keycount"] = int(beatmap.circle_size)
                 data["hold_note_ratio"] = get_hold_note_ratio(beatmap)
             if gamemode in [1, 3]:
-                data["scroll_speed_ratio"] = get_scroll_speed_ratio(beatmap)
+                data["scroll_speed_ratio"] = get_scroll_speed_ratio(beatmap, self.args.mania_bpm_normalized_scroll_speed)
 
         def get_context(context: ContextType, identifier, add_type=True):
             data = {"extra": {"context_type": context, "add_type": add_type, "id": identifier + '_' + context.value}}

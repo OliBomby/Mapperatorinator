@@ -133,7 +133,7 @@ class OsuParser:
             if i == len(beatmap.timing_points) - 1 or beatmap.timing_points[i + 1].offset > tp.offset:
                 normalized_scroll_speed = scroll_speed * median_mpb / mpb if normalized else scroll_speed
 
-                if normalized_scroll_speed != last_normalized_scroll_speed or last_normalized_scroll_speed == -1:
+                if abs(normalized_scroll_speed - last_normalized_scroll_speed) > 1e-3 or last_normalized_scroll_speed == -1:
                     self._add_group(
                         EventType.SCROLL_SPEED_CHANGE,
                         tp.offset,
