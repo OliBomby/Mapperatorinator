@@ -3,6 +3,7 @@ import re
 import sys
 import argparse
 import subprocess
+import math
 
 
 def get_color_for_value(value, min_val, max_val, lower_is_better=False):
@@ -25,6 +26,8 @@ def get_color_for_value(value, min_val, max_val, lower_is_better=False):
 
     # Normalize the value to a 0-1 range
     normalized = (value - min_val) / (max_val - min_val)
+    # Clamp so values outside robust bounds still map to valid endpoint colors.
+    normalized = max(0.0, min(1.0, normalized))
 
     if lower_is_better:
         # Invert the scale: 1 (best) -> 0 (worst)
@@ -35,6 +38,65 @@ def get_color_for_value(value, min_val, max_val, lower_is_better=False):
 
     # Return HSL color: hue from 0 (red) to 120 (green), with fixed saturation and lightness
     return f"hsl({hue:.0f}, 70%, 60%)"
+
+
+def _percentile(sorted_values, pct):
+    """Return a percentile from a pre-sorted numeric list using linear interpolation."""
+    if not sorted_values:
+        raise ValueError("sorted_values must not be empty")
+
+    if len(sorted_values) == 1:
+        return float(sorted_values[0])
+
+    p = max(0.0, min(100.0, float(pct)))
+    pos = (len(sorted_values) - 1) * (p / 100.0)
+    lo = int(math.floor(pos))
+    hi = int(math.ceil(pos))
+    if lo == hi:
+        return float(sorted_values[lo])
+    weight = pos - lo
+    return float(sorted_values[lo] * (1.0 - weight) + sorted_values[hi] * weight)
+
+
+def _robust_min_max(values, min_samples=5, iqr_multiplier=1.5):
+    """Compute color bounds while reducing outlier impact.
+
+    Uses Tukey IQR fences and clamps to in-fence observations.
+    For small samples we keep raw min/max to avoid over-clipping.
+    """
+    clean_values = [float(v) for v in values if v is not None and math.isfinite(float(v))]
+    if not clean_values:
+        return None
+
+    clean_values.sort()
+    raw_min = clean_values[0]
+    raw_max = clean_values[-1]
+    if raw_min == raw_max:
+        return {'min': raw_min, 'max': raw_max}
+
+    if len(clean_values) < min_samples:
+        return {'min': raw_min, 'max': raw_max}
+
+    q1 = _percentile(clean_values, 25.0)
+    q3 = _percentile(clean_values, 75.0)
+    iqr = q3 - q1
+    if iqr <= 0:
+        return {'min': raw_min, 'max': raw_max}
+
+    lo_fence = q1 - iqr_multiplier * iqr
+    hi_fence = q3 + iqr_multiplier * iqr
+
+    inliers = [v for v in clean_values if lo_fence <= v <= hi_fence]
+    if len(inliers) < 2:
+        return {'min': raw_min, 'max': raw_max}
+
+    lo = inliers[0]
+    hi = inliers[-1]
+
+    if lo >= hi:
+        return {'min': raw_min, 'max': raw_max}
+
+    return {'min': lo, 'max': hi}
 
 
 def _model_sort_key(name: str):
@@ -183,8 +245,9 @@ def parse_log_files(root_dir):
             continue
         # Get all valid values for the current header
         values = [res.get(header) for res in results if res.get(header) is not None]
-        if values:
-            min_max_vals[header] = {'min': min(values), 'max': max(values)}
+        bounds = _robust_min_max(values)
+        if bounds is not None:
+            min_max_vals[header] = bounds
 
     # --- Generate HTML Table ---
     html = ["<table>"]
