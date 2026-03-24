@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 import numpy as np
 from torch.optim import Optimizer
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, IterableDataset
 from torch.optim.lr_scheduler import (
     LRScheduler,
     SequentialLR,
@@ -17,6 +17,7 @@ from torch.optim.lr_scheduler import (
 from ..dataset.ors_dataset import OrsDataset
 from ..dataset.osu_parser import OsuParser
 from ..dataset.mmrs_dataset import MmrsDataset
+from ..dataset.web_dataset import get_web_dataset
 from ..event import EventType
 from ..model.configuration_mapperatorinator import MapperatorinatorConfig
 from ..model.modeling_mapperatorinator import Mapperatorinator
@@ -342,11 +343,13 @@ def get_scheduler(optimizer: Optimizer, args: TrainConfig, accelerator) -> LRSch
     return scheduler
 
 
-def get_dataset(args: TrainConfig, test: bool, **kwargs) -> Dataset:
+def get_dataset(args: TrainConfig, **kwargs) -> IterableDataset:
     if args.data.dataset_type == "ors":
-        return OrsDataset(args=args.data, test=test, **kwargs)
+        return OrsDataset(args=args.data, **kwargs)
     elif args.data.dataset_type == "mmrs":
         return MmrsDataset(args=args.data, **kwargs)
+    elif args.data.dataset_type == "web":
+        return get_web_dataset(args=args.data, **kwargs)
     else:
         raise NotImplementedError
 
@@ -381,7 +384,7 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
             pin_memory=args.dataloader.pin_memory,
             drop_last=args.dataloader.drop_last,
             persistent_workers=args.dataloader.num_workers > 0,
-            worker_init_fn=worker_init_fn,
+            worker_init_fn=worker_init_fn if args.data.dataset_type in ["ors", "mmrs"] else None,
         )
 
     return dataloaders["train"], dataloaders["test"]

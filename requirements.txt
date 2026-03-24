@@ -20,3 +20,5 @@ audioop-lts; python_version>='3.13'
 rich==14.2.0
 peft==0.18.1
 rosu-pp-py==3.1.0
+datasets[audio]==4.8.3
+huggingface-hub==0.36.2

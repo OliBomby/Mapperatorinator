@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Union, Optional
 
 import numpy as np
-import pandas as pd
+from datasets import load_dataset
 from pandas import DataFrame
 from tqdm import tqdm
 from transformers.utils import PushToHubMixin, cached_file
@@ -567,6 +567,8 @@ class Tokenizer(PushToHubMixin):
             self._init_descriptor_idx_ors(args)
         elif args.data.dataset_type == "mmrs":
             self._init_descriptor_idx_mmrs(args)
+        elif args.data.dataset_type == "web":
+            self._init_descriptor_idx_web(args)
 
     def _init_descriptor_idx_ors(self, args):
         if args is None or "descriptors_path" not in args.data:
@@ -612,19 +614,6 @@ class Tokenizer(PushToHubMixin):
 
             self.num_descriptor_classes = len(self.descriptor_idx)
         elif args.data.descriptor_source == "user_tags":
-            path = Path(args.data.tags_metadata_path)
-
-            if not path.exists():
-                raise ValueError(f"tags_metadata_path {path} not found")
-
-            # The tags metadata file is a JSON file with the following format:
-            #  { "tags": [ { "id": tag_idx, "name": tag_name }, ... ] }
-            with open(path, 'r', encoding="utf-8") as file:
-                data = json.load(file)
-            tags = data["tags"]
-            self.descriptor_idx = {tag["name"]: tag["id"] for tag in tags}
-            self.num_descriptor_classes = max(self.descriptor_idx.values()) + 1
-
             def filter_tags(row):
                 # Zip the two lists together and keep pairs where count >= 2
                 filtered_pairs = [(t, c) for t, c in zip(row['TopTagIds'], row['TopTagCounts']) if c >= args.data.min_top_tag_count]
@@ -638,10 +627,46 @@ class Tokenizer(PushToHubMixin):
                 ids, _ = zip(*filtered_pairs)
                 return list(ids)
 
+            self._init_user_tag_idx(args)
             self.beatmap_descriptors = (self.metadata.reset_index().set_index(["Id"])[["TopTagIds", "TopTagCounts"]]
                                         .apply(filter_tags, axis=1).dropna().to_dict())
         else:
             raise ValueError(f"descriptor_source {args.data.descriptor_source} not supported")
+
+    def _init_descriptor_idx_web(self, args):
+        if args.data.descriptor_source != "web":
+            return
+
+        self._init_user_tag_idx(args)
+
+        tags_ds = load_dataset(args.data.descriptors_path, split="train")
+        df = tags_ds.to_pandas()
+        id_col = df.columns[0]
+        df_long = df.melt(id_vars=[id_col], var_name='tag', value_name='votes')
+        df_filtered = df_long[df_long['votes'] >= args.data.min_top_tag_count].copy()
+        df_filtered.sort_values(by=[id_col, 'votes'], ascending=[True, False], inplace=True)
+        df_filtered["tag"] = (
+            df_filtered["tag"]
+            .map(self.descriptor_idx)  # tag name -> id
+            .fillna(self.num_descriptor_classes)  # unknown tag fallback
+            .astype(int)
+        )
+        tags_series = df_filtered.groupby(id_col)['tag'].apply(list)
+        self.beatmap_descriptors = tags_series.to_dict()
+
+    def _init_user_tag_idx(self, args):
+        path = Path(args.data.tags_metadata_path)
+
+        if not path.exists():
+            raise ValueError(f"tags_metadata_path {path} not found")
+
+        # The tags metadata file is a JSON file with the following format:
+        #  { "tags": [ { "id": tag_idx, "name": tag_name }, ... ] }
+        with open(path, 'r', encoding="utf-8") as file:
+            data = json.load(file)
+        tags = data["tags"]
+        self.descriptor_idx = {tag["name"]: tag["id"] for tag in tags}
+        self.num_descriptor_classes = max(self.descriptor_idx.values()) + 1
 
     def save_pretrained(self, save_directory: str, **kwargs):
         """Save the tokenizer to the given directory as a JSON file."""
