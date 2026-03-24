@@ -76,7 +76,7 @@ data:                  # Data settings
   snapping_random_prob: 0.25  # Probability of randomizing hit object snapping in the dataset
   sustain_interval: 8000  # Time in milliseconds between sustain tokens for held notes. Should be shorter than the lookback window.
   position_refinement: 2  # Add a second pass of position tokens with higher precision
-  descriptor_source: 'web'  # Source of beatmap descriptors (omdb/user_tags/web)
+  descriptor_source: 'web'  # Source of beatmap descriptors (local/web/omdb/user_tags)
   min_top_tag_count: 2  # Minimum count of a tag in the dataset to be included as a descriptor
   descriptors_path: 'project-riz/osu-beatmap-tags'   # Path to file with all beatmap descriptors
   tags_metadata_path: "../../../datasets/tags_2026.json"       # Path to file with all beatmap mappers

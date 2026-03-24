@@ -563,14 +563,14 @@ class Tokenizer(PushToHubMixin):
 
     def _init_descriptor_idx(self, args):
         """"Indexes beatmap descriptors and descriptor idx."""
-        if args.data.dataset_type == "ors":
-            self._init_descriptor_idx_ors(args)
+        if args.data.descriptor_source == "local" or args.data.dataset_type == "ors":
+            self._init_descriptor_idx_local(args)
+        elif args.data.descriptor_source == "web":
+            self._init_descriptor_idx_web(args)
         elif args.data.dataset_type == "mmrs":
             self._init_descriptor_idx_mmrs(args)
-        elif args.data.dataset_type == "web":
-            self._init_descriptor_idx_web(args)
 
-    def _init_descriptor_idx_ors(self, args):
+    def _init_descriptor_idx_local(self, args):
         if args is None or "descriptors_path" not in args.data:
             raise ValueError("descriptors_path not found in args")
 
@@ -634,9 +634,6 @@ class Tokenizer(PushToHubMixin):
             raise ValueError(f"descriptor_source {args.data.descriptor_source} not supported")
 
     def _init_descriptor_idx_web(self, args):
-        if args.data.descriptor_source != "web":
-            return
-
         self._init_user_tag_idx(args)
 
         tags_ds = load_dataset(args.data.descriptors_path, split="train")

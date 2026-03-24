@@ -22,9 +22,7 @@ def get_web_dataset(
 
         all_files = [f for f in list_repo_files(repo_id, repo_type="dataset") if f.startswith("compressed/")]
         all_files.sort() # Ensure consistent order
-
         files_split = all_files[dataset_start:dataset_end]
-
         dataset = load_dataset(repo_id, data_files=files_split, streaming=True, split="train")
 
         print(f"Num shards: {len(files_split)}")
