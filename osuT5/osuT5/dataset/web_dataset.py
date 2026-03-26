@@ -33,25 +33,3 @@ def get_web_dataset(
         print(dataset)
 
         return dataset
-        # print(dataset.features)
-        # for idx, example in enumerate(dataset["__key__"]):
-        #     print(example)
-        #     if idx == 2:
-        #         state_dict = dataset.state_dict()
-        #         print("checkpoint")
-        #         break
-        # dataset.load_state_dict(state_dict)
-        # print(f"restart from checkpoint")
-        # for idx, example in enumerate(dataset["__key__"]):
-        #     print(example)
-        #     if idx == 2:
-        #         break
-
-
-        # train_ds = train_ds.filter(lambda x: int(x['approved_date'].split("-")[0]) >= 2018)
-
-        # loader = DataLoader(windowed_train_ds, batch_size=32, num_workers=4)
-        #
-        # for batch in loader:
-        #     # 'batch["audio"]' will be shape [32, window_size_samples]
-        #     pass

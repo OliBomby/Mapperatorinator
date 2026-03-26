@@ -3,6 +3,7 @@ import os.path
 import time
 from multiprocessing.managers import Namespace
 
+import datasets
 import numpy as np
 import torch
 import wandb
@@ -349,6 +350,9 @@ def train(
         optimizer.zero_grad(set_to_none=True)
 
         accelerator.print(f"Epoch {shared.current_epoch}")
+
+        if isinstance(train_dataloader.dataset, datasets.IterableDataset):
+            train_dataloader.dataset.set_epoch(shared.current_epoch)
 
         for batch_id, batch in enumerate(train_dataloader, start=1):
             with accelerator.accumulate(model):
