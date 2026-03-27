@@ -351,7 +351,7 @@ def train(
 
         accelerator.print(f"Epoch {shared.current_epoch}")
 
-        if isinstance(train_dataloader.dataset, datasets.IterableDataset):
+        if hasattr(train_dataloader.dataset, "set_epoch"):
             train_dataloader.dataset.set_epoch(shared.current_epoch)
 
         for batch_id, batch in enumerate(train_dataloader, start=1):

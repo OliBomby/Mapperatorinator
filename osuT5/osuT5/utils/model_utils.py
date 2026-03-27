@@ -17,7 +17,7 @@ from torch.optim.lr_scheduler import (
 from ..dataset.ors_dataset import OrsDataset
 from ..dataset.osu_parser import OsuParser
 from ..dataset.mmrs_dataset import MmrsDataset
-from ..dataset.web_dataset import get_web_dataset
+from ..dataset.web_dataset import WebDataset
 from ..event import EventType
 from ..model.configuration_mapperatorinator import MapperatorinatorConfig
 from ..model.modeling_mapperatorinator import Mapperatorinator
@@ -349,7 +349,7 @@ def get_dataset(args: TrainConfig, **kwargs) -> IterableDataset:
     elif args.data.dataset_type == "mmrs":
         return MmrsDataset(args=args.data, **kwargs)
     elif args.data.dataset_type == "web":
-        return get_web_dataset(args=args.data, **kwargs)
+        return WebDataset(args=args.data, **kwargs)
     else:
         raise NotImplementedError
 

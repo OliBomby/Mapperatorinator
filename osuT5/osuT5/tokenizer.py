@@ -4,13 +4,14 @@ import pickle
 from pathlib import Path
 from typing import Union, Optional
 
+from huggingface_hub import list_repo_files
 import numpy as np
 from datasets import load_dataset
 from pandas import DataFrame
 from tqdm import tqdm
 from transformers.utils import PushToHubMixin, cached_file
 
-from .dataset.data_utils import load_mmrs_metadata, filter_mmrs_metadata
+from .dataset.data_utils import load_mmrs_metadata, filter_mmrs_metadata, filter_web_beatmaps
 from .event import Event, EventType, EventRange, ContextType
 from .config import TrainConfig
 
@@ -105,7 +106,7 @@ class Tokenizer(PushToHubMixin):
 
             if args.model.do_style_embed or args.data.add_style_token:
                 self._init_beatmap_idx(args)
-                self.num_classes = args.data.num_classes
+                self.num_classes = max(args.data.num_classes, len(self.beatmap_idx))
                 if args.data.add_style_token:
                     self.input_event_ranges.append(EventRange(EventType.STYLE, 0, self.num_classes))
 
@@ -477,9 +478,11 @@ class Tokenizer(PushToHubMixin):
             self._init_beatmap_idx_ors(args)
         elif args.data.dataset_type == "mmrs":
             self._init_beatmap_idx_mmrs(args)
+        elif args.data.dataset_type == "web":
+            self._init_beatmap_idx_web(args)
 
     def _init_beatmap_idx_ors(self, args: TrainConfig) -> None:
-        if args is None or "train_dataset_path" not in args.data:
+        if args is None or not getattr(args.data, "train_dataset_path", None):
             return
 
         path = Path(args.data.train_dataset_path)
@@ -508,6 +511,35 @@ class Tokenizer(PushToHubMixin):
     def _init_beatmap_idx_mmrs(self, args: TrainConfig) -> None:
         self.beatmap_idx = self.metadata.reset_index().set_index(["Id"])["BeatmapIdx"].to_dict()
 
+    def _init_beatmap_idx_web(self, args: TrainConfig) -> None:
+        repo_id = args.data.train_dataset_path
+        dataset_start = args.data.train_dataset_start
+        dataset_end = args.data.train_dataset_end
+        all_files = [f for f in list_repo_files(repo_id, repo_type="dataset") if f.startswith("compressed/")]
+        all_files.sort()
+        files_split = all_files[dataset_start:dataset_end]
+
+        beatmap_idx = {}
+        dataset = load_dataset(repo_id, data_files=files_split, streaming=True, split="train")
+        for row in tqdm(dataset, desc="Caching web beatmap index"):
+            beatmaps = filter_web_beatmaps(
+                (row.get("json") or {}).get("beatmaps") or [],
+                gamemodes=args.data.gamemodes,
+                min_year=args.data.min_year,
+                max_year=args.data.max_year,
+                min_difficulty=args.data.min_difficulty,
+                max_difficulty=args.data.max_difficulty,
+            )
+            for beatmap in beatmaps:
+                beatmap_id = beatmap.get("beatmap_id")
+                if beatmap_id is None:
+                    continue
+                beatmap_id = int(beatmap_id)
+                if beatmap_id not in beatmap_idx:
+                    beatmap_idx[beatmap_id] = len(beatmap_idx)
+
+        self.beatmap_idx = beatmap_idx
+
     def _get_metadata(self, args: TrainConfig) -> DataFrame:
         return filter_mmrs_metadata(
             load_mmrs_metadata(args.data.train_dataset_path),
@@ -526,9 +558,11 @@ class Tokenizer(PushToHubMixin):
             self._init_mapper_idx_ors(args)
         elif args.data.dataset_type == "mmrs":
             self._init_mapper_idx_mmrs(args)
+        elif args.data.dataset_type == "web":
+            self._init_mapper_idx_web(args)
 
     def _init_mapper_idx_ors(self, args):
-        if args is None or "mappers_path" not in args.data:
+        if args is None or not getattr(args.data, "mappers_path", None):
             raise ValueError("mappers_path not found in args")
 
         path = Path(args.data.mappers_path)
@@ -561,6 +595,9 @@ class Tokenizer(PushToHubMixin):
         self.mapper_idx = {user_id: idx for idx, user_id in enumerate(unique_user_ids)}
         self.num_mapper_classes = len(unique_user_ids)
 
+    def _init_mapper_idx_web(self, args):
+        self._init_mapper_idx_ors(args)
+
     def _init_descriptor_idx(self, args):
         """"Indexes beatmap descriptors and descriptor idx."""
         if args.data.descriptor_source == "local" or args.data.dataset_type == "ors":
@@ -571,7 +608,7 @@ class Tokenizer(PushToHubMixin):
             self._init_descriptor_idx_mmrs(args)
 
     def _init_descriptor_idx_local(self, args):
-        if args is None or "descriptors_path" not in args.data:
+        if args is None or not getattr(args.data, "descriptors_path", None):
             raise ValueError("descriptors_path not found in args")
 
         path = Path(args.data.descriptors_path)
