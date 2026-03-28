@@ -136,6 +136,7 @@ def filter_mmrs_metadata(
         end: Optional[int] = None,
         subset_ids: Optional[list[int]] = None,
         gamemodes: Optional[list[int]] = None,
+        ranked_statuses: Optional[list[int]] = None,
         min_year: Optional[int] = None,
         max_year: Optional[int] = None,
         min_difficulty: Optional[float] = None,
@@ -149,6 +150,7 @@ def filter_mmrs_metadata(
         end: End split index.
         subset_ids: List of beatmap IDs to filter by.
         gamemodes: List of gamemodes to filter by.
+        ranked_statuses: List of ranked statuses to filter by.
         min_year: Minimum year to filter by.
         max_year: Maximum year to filter by.
         min_difficulty: Minimum difficulty star rating to filter by.
@@ -168,6 +170,9 @@ def filter_mmrs_metadata(
 
     if gamemodes is not None:
         df = df[df["ModeInt"].isin(gamemodes)]
+
+    if ranked_statuses is not None:
+        df = df[df["Ranked"].isin(ranked_statuses)]
 
     if min_year is not None:
         df = df[df["RankedDate"] >= datetime(min_year, 1, 1)]
@@ -213,6 +218,7 @@ def filter_web_beatmaps(
         *,
         subset_ids: Optional[list[int]] = None,
         gamemodes: Optional[list[int]] = None,
+        ranked_statuses: Optional[list[int]] = None,
         min_year: Optional[int] = None,
         max_year: Optional[int] = None,
         min_difficulty: Optional[float] = None,
@@ -228,6 +234,10 @@ def filter_web_beatmaps(
 
         mode = beatmap.get("mode")
         if gamemodes is not None and mode not in gamemodes:
+            continue
+
+        status = beatmap.get("approved")
+        if ranked_statuses is not None and status not in ranked_statuses:
             continue
 
         ranked_date = get_web_ranked_date(beatmap)

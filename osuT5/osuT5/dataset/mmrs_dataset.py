@@ -86,6 +86,7 @@ class MmrsDataset(IterableDataset):
             end=self.end,
             subset_ids=self.subset_ids,
             gamemodes=self.args.gamemodes,
+            ranked_statuses=self.args.ranked_statuses,
             min_year=self.args.min_year,
             max_year=self.args.max_year,
             min_difficulty=self.args.min_difficulty,

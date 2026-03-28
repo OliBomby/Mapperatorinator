@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from multiprocessing.managers import Namespace
 from typing import Optional, Any
 
 from huggingface_hub import list_repo_files
@@ -48,6 +49,7 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
             tokenizer: Tokenizer,
             subset_ids: Optional[list[int]] = None,
             test: bool = False,
+            shared: Namespace = None,
     ):
         super().__init__()
         self._validate_args(args)
@@ -56,11 +58,17 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
         self.tokenizer = tokenizer
         self.subset_ids = subset_ids
         self.test = test
+        self.shared = shared
         self.repo_id = args.test_dataset_path if test else args.train_dataset_path
         dataset_start = args.test_dataset_start if test else args.train_dataset_start
         dataset_end = args.test_dataset_end if test else args.train_dataset_end
 
-        all_files = [f for f in list_repo_files(self.repo_id, repo_type="dataset") if f.startswith("compressed/")]
+        if args.dataset_subset is not None:
+            subset_prefix = args.dataset_subset if args.dataset_subset.startswith('/') else args.dataset_subset + "/"
+            all_files = [f for f in list_repo_files(self.repo_id, repo_type="dataset") if f.startswith(subset_prefix)]
+        else:
+            all_files = [f for f in list_repo_files(self.repo_id, repo_type="dataset")]
+
         all_files.sort()
         self.files_split = all_files[dataset_start:dataset_end]
 
@@ -86,7 +94,8 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
         dataset = dataset.cast_column("opus", Audio(sampling_rate=self.args.sample_rate, num_channels=1))
 
         if not self.test:
-            dataset = dataset.shuffle(seed=42, buffer_size=max(1000, len(self.files_split)))
+            dataset = dataset.shuffle(seed=42, buffer_size=100)
+            dataset.set_epoch(self.shared.current_epoch)
 
         return self._iter_rows(dataset)
 
@@ -96,6 +105,7 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
                 (row.get("json") or {}).get("beatmaps") or [],
                 subset_ids=self.subset_ids,
                 gamemodes=self.args.gamemodes,
+                ranked_statuses=self.args.ranked_statuses,
                 min_year=self.args.min_year,
                 max_year=self.args.max_year,
                 min_difficulty=self.args.min_difficulty,
@@ -134,8 +144,7 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
 
             frames, frame_times = self._get_frames(audio_samples)
             for i, entry in enumerate(parsed_entries):
-                for sample in self._get_next_beatmap(audio_samples, frames, frame_times, parsed_entries, i, entry):
-                    yield sample
+                yield from self._get_next_beatmap(audio_samples, frames, frame_times, parsed_entries, i, entry)
 
     def _get_context_info(self, set_size: int) -> dict[str, list[ContextType]]:
         context_info = random.choices(self.args.context_types, weights=self.args.context_weights)[0].copy()

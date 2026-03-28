@@ -1,5 +1,3 @@
-import multiprocessing
-
 import hydra
 import torch
 import tqdm
@@ -17,6 +15,7 @@ from osuT5.utils import (
     get_tokenizer,
     worker_init_fn,
     get_dataset,
+    get_shared_training_state,
 )
 
 
@@ -67,9 +66,7 @@ def main(args: TrainConfig):
     args = OmegaConf.to_object(args)
     setup_args(args)
 
-    mgr = multiprocessing.Manager()
-    shared = mgr.Namespace()
-    shared.current_train_step = 1
+    shared = get_shared_training_state()
     tokenizer = get_tokenizer(args)
     parser = OsuParser(args, tokenizer)
     dataset = get_dataset(
@@ -88,7 +85,7 @@ def main(args: TrainConfig):
         pin_memory=True,
         drop_last=False,
         persistent_workers=args.dataloader.num_workers > 0,
-        worker_init_fn=worker_init_fn,
+        worker_init_fn=worker_init_fn if args.data.dataset_type in ["ors", "mmrs"] else None,
     )
 
     transform = MelSpectrogram(

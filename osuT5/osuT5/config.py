@@ -154,6 +154,8 @@ class DataConfig:
     descriptor_source: str = 'omdb'
     min_top_tag_count: int = 2
     tags_metadata_path: str = ''
+    ranked_statuses: list[int] = field(default_factory=lambda: [1, 2])
+    dataset_subset: Optional[str] = None
 
 
 @dataclass

@@ -47,7 +47,6 @@ data:                  # Data settings
     - "in": []
       "out": ['${context_type:timing}', '${context_type:map}', '${context_type:sv}']
   context_weights: [1]    # List of weights for each context type. Determines how often each context type is sampled
-  mappers_path: "./datasets/beatmap_users.json"       # Path to file with all beatmap mappers
   add_timing: false      # Interweave timing tokens with the beatmap tokens
   add_snapping: true    # Model hit object snapping
   add_timing_points: true  # Model beatmap timing with timing points
@@ -80,6 +79,8 @@ data:                  # Data settings
   min_top_tag_count: 2  # Minimum count of a tag in the dataset to be included as a descriptor
   descriptors_path: 'project-riz/osu-beatmap-tags'   # Path to file with all beatmap descriptors
   tags_metadata_path: "../../../datasets/tags_2026.json"       # Path to file with all beatmap mappers
+  mappers_path: "../../../datasets/beatmap_users.json"       # Path to file with all beatmap mappers
+  dataset_subset: "compressed"  # Subset of the dataset to use for web dataset
 
 dataloader:             # Dataloader settings
   num_workers: 8

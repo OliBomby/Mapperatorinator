@@ -351,9 +351,6 @@ def train(
 
         accelerator.print(f"Epoch {shared.current_epoch}")
 
-        if hasattr(train_dataloader.dataset, "set_epoch"):
-            train_dataloader.dataset.set_epoch(shared.current_epoch)
-
         for batch_id, batch in enumerate(train_dataloader, start=1):
             with accelerator.accumulate(model):
                 if shared.current_train_step > args.optim.total_steps:

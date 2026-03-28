@@ -525,6 +525,7 @@ class Tokenizer(PushToHubMixin):
             beatmaps = filter_web_beatmaps(
                 (row.get("json") or {}).get("beatmaps") or [],
                 gamemodes=args.data.gamemodes,
+                ranked_statuses=args.data.ranked_statuses,
                 min_year=args.data.min_year,
                 max_year=args.data.max_year,
                 min_difficulty=args.data.min_difficulty,
@@ -546,6 +547,7 @@ class Tokenizer(PushToHubMixin):
             start=args.data.train_dataset_start,
             end=args.data.train_dataset_end,
             gamemodes=args.data.gamemodes,
+            ranked_statuses=args.data.ranked_statuses,
             min_year=args.data.min_year,
             max_year=args.data.max_year,
             min_difficulty=args.data.min_difficulty,
