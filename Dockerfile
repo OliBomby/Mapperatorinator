@@ -5,6 +5,8 @@ RUN apt-get -y update \
     && apt-get install -y git \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+RUN pip install --break-system-packages ninja==1.13.0
+RUN MAX_JOBS=4 pip install --no-build-isolation --break-system-packages flash-attn==2.8.3
 RUN pip install --break-system-packages \
     accelerate==1.12.0 \
     pydub==0.25.1 \
@@ -20,11 +22,9 @@ RUN pip install --break-system-packages \
     'git+https://github.com/OliBomby/slider.git#egg=slider' \
     torch_tb_profiler==0.4.3 \
     wandb==0.24.2 \
-    ninja==1.13.0 \
     peft==0.18.1 \
     datasets==4.8.3 \
     torchcodec==0.10.0
-RUN MAX_JOBS=4 pip install flash-attn==2.8.3 --no-build-isolation --break-system-packages
 
 # Modify .bashrc to include the custom prompt
 RUN echo 'if [ -f /.dockerenv ]; then export PS1="(docker) $PS1"; fi' >> /root/.bashrc
