@@ -5,7 +5,8 @@ RUN apt-get -y update \
     && apt-get install -y git \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
-RUN pip install accelerate==1.12.0 \
+RUN pip install --break-system-packages \
+    accelerate==1.12.0 \
     pydub==0.25.1 \
     nnAudio==0.3.4 \
     PyYAML==6.0.3 \
