@@ -290,6 +290,7 @@ def eager_attention_forward(
     return (attn_output,)
 
 
+@dynamo.disable
 def flash_attention_forward(
     module: "VarWhisperAttention",
     qkv: torch.Tensor,
