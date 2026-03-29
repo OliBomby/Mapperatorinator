@@ -556,14 +556,12 @@ class Tokenizer(PushToHubMixin):
 
     def _init_mapper_idx(self, args):
         """Indexes beatmap mappers and mapper idx."""
-        if args.data.dataset_type == "ors":
-            self._init_mapper_idx_ors(args)
+        if args.data.dataset_type in ["ors", "web"]:
+            self._init_mapper_idx_local(args)
         elif args.data.dataset_type == "mmrs":
             self._init_mapper_idx_mmrs(args)
-        elif args.data.dataset_type == "web":
-            self._init_mapper_idx_web(args)
 
-    def _init_mapper_idx_ors(self, args):
+    def _init_mapper_idx_local(self, args):
         if args is None or not getattr(args.data, "mappers_path", None):
             raise ValueError("mappers_path not found in args")
 
@@ -577,8 +575,8 @@ class Tokenizer(PushToHubMixin):
             data = json.load(file)
 
         # Populate beatmap_mapper
-        for item in data:
-            self.beatmap_mapper[item['id']] = item['user_id']
+        for beatmap_id in data:
+            self.beatmap_mapper[int(beatmap_id)] = data[beatmap_id]
 
         # Get unique user_ids from beatmap_mapper values
         unique_user_ids = list(set(self.beatmap_mapper.values()))
@@ -596,9 +594,6 @@ class Tokenizer(PushToHubMixin):
         # Create mapper_idx
         self.mapper_idx = {user_id: idx for idx, user_id in enumerate(unique_user_ids)}
         self.num_mapper_classes = len(unique_user_ids)
-
-    def _init_mapper_idx_web(self, args):
-        self._init_mapper_idx_ors(args)
 
     def _init_descriptor_idx(self, args):
         """"Indexes beatmap descriptors and descriptor idx."""
