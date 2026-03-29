@@ -24,7 +24,7 @@ RUN pip install --break-system-packages \
     peft==0.18.1 \
     datasets==4.8.3 \
     torchcodec==0.10.0
-RUN MAX_JOBS=4 pip install flash-attn-4[cu13] --no-build-isolation --break-system-packages
+RUN MAX_JOBS=4 pip install flash-attn==2.8.3 --no-build-isolation --break-system-packages
 
 # Modify .bashrc to include the custom prompt
 RUN echo 'if [ -f /.dockerenv ]; then export PS1="(docker) $PS1"; fi' >> /root/.bashrc
