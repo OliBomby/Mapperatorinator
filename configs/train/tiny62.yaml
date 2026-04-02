@@ -5,31 +5,32 @@ defaults:
 
 compile: true          # PyTorch 2.0 optimization
 mixed_precision: 'bf16'         # Enable mixed precision (no/fp16/bf16/fp8)
+precision: 'bf16'               # Model weight precision (null/fp32/fp16/bf16)
 attn_implementation: 'flash_attention_2'  # Attention implementation (eager/sdpa/flash_attention_2)
 
 data:                  # Data settings
-  dataset_type: "mmrs"
-  train_dataset_path: "/workspace/datasets/MMRS39389"
-  test_dataset_path: "/workspace/datasets/MMRS39389"
-  train_dataset_start: 10187  # Start of ORS train dataset
-  train_dataset_end: 38689
-  test_dataset_start: 38689
-  test_dataset_end: 39389
-  num_classes: 152680
+  dataset_type: "web"
+  train_dataset_path: "project-riz/osu-beatmaps"
+  test_dataset_path: "project-riz/osu-beatmaps"
+  train_dataset_start: 0
+  train_dataset_end: 72
+  test_dataset_start: 72
+  test_dataset_end: 74
+  num_classes: 0
   # All Special Prefix Tokens
   add_out_context_types: true  # Add tokens indicating types of the out context
-  add_gamemode_token: false
+  add_gamemode_token: true
   add_style_token: false
   add_diff_token: true
   add_mapper_token: true
   add_year_token: true
-  add_hitsounded_token: false  # Add token for whether the map has hitsounds
+  add_hitsounded_token: true  # Add token for whether the map has hitsounds
   add_song_length_token: true  # Add token for the length of the song
   add_global_sv_token: true  # Add token for the global slider velocity in std and ctb
   add_cs_token: true
-  add_keycount_token: false  # Add token for the number of keys in mania
-  add_hold_note_ratio_token: false  # Add token for the ratio of hold notes in mania
-  add_scroll_speed_ratio_token: false  # Add token for the scroll speed ratio in mania
+  add_keycount_token: true  # Add token for the number of keys in mania
+  add_hold_note_ratio_token: true  # Add token for the ratio of hold notes in mania
+  add_scroll_speed_ratio_token: true  # Add token for the scroll speed ratio in mania
   add_descriptors: true  # Add beatmap descriptor tokens
   add_sv_special_token: true  # Add token for last SV value
   add_kiai_special_token: false  # Add token for last kiai state
@@ -40,14 +41,13 @@ data:                  # Data settings
   src_seq_len: 2048
   tgt_seq_len: 2560
   rhythm_weight: 1.0    # Weight of rhythm tokens in the loss calculation
-  label_smoothing: 0.1  # Label smoothing for the loss calculation
+  label_smoothing: 0.2  # Label smoothing for the loss calculation
   lookback: 0.2             # Fraction of audio sequence to fill with tokens from previous inference window
   lookback_prob: 0.5  # Probability of using the lookback augmentation for a beatmap in the dataset
   context_types:       # List of context types to include in the dataset
     - "in": []
-      "out": ['${context_type:timing}', '${context_type:map}']
+      "out": ['${context_type:timing}', '${context_type:map}', '${context_type:sv}']
   context_weights: [1]    # List of weights for each context type. Determines how often each context type is sampled
-  mappers_path: "./datasets/beatmap_users.json"       # Path to file with all beatmap mappers
   add_timing: false      # Interweave timing tokens with the beatmap tokens
   add_snapping: true    # Model hit object snapping
   add_timing_points: true  # Model beatmap timing with timing points
@@ -63,19 +63,25 @@ data:                  # Data settings
   dt_augment_sqrt: true  # Sample DT augmentation from a square root distribution
   types_first: false       # Put the type token at the start of the group before the timeshift token
   add_kiai: false        # Model kiai times
-  gamemodes: [0]  # List of gamemodes to include in the dataset
+  gamemodes: [0, 1, 2, 3]  # List of gamemodes to include in the dataset
   mania_bpm_normalized_scroll_speed: true  # Normalize mania scroll speed by BPM
   add_sv: true  # Model slider velocity in std and ctb
   add_mania_sv: false  # Add mania scroll velocity in map context
   normalize_audio: true  # Normalize audio data
   frame_offset_augment_prob: 0.5  # Probability of augmenting the dataset with frame offset
   cycle_length: 1
+  min_year: 2014
   max_year: 2023  # Maximum year of the beatmap to include in the dataset
   slider_version: 2  # Slider version to use (1 or 2)
   snapping_random_prob: 0.25  # Probability of randomizing hit object snapping in the dataset
   sustain_interval: 8000  # Time in milliseconds between sustain tokens for held notes. Should be shorter than the lookback window.
   position_refinement: 2  # Add a second pass of position tokens with higher precision
-  descriptor_source: 'user_tags'  # Source of beatmap descriptors (omdb/user_tags)\
+  descriptor_source: 'web'  # Source of beatmap descriptors (local/web/omdb/user_tags)
+  min_top_tag_count: 2  # Minimum count of a tag in the dataset to be included as a descriptor
+  descriptors_path: 'project-riz/osu-beatmap-tags'   # Path to file with all beatmap descriptors
+  tags_metadata_path: "../../../datasets/tags_2026.json"       # Path to file with all beatmap mappers
+  mappers_path: "../../../datasets/beatmap_users.json"       # Path to file with all beatmap mappers
+  dataset_subset: "compressed"  # Subset of the dataset to use for web dataset
 
 dataloader:             # Dataloader settings
   num_workers: 8
@@ -85,12 +91,18 @@ optim:                  # Optimizer settings
   name: muon
   base_lr: 0.004         # Should be scaled with the number of devices present
   base_lr_2: 0.001        # Secondary learning rate for the internal optimizer
-  batch_size: 64
-  grad_acc: 4
-  total_steps: 35000
+  batch_size: 32
+  grad_acc: 2
+  total_steps: 70000
   warmup_steps: 0
-  sustain_steps: 10000      # Steps to sustain the learning rate after warmup
+  sustain_steps: 20000      # Steps to sustain the learning rate after warmup
   weight_decay: 0.01
   lr_scheduler: linear
   final_cosine: 0
+
+eval: # Evaluation settings
+  every_steps: 2000
+
+checkpoint: # Checkpoint settings
+  every_steps: 10000
 

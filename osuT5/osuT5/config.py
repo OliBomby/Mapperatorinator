@@ -215,7 +215,8 @@ class ProfileConfig:
 class TrainConfig:
     compile: bool = True
     device: str = "gpu"
-    precision: str = "bf16"
+    mixed_precision: Optional[str] = "bf16"
+    precision: Optional[str] = None
     attn_implementation: str = "sdpa"
     seed: int = 42
     checkpoint_path: str = ""

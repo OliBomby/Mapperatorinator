@@ -60,7 +60,7 @@ def main(args: TrainConfig):
         args.pretrained_path,
         args,
         device=accelerator.device,
-        # Ignore precision argument because that is handled by accelerator
+        precision=args.precision,
         attn_implementation=args.attn_implementation,
         eval_mode=False
     )
