@@ -24,7 +24,7 @@ dataset_type: "mmrs"
 dataset_path: C:/Users/Olivier/Documents/Collections/Beatmap ML Datasets/MMRS2025
 dataset_start: 0
 dataset_end: 106  # Contains 324 std beatmaps
-gamemodes: [3]  # List of gamemodes to include in the dataset
+gamemodes: [0, 1, 2, 3]  # List of gamemodes to include in the dataset
 
 inference:
   seed: 0
@@ -44,7 +44,7 @@ hydra:
     name: calc_fid
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/sweeps/test_m/inference=tiny61
+    dir: ./logs_fid/sweeps/test_a/inference=tiny61
   sweep:
     dir: ./logs_fid/sweeps/test_a
     subdir: ${hydra.job.override_dirname}
