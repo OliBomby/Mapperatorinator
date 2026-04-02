@@ -94,6 +94,7 @@ class OsuParser:
 
         # Sort events by time
         if len(events) > 0:
+            # noinspection PyArgumentList
             events, event_times = zip(*sorted(zip(events, event_times), key=lambda x: x[1]))
         result = list(events), list(event_times)
 
@@ -281,12 +282,15 @@ class OsuParser:
         if not self.add_hitsounds:
             return
 
+        def valid_addition(i: int) -> bool:
+            return len(addition_split) > i and addition_split[i] and addition_split[i] != '0'
+
         tp = self.hitsound_point_at(time, beatmap)
         tp_sample_set = tp.sample_type if tp.sample_type != 0 else 2  # Inherit to soft sample set
         addition_split = addition.split(":")
-        sample_set = int(addition_split[0]) if addition_split[0] != "0" else tp_sample_set
-        addition_set = int(addition_split[1]) if addition_split[1] != "0" else sample_set
-        volume = int(addition_split[3]) if len(addition_split) > 3 and addition_split[3] != "0" else tp.volume
+        sample_set = int(addition_split[0]) if valid_addition(0) else tp_sample_set
+        addition_set = int(addition_split[1]) if valid_addition(1) else sample_set
+        volume = int(addition_split[3]) if valid_addition(3) else tp.volume
 
         sample_set = sample_set if 0 < sample_set < 4 else 1  # Overflow default to normal sample set
         addition_set = addition_set if 0 < addition_set < 4 else 1  # Overflow default to normal sample set
@@ -300,7 +304,7 @@ class OsuParser:
         event_times.append(group_time)
         event_times.append(group_time)
 
-    def _clip_dist(self, dist: int) -> int:
+    def _clip_dist(self, dist) -> int:
         """Clip distance to valid range."""
         return int(np.clip(dist, self.dist_min, self.dist_max))
 
