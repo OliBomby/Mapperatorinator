@@ -34,7 +34,7 @@ def main(args: TrainConfig):
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(
         cpu=args.device == "cpu",
-        mixed_precision=args.precision,
+        mixed_precision=args.mixed_precision,
         gradient_accumulation_steps=args.optim.grad_acc,
         log_with=args.logging.log_with,
         project_config=ProjectConfiguration(
