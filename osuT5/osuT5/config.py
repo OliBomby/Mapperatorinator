@@ -199,6 +199,7 @@ class LoggingConfig:
     grad_l2: bool = True
     weights_l2: bool = True
     mode: str = 'online'
+    run_name: Optional[str] = None  # Custom run name for the wandb tracker
 
 
 @dataclass

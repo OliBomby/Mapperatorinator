@@ -42,14 +42,18 @@ def main(args: TrainConfig):
         ),
         kwargs_handlers=[ddp_kwargs],
     )
+    wandb_kwargs = {
+        "job_type": "training",
+        "sync_tensorboard": args.profile.do_profile,
+        "mode": args.logging.mode,
+    }
+    if args.logging.run_name:
+        wandb_kwargs["name"] = args.logging.run_name
+
     accelerator.init_trackers(
         "osuT5",
         init_kwargs={
-            "wandb": {
-                "job_type": "training",
-                "sync_tensorboard": args.profile.do_profile,
-                "mode": args.logging.mode,
-            }
+            "wandb": wandb_kwargs,
         }
     )
 
