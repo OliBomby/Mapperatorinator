@@ -6,7 +6,6 @@ from typing import Union, Optional
 
 from huggingface_hub import list_repo_files
 import numpy as np
-from datasets import load_dataset
 from pandas import DataFrame
 from tqdm import tqdm
 from transformers.utils import PushToHubMixin, cached_file
@@ -512,6 +511,7 @@ class Tokenizer(PushToHubMixin):
         self.beatmap_idx = self.metadata.reset_index().set_index(["Id"])["BeatmapIdx"].to_dict()
 
     def _init_beatmap_idx_web(self, args: TrainConfig) -> None:
+        from datasets import load_dataset
         repo_id = args.data.train_dataset_path
         dataset_start = args.data.train_dataset_start
         dataset_end = args.data.train_dataset_end
@@ -668,6 +668,7 @@ class Tokenizer(PushToHubMixin):
             raise ValueError(f"descriptor_source {args.data.descriptor_source} not supported")
 
     def _init_descriptor_idx_web(self, args):
+        from datasets import load_dataset
         self._init_user_tag_idx(args)
 
         tags_ds = load_dataset(args.data.descriptors_path, split="train")
