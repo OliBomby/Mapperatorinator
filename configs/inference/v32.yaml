@@ -1,12 +1,12 @@
 defaults:
   - default
-  - ../train@train: tiny65
+  - ../train@train: v32
   - ../diffusion@diffusion: v1
   - _self_
 
-model_path: './test/tiny65/'  # Path to trained model
+model_path: './test/v32/'  # Path to trained model
 diff_ckpt: 'OliBomby/osu-diffusion-v2'
-version: 'Mapperatorinator tiny65'
+version: 'Mapperatorinator V32'
 in_context: []
 output_type: [TIMING, MAP, SV]    # Output type (map, timing)
 temperature: 0.9        # Sampling temperature
