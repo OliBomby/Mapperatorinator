@@ -3,11 +3,12 @@
 # Multi-Train Script
 # Trains a base model on all gamemodes, then fine-tunes on each gamemode separately.
 #
-# Usage: ./osuT5/multi_train.sh <config_name> <finetune_config_name> <run_name> [extra_overrides...]
+# Usage: ./osuT5/multi_train.sh [--skip-base] <config_name> <finetune_config_name> <run_name> [extra_overrides...]
 #
 # Examples:
 #   ./osuT5/multi_train.sh tiny64 tiny64_ft "tiny64 train"
 #   ./osuT5/multi_train.sh tiny64 tiny64_ft "tiny64 train" optim.total_steps=50000
+#   ./osuT5/multi_train.sh --skip-base tiny64 tiny64_ft "tiny64 train"
 
 set -e  # Exit on error
 
@@ -29,13 +30,25 @@ print_header() {
     echo
 }
 
-# --- Argument parsing ---
-if [ $# -lt 3 ]; then
-    echo -e "${RED}Usage: $0 <config_name> <finetune_config_name> <run_name> [extra_overrides...]${NC}"
+print_usage() {
+    echo -e "${RED}Usage: $0 [--skip-base] <config_name> <finetune_config_name> <run_name> [extra_overrides...]${NC}"
+    echo "  --skip-base:          Skip base training and use the latest checkpoint in ./logs/<run_name>/base"
     echo "  config_name:          Hydra config name for base training (e.g. tiny64)"
     echo "  finetune_config_name: Hydra config name for fine-tune runs (e.g. tiny64_ft)"
     echo "  run_name:             Base run name for wandb (e.g. 'tiny64 train')"
     echo "  extra_overrides:      Optional additional Hydra overrides"
+}
+
+# --- Argument parsing ---
+SKIP_BASE=false
+
+if [ "$1" = "--skip-base" ]; then
+    SKIP_BASE=true
+    shift
+fi
+
+if [ $# -lt 3 ]; then
+    print_usage
     exit 1
 fi
 
@@ -76,20 +89,26 @@ find_latest_checkpoint() {
 # ==============================
 # Phase 1: Base model training
 # ==============================
-print_header "Phase 1: Base Model Training"
-echo -e "${GREEN}Config:${NC}   $CONFIG_NAME"
-echo -e "${GREEN}Run Name:${NC} $RUN_NAME"
-echo -e "${GREEN}Log Dir:${NC}  ./logs/$RUN_DIR_NAME/base"
-echo
-
 BASE_LOG_DIR="./logs/${RUN_DIR_NAME}/base"
 
-python osuT5/train.py \
-    -cn "$CONFIG_NAME" \
-    "logging.run_name=$RUN_NAME" \
-    "data.gamemodes=[0,1,2,3]" \
-    "hydra.run.dir=$BASE_LOG_DIR" \
-    "${EXTRA_OVERRIDES[@]}"
+if [ "$SKIP_BASE" = false ]; then
+    print_header "Phase 1: Base Model Training"
+    echo -e "${GREEN}Config:${NC}   $CONFIG_NAME"
+    echo -e "${GREEN}Run Name:${NC} $RUN_NAME"
+    echo -e "${GREEN}Log Dir:${NC}  $BASE_LOG_DIR"
+    echo
+
+    python osuT5/train.py \
+        -cn "$CONFIG_NAME" \
+        "logging.run_name=$RUN_NAME" \
+        "data.gamemodes=[0,1,2,3]" \
+        "hydra.run.dir=$BASE_LOG_DIR" \
+        "${EXTRA_OVERRIDES[@]}"
+else
+    print_header "Phase 1: Base Model Training Skipped"
+    echo -e "${GREEN}Using existing base log dir:${NC} $BASE_LOG_DIR"
+    echo
+fi
 
 # Find the latest checkpoint from base training
 LATEST_CHECKPOINT=$(find_latest_checkpoint "$BASE_LOG_DIR")
@@ -112,16 +131,16 @@ for GM in "${GAMEMODES[@]}"; do
     FT_LOG_DIR="./logs/${RUN_DIR_NAME}/${GM_NAME}"
 
     print_header "Phase 2: Fine-Tune - $GM_NAME (gamemode $GM)"
-    echo -e "${GREEN}Run Name:${NC}       $FT_RUN_NAME"
-    echo -e "${GREEN}Checkpoint:${NC}     $LATEST_CHECKPOINT"
-    echo -e "${GREEN}Log Dir:${NC}        $FT_LOG_DIR"
+    echo -e "${GREEN}Run Name:${NC}        $FT_RUN_NAME"
+    echo -e "${GREEN}Pretrained Path:${NC} $LATEST_CHECKPOINT"
+    echo -e "${GREEN}Log Dir:${NC}         $FT_LOG_DIR"
     echo
 
     python osuT5/train.py \
         -cn "$FINETUNE_CONFIG_NAME" \
         "logging.run_name=$FT_RUN_NAME" \
         "data.gamemodes=[$GM]" \
-        "checkpoint_path=$LATEST_CHECKPOINT" \
+        "pretrained_path=$LATEST_CHECKPOINT" \
         "hydra.run.dir=$FT_LOG_DIR" \
         "${EXTRA_OVERRIDES[@]}"
 
