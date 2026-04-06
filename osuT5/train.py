@@ -1,5 +1,6 @@
 import hydra
 import torch
+import wandb
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from accelerate.utils import ProjectConfiguration
 from omegaconf import OmegaConf
@@ -46,6 +47,7 @@ def main(args: TrainConfig):
         "job_type": "training",
         "sync_tensorboard": args.profile.do_profile,
         "mode": args.logging.mode,
+        "settings": wandb.Settings(x_graphql_timeout_seconds=120),
     }
     if args.logging.run_name:
         wandb_kwargs["name"] = args.logging.run_name
