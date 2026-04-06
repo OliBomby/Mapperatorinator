@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-import rosu_pp_py as rosu
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -50,6 +49,7 @@ def generation_config_from_beatmap(beatmap: Beatmap, beatmap_path, tokenizer: Op
 
     difficulty = None
     try:
+        import rosu_pp_py as rosu
         rosu_map = rosu.Beatmap(path=str(beatmap_path))
         rosu_diff = rosu.Difficulty()
         rosu_attrs = rosu_diff.calculate(rosu_map)
