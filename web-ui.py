@@ -174,7 +174,7 @@ process_lock = threading.Lock()
 
 def _ensure_inference_server(args):
     model_loader, tokenizer_loader = load_model_loaders(
-        ckpt_path_str=args.model_path,
+        ckpt_path=args.model_path,
         t5_args=args.train,
         device=args.device,
         precision=args.precision,

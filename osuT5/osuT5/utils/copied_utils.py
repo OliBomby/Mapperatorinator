@@ -1,5 +1,6 @@
 from typing import Dict, List
 import numpy as np
+from torch.optim.optimizer import ParamsT
 from transformers import BatchEncoding
 from dataclasses import dataclass
 from transformers import AutoTokenizer
@@ -266,7 +267,7 @@ class AdamWScale(Optimizer):
 
     def __init__(
         self,
-        params: Iterable[nn.parameter.Parameter],
+        params: ParamsT,
         lr: float = 1e-3,
         betas: Tuple[float, float] = (0.9, 0.999),
         eps: float = 1e-6,

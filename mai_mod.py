@@ -367,15 +367,10 @@ def main(args: MaiModConfig):
     compile_args(i_args)
     setup_inference_environment(i_args.seed)
 
-    model, tokenizer = load_model_with_server(
-        i_args.model_path,
-        i_args.train,
-        i_args.device,
-        max_batch_size=i_args.max_batch_size,
-        precision=i_args.precision,
-        attn_implementation=i_args.attn_implementation,
-        use_server=False,
-    )
+    model, tokenizer = load_model_with_server(i_args.model_path, i_args.train, i_args.device,
+                                              max_batch_size=i_args.max_batch_size, use_server=False,
+                                              precision=i_args.precision,
+                                              attn_implementation=i_args.attn_implementation)
 
     generation_config, beatmap_config = get_config(i_args)
 
