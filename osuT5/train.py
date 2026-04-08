@@ -85,14 +85,8 @@ def main(args: TrainConfig):
     setup_args(args)
 
     shared = get_shared_training_state()
-    model, tokenizer = load_model(
-        args.pretrained_path,
-        args,
-        device=accelerator.device,
-        precision=args.precision,
-        attn_implementation=args.attn_implementation,
-        eval_mode=False
-    )
+    model, tokenizer = load_model(args.pretrained_path, args, device=accelerator.device, precision=args.precision,
+                                  attn_implementation=args.attn_implementation, eval_mode=False)
     train_dataloader, test_dataloader = get_dataloaders(tokenizer, args, shared)
 
     if args.enable_lora:

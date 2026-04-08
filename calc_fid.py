@@ -370,15 +370,9 @@ def generate_beatmaps(beatmap_paths, args: InferenceConfig, dataset_type, idx, l
     gen_logger = _configure_generation_log_worker(log_queue)
 
     model, tokenizer, diff_model, diff_tokenizer, refine_model = None, None, None, None, None
-    model, tokenizer = load_model_with_server(
-        args.model_path,
-        args.train,
-        args.device,
-        max_batch_size=args.max_batch_size,
-        use_server=args.use_server,
-        precision=args.precision,
-        attn_implementation=args.attn_implementation,
-    )
+    model, tokenizer = load_model_with_server(args.model_path, args.train, args.device,
+                                              max_batch_size=args.max_batch_size, use_server=args.use_server,
+                                              precision=args.precision, attn_implementation=args.attn_implementation)
 
     if args.compile:
         model.transformer.forward = torch.compile(model.transformer.forward, mode="reduce-overhead", fullgraph=True)
