@@ -90,7 +90,7 @@ optim:                  # Optimizer settings
   name: muon
   base_lr: 0.002         # Should be scaled with the number of devices present
   base_lr_2: 0.001        # Secondary learning rate for the internal optimizer
-  batch_size: 36
+  batch_size: 33
   grad_acc: 3
   total_steps: 622000
   warmup_steps: 0
