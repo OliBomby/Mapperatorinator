@@ -105,7 +105,8 @@
         "v28": "Mapperatorinator V28",
         "v29": "Mapperatorinator V29 (Supports gamemodes and descriptors)",
         "v30": "Mapperatorinator V30 (Best model)",
-        "v31": "Mapperatorinator V31 (Slightly more accurate than V29)"
+        "v31": "Mapperatorinator V31 (Slightly more accurate than V29)",
+        "v32": "Mapperatorinator V32 (LoRA fine-tuned on 2024-2026 data)"
     },
     "gamemodes": {
         "0": "Standard",

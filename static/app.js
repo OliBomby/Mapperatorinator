@@ -16,6 +16,9 @@ $(document).ready(function() {
                 hideHitsoundsOption: true,
                 supportsDescriptors: false,
             },
+            "v32": {
+                yearRange: { min: 2008, max: 2026 },
+            },
         }
     };
 
@@ -181,6 +184,15 @@ $(document).ready(function() {
             if (capabilities.hideHitsoundsOption) {
                 $('#hitsounded').prop('checked', true);
             }
+
+            // Handle year range per model
+            const defaultYearRange = { min: 2007, max: 2023 };
+            const yearRange = capabilities.yearRange || defaultYearRange;
+            const $yearInput = $('#year');
+            $yearInput.attr('min', yearRange.min).attr('max', yearRange.max);
+            const yearLabel = `Year (${yearRange.min}-${yearRange.max})`;
+            const yearTooltip = `Year of the song (${yearRange.min}-${yearRange.max})`;
+            $('label[for="year"]').text(yearLabel + ':').attr('title', yearTooltip);
 
             this.updateConditionalFields();
         }
@@ -1177,10 +1189,11 @@ $(document).ready(function() {
             });
         }
 
-        // Check BF16 support on page load
+        // Check BF16 support on page load and auto-enable if supported
         $.get("/check_bf16_support", function(data) {
             if (data.supported) {
                 $("#bf16-option").show();
+                $("#enable_bf16").prop('checked', true);
                 if (data.gpu_name) {
                     $("#bf16-gpu-info").text("(" + data.gpu_name + ")");
                 }

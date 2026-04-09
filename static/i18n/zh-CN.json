@@ -105,7 +105,8 @@
         "v28": "Mapperatorinator V28",
         "v29": "Mapperatorinator V29（支持游戏模式和描述符）",
         "v30": "Mapperatorinator V30（最佳模型）",
-        "v31": "Mapperatorinator V31（比 V29 略准确）"
+        "v31": "Mapperatorinator V31（比 V29 略准确）",
+        "v32": "Mapperatorinator V32（LoRA 微调 2024-2026 数据）"
     },
     "gamemodes": {
         "0": "Standard（标准）",
