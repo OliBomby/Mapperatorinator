@@ -1,0 +1,59 @@
+# LoRA fine-tune config for V31 on 2024-2025 beatmap data.
+# Inherits from lora.yaml but targets V31 with a year-filtered dataset.
+#
+# Usage:
+#   python osuT5/train.py -cn lora_2024_2025
+#   python osuT5/train.py -cn lora_2024_2025 \
+#     data.train_dataset_path="/path/to/dataset" \
+#     data.test_dataset_path="/path/to/dataset"
+
+defaults:
+  - v31
+  - _self_
+
+compile: false
+precision: 'bf16'
+enable_lora: true
+
+pretrained_path: "OliBomby/Mapperatorinator-v31"
+
+data:
+  dataset_type: "mmrs"
+  train_dataset_path: "/workspace/datasets/MMRS_2024_2025"
+  test_dataset_path: "/workspace/datasets/MMRS_2024_2025"
+  train_dataset_start: 0
+  train_dataset_end: 13491
+  test_dataset_start: 13491
+  test_dataset_end: 14991
+
+  min_year: 2024
+  max_year: 2025
+  add_year_token: true
+
+optim:
+  name: muon
+  base_lr: 0.0004
+  base_lr_2: 0.0001
+  batch_size: 32
+  grad_acc: 32             # per-GPU batch of 1, fits 12GB VRAM
+  total_steps: 2000
+  warmup_steps: 100
+  sustain_steps: 0
+  weight_decay: 0.01
+  lr_scheduler: cosine
+  final_cosine: 0
+
+lora:
+  r: 64
+  lora_alpha: 128
+  target_modules: ['k_proj', 'v_proj', 'q_proj', 'out_proj']
+  lora_dropout: 0.05
+  bias: "none"
+  init_lora_weights: "pissa"
+
+eval:
+  every_steps: 200
+  steps: 100
+
+checkpoint:
+  every_steps: 200
