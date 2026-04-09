@@ -141,6 +141,9 @@ eval:                   # Evaluation settings
 
 checkpoint:             # Checkpoint settings
   every_steps: 5000
+  local_total_limit: 2  # Number of local Accelerate checkpoints to retain on disk
+  cleanup_wandb_cache_before_save: true
+  wandb_cache_cleanup_size: '1GB'
 
 logging:                # Logging settings
   log_with: 'wandb'     # Logging service (wandb/tensorboard)

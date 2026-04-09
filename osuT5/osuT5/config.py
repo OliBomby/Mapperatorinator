@@ -190,6 +190,9 @@ class EvalConfig:
 @dataclass
 class CheckpointConfig:
     every_steps: int = 5000
+    local_total_limit: int = 2
+    cleanup_wandb_cache_before_save: bool = True
+    wandb_cache_cleanup_size: str = "1GB"
 
 
 @dataclass

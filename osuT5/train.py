@@ -1,4 +1,6 @@
 import hydra
+import os
+import re
 import torch
 import wandb
 from accelerate import Accelerator, DistributedDataParallelKwargs
@@ -28,9 +30,26 @@ def print_model_parameters(model):
     print(f"Frozen Parameters: {frozen_params:,}")
 
 
+def get_next_checkpoint_iteration(checkpoint_root: str = "checkpoints") -> int:
+    if not os.path.isdir(checkpoint_root):
+        return 0
+
+    checkpoint_indices = []
+    for entry in os.listdir(checkpoint_root):
+        match = re.fullmatch(r"checkpoint_(\d+)", entry)
+        if match is not None and os.path.isdir(os.path.join(checkpoint_root, entry)):
+            checkpoint_indices.append(int(match.group(1)))
+
+    if not checkpoint_indices:
+        return 0
+
+    return max(checkpoint_indices) + 1
+
+
 @hydra.main(config_path="../configs/train", config_name="v29", version_base="1.1")
 def main(args: TrainConfig):
     args: TrainConfig = OmegaConf.to_object(args)
+    checkpoint_iteration = get_next_checkpoint_iteration()
 
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(
@@ -39,7 +58,11 @@ def main(args: TrainConfig):
         gradient_accumulation_steps=args.optim.grad_acc,
         log_with=args.logging.log_with,
         project_config=ProjectConfiguration(
-            project_dir="..", logging_dir="tensorboard_logs"
+            project_dir=".",
+            logging_dir="tensorboard_logs",
+            automatic_checkpoint_naming=True,
+            total_limit=args.checkpoint.local_total_limit,
+            iteration=checkpoint_iteration,
         ),
         kwargs_handlers=[ddp_kwargs],
     )

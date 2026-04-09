@@ -73,17 +73,27 @@ GAMEMODES=(0 1 2 3)
 # --- Helper: find the latest checkpoint directory ---
 find_latest_checkpoint() {
     local run_dir="$1"
-    # Checkpoint dirs are named checkpoint-{step}, find the one with the highest step
     local latest
-    latest=$(find "$run_dir" -maxdepth 1 -type d -name 'checkpoint-*' \
+
+    latest=$(find "$run_dir/checkpoints" -maxdepth 1 -type d -name 'checkpoint_*' 2>/dev/null \
+        | sed 's/.*checkpoint_//' \
+        | sort -n \
+        | tail -1)
+    if [ -n "$latest" ]; then
+        echo "$run_dir/checkpoints/checkpoint_$latest"
+        return
+    fi
+
+    latest=$(find "$run_dir" -maxdepth 1 -type d -name 'checkpoint-*' 2>/dev/null \
         | sed 's/.*checkpoint-//' \
         | sort -n \
         | tail -1)
-    if [ -z "$latest" ]; then
-        echo ""
-    else
+    if [ -n "$latest" ]; then
         echo "$run_dir/checkpoint-$latest"
+        return
     fi
+
+    echo ""
 }
 
 # ==============================
