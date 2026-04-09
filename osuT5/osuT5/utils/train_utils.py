@@ -1,4 +1,5 @@
 import glob
+import math
 import os.path
 import time
 from multiprocessing.managers import Namespace
@@ -67,34 +68,38 @@ def maybe_save_checkpoint(model, accelerator: Accelerator, args: TrainConfig, sh
 
         wandb_tracker = accelerator.get_tracker("wandb")
         if wandb_tracker is not None:
-            art = wandb.Artifact(
-                f"osuT5-{wandb.run.id}",
-                type="model",
-                metadata={
-                    "format": "accelerate",
-                    "src_seq_len": args.data.src_seq_len,
-                    "tgt_seq_len": args.data.tgt_seq_len,
-                    "num_classes": args.data.num_classes,
-                    "num_diff_classes": args.data.num_diff_classes,
-                    "max_difficulty": args.data.max_diff,
-                    "class_dropout_prob": args.data.class_dropout_prob,
-                    "diff_dropout_prob": args.data.diff_dropout_prob,
-                    "spectrogram": args.model.spectrogram,
-                    "current_train_step": shared.current_train_step,
-                    "current_epoch": shared.current_epoch,
-                    "current_loss": shared.current_loss,
-                },
-            )
+            try:
+                safe_loss = shared.current_loss if math.isfinite(shared.current_loss) else 0.0
+                art = wandb.Artifact(
+                    f"osuT5-{wandb.run.id}",
+                    type="model",
+                    metadata={
+                        "format": "accelerate",
+                        "src_seq_len": args.data.src_seq_len,
+                        "tgt_seq_len": args.data.tgt_seq_len,
+                        "num_classes": args.data.num_classes,
+                        "num_diff_classes": args.data.num_diff_classes,
+                        "max_difficulty": args.data.max_diff,
+                        "class_dropout_prob": args.data.class_dropout_prob,
+                        "diff_dropout_prob": args.data.diff_dropout_prob,
+                        "spectrogram": args.model.spectrogram,
+                        "current_train_step": shared.current_train_step,
+                        "current_epoch": shared.current_epoch,
+                        "current_loss": safe_loss,
+                    },
+                )
 
-            # Iterate over all files in the output_dir and subfolders and add them to the artifact
-            for root, _, files in os.walk(output_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    artifact_path = os.path.relpath(file_path, output_dir)
-                    art.add_file(file_path, artifact_path)
+                # Iterate over all files in the output_dir and subfolders and add them to the artifact
+                for root, _, files in os.walk(output_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        artifact_path = os.path.relpath(file_path, output_dir)
+                        art.add_file(file_path, artifact_path)
 
-            wandb.log_artifact(art, aliases=["best"] if is_best else None)
-            logger.info(f"Logged checkpoint to wandb: {art.name}")
+                wandb.log_artifact(art, aliases=["best"] if is_best else None)
+                logger.info(f"Logged checkpoint to wandb: {art.name}")
+            except Exception as e:
+                logger.warning(f"Failed to log checkpoint artifact to wandb: {e}")
 
 
 def maybe_eval(

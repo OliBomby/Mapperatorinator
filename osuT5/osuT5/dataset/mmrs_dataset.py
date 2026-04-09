@@ -727,8 +727,13 @@ class BeatmapDatasetIterable:
                 continue
 
             for i, beatmap_metadata in metadata.iterrows():
-                for sample in self._get_next_beatmap(audio_samples, i, beatmap_metadata, metadata, speed):
-                    yield sample
+                try:
+                    for sample in self._get_next_beatmap(audio_samples, i, beatmap_metadata, metadata, speed):
+                        yield sample
+                except (ValueError, IndexError) as e:
+                    beatmap_file = beatmap_metadata.get("BeatmapFile", "unknown")
+                    print(f"Skipping corrupt beatmap {beatmap_file}: {type(e).__name__}: {e}")
+                    continue
 
     def _get_next_beatmap(self, audio_samples, i, beatmap_metadata: Series, set_metadata: DataFrame,
                           speed: float) -> dict:
