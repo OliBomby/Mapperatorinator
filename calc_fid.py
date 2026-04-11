@@ -198,6 +198,16 @@ def _configure_generation_log_worker(queue: multiprocessing.Queue) -> logging.Lo
     return gen_logger
 
 
+def _read_gamemode_from_osu(path: Path) -> int:
+    """Read the Mode field from an .osu file without fully parsing it."""
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            stripped = line.strip()
+            if stripped.startswith("Mode:"):
+                return int(stripped.split(":")[1].strip())
+    return 0  # default to std
+
+
 def get_beatmap_paths(args: FidConfig) -> list[Path]:
     """Get all beatmap paths (.osu) from the dataset directory."""
     dataset_path = Path(args.dataset_path)
@@ -222,6 +232,45 @@ def get_beatmap_paths(args: FidConfig) -> list[Path]:
         raise ValueError(f"Unknown dataset type: {args.dataset_type}")
 
     return beatmap_files
+
+
+def get_beatmap_paths_by_gamemode(args: FidConfig) -> dict[int, list[Path]]:
+    """Get beatmap paths grouped by gamemode.
+
+    For mmrs datasets the gamemode comes from the metadata.
+    For ors datasets the Mode field is read from each .osu file.
+
+    Returns:
+        Dictionary mapping gamemode (int) to the list of beatmap paths for that mode.
+    """
+    dataset_path = Path(args.dataset_path)
+    paths_by_gm: dict[int, list[Path]] = {}
+
+    if args.dataset_type == "mmrs":
+        metadata = load_mmrs_metadata(dataset_path)
+        filtered_metadata = filter_mmrs_metadata(
+            metadata,
+            start=args.dataset_start,
+            end=args.dataset_end,
+            gamemodes=args.gamemodes,
+        )
+        for _, item in filtered_metadata.iterrows():
+            gm = int(item["ModeInt"])
+            path = dataset_path / "data" / item["BeatmapSetFolder"] / item["BeatmapFile"]
+            paths_by_gm.setdefault(gm, []).append(path)
+    elif args.dataset_type == "ors":
+        track_names = ["Track" + str(i).zfill(5) for i in range(args.dataset_start, args.dataset_end)]
+        for track_name in track_names:
+            for beatmap_file in (dataset_path / track_name / "beatmaps").iterdir():
+                path = dataset_path / track_name / "beatmaps" / beatmap_file.name
+                gm = _read_gamemode_from_osu(path)
+                if gm in args.gamemodes:
+                    paths_by_gm.setdefault(gm, []).append(path)
+    else:
+        raise ValueError(f"Unknown dataset type: {args.dataset_type}")
+
+    # Sort keys so generation order is deterministic (0, 1, 2, 3)
+    return dict(sorted(paths_by_gm.items()))
 
 
 def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
@@ -637,12 +686,15 @@ def main(args: FidConfig):
     print(f"Logging to directory: {os.getcwd()}")
 
     # Fix inference model path
-    if args.inference.model_path.startswith("./"):
-        args.inference.model_path = os.path.join(Path(__file__).parent, args.inference.model_path[2:])
+    base_model_path = args.inference.model_path
+    if base_model_path.startswith("./"):
+        base_model_path = os.path.join(Path(__file__).parent, base_model_path[2:])
 
-    beatmap_paths = get_beatmap_paths(args)
+    # Group beatmaps by gamemode so each stage uses the correct checkpoint
+    paths_by_gm = get_beatmap_paths_by_gamemode(args)
+    all_beatmap_paths = [p for gm_paths in paths_by_gm.values() for p in gm_paths]
 
-    test_training_set_overlap(beatmap_paths, args.training_set_ids_path)
+    test_training_set_overlap(all_beatmap_paths, args.training_set_ids_path)
 
     listener = None
     try:
@@ -650,25 +702,47 @@ def main(args: FidConfig):
         listener, log_queue = _configure_generation_log_parent(Path(os.getcwd()) / "generation.log")
 
         if not args.skip_generation:
-            # Assign beatmaps to processes in a round-robin fashion
-            num_processes = max(args.num_processes, 1)
-            chunks = [[] for _ in range(num_processes)]
-            for i, path in enumerate(beatmap_paths):
-                chunks[i % num_processes].append(path)
+            gamemode_names = {0: "std", 1: "taiko", 2: "catch", 3: "mania"}
+            for gm, gm_beatmap_paths in paths_by_gm.items():
+                gm_name = gamemode_names.get(gm, f"gamemode {gm}")
+                gm_model_path = os.path.join(base_model_path, f"gamemode={gm}")
 
-            if args.num_processes <= 0:
-                generate_beatmaps(chunks[0], args.inference, args.dataset_type, 0, log_queue=log_queue)
-            else:
-                processes = []
-                for i in range(num_processes):
-                    p = Process(target=generate_beatmaps, args=(chunks[i], args.inference, args.dataset_type, i, log_queue))
-                    processes.append(p)
-                    p.start()
+                if not os.path.exists(gm_model_path):
+                    logger.warning(
+                        "Checkpoint folder %s does not exist, falling back to base model path for %s",
+                        gm_model_path, gm_name,
+                    )
+                    gm_model_path = base_model_path
 
-                for p in processes:
-                    p.join()
+                logger.info(
+                    "=== Generating %s beatmaps (%d maps) with checkpoint %s ===",
+                    gm_name, len(gm_beatmap_paths), gm_model_path,
+                )
 
-        calculate_metrics(args, beatmap_paths)
+                # Override model path for this gamemode
+                args.inference.model_path = gm_model_path
+
+                # Assign beatmaps to processes in a round-robin fashion
+                num_processes = max(args.num_processes, 1)
+                chunks = [[] for _ in range(num_processes)]
+                for i, path in enumerate(gm_beatmap_paths):
+                    chunks[i % num_processes].append(path)
+
+                if args.num_processes <= 0:
+                    generate_beatmaps(chunks[0], args.inference, args.dataset_type, 0, log_queue=log_queue)
+                else:
+                    processes = []
+                    for i in range(num_processes):
+                        p = Process(target=generate_beatmaps, args=(chunks[i], args.inference, args.dataset_type, i, log_queue))
+                        processes.append(p)
+                        p.start()
+
+                    for p in processes:
+                        p.join()
+
+                logger.info("=== Finished generating %s beatmaps ===", gm_name)
+
+        calculate_metrics(args, all_beatmap_paths)
     finally:
         if listener is not None:
             listener.stop()
