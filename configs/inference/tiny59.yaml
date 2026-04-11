@@ -13,3 +13,4 @@ temperature: 0.9        # Sampling temperature
 top_p: 0.9              # Top-p sampling threshold
 max_batch_size: 32       # Maximum batch size for inference
 generate_positions: false
+snap_near_perfect_overlaps: false

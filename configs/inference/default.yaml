@@ -61,6 +61,7 @@ timer_iterations: 20     # Number of iterations for timer
 use_server: false        # Use server for optimized multiprocess inference (adds about 8% overhead)
 max_batch_size: 16       # Maximum batch size for inference
 resnap_events: true      # Resnap events to the timing after generation
+snap_near_perfect_overlaps: true  # Snap nearly overlapping positions to each other
 
 # Metadata settings
 bpm: null                 # Beats per minute of input audio

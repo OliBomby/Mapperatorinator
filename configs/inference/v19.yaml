@@ -9,4 +9,5 @@ version: 'Mapperatorinator V19'        # Beatmap version
 timeshift_bias: -1.5        # Logit bias for sampling timeshift tokens
 
 # Diffusion settings
-generate_positions: false      # Use diffusion to generate object positions
+generate_positions: false
+snap_near_perfect_overlaps: false      # Use diffusion to generate object positions

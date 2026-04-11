@@ -137,6 +137,7 @@ class Postprocessor(object):
         self.start_time = args.start_time
         self.end_time = args.end_time
         self.has_sv = args.train.data.add_sv
+        self.snap_near_perfect_overlaps_enabled = args.snap_near_perfect_overlaps
 
         self.logger = logging.getLogger(__name__) if logger is None else logger.getChild(__name__)
 
@@ -174,7 +175,8 @@ class Postprocessor(object):
         groups, _ = get_groups(events, types_first=self.types_first)
         last_x, last_y = 256, 192
 
-        self.snap_near_perfect_overlaps(groups)
+        if self.snap_near_perfect_overlaps_enabled:
+            self.snap_near_perfect_overlaps(groups)
 
         # Prepare unnormalizing scroll speed changes in mania
         last_time = max(group.time for group in groups) if len(groups) > 0 else 0
