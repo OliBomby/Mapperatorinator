@@ -13,7 +13,8 @@ from slider import Beatmap
 from torch.utils.data import IterableDataset
 
 from .data_utils import load_audio_file, remove_events_of_type, get_hold_note_ratio, get_scroll_speed_ratio, \
-    get_hitsounded_status, get_song_length, load_mmrs_metadata, filter_mmrs_metadata, SequenceDatasetMixin
+    get_hitsounded_status, get_song_length, load_mmrs_metadata, filter_mmrs_metadata, SequenceDatasetMixin, \
+    get_speed_augment
 from .osu_parser import OsuParser
 from ..tokenizer import EventType, Tokenizer, ContextType
 from ..config import DataConfig
@@ -235,16 +236,6 @@ class BeatmapDatasetIterable(SequenceDatasetMixin):
         speed_ratios = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
         return np.interp(speed, speed_ratios, star_ratings)  # type: ignore
 
-    def _get_speed_augment(self):
-        if self.test or random.random() >= self.args.dt_augment_prob:
-            return 1.0
-
-        mi, ma = self.args.dt_augment_range
-        base = random.random()
-        if self.args.dt_augment_sqrt:
-            base = np.power(base, 0.5)
-        return mi + (ma - mi) * base
-
     def _get_next_tracks(self) -> Generator[dict, None, None]:
         for beatmapset_id in self.metadata.index.get_level_values(0).unique():
             metadata = self.metadata.loc[beatmapset_id]
@@ -252,7 +243,12 @@ class BeatmapDatasetIterable(SequenceDatasetMixin):
             if self.args.add_gd_context and len(metadata) <= 1:
                 continue
 
-            speed = self._get_speed_augment()
+            speed = get_speed_augment(
+                self.test,
+                self.args.dt_augment_prob,
+                self.args.dt_augment_range,
+                self.args.dt_augment_sqrt,
+            )
             track_path = self.path / "data" / metadata.iloc[0]["BeatmapSetFolder"]
             audio_path = track_path / metadata.iloc[0]["AudioFile"]
             try:

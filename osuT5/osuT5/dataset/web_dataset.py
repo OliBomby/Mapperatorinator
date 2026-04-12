@@ -15,7 +15,7 @@ from ..dataset.osu_parser import OsuParser
 from ..tokenizer import Tokenizer, ContextType, EventType
 from .data_utils import (
     SequenceDatasetMixin,
-    decode_web_audio,
+    load_web_audio,
     filter_web_beatmaps,
     get_hold_note_ratio,
     get_scroll_speed_ratio,
@@ -23,6 +23,8 @@ from .data_utils import (
     get_song_length,
     get_web_submitted_date,
     remove_events_of_type,
+    get_speed_augment,
+    calculate_difficulty,
 )
 
 
@@ -86,8 +88,6 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
             raise ValueError("Web dataset does not support only_last_beatmap")
         if args.cycle_length > 1:
             raise ValueError("Web dataset does not support cycle_length > 1")
-        if args.dt_augment_prob > 0:
-            raise ValueError("Web dataset does not support dt_augment_prob > 0")
 
     def __iter__(self):
         streaming = self.args.test_dataset_streaming if self.test else self.args.train_dataset_streaming
@@ -140,8 +140,15 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
             if self.args.add_gd_context and len(parsed_entries) <= 1:
                 continue
 
+            speed = get_speed_augment(
+                self.test,
+                self.args.dt_augment_prob,
+                self.args.dt_augment_range,
+                self.args.dt_augment_sqrt,
+            )
+
             try:
-                audio_samples = decode_web_audio(row["opus"], normalize=self.args.normalize_audio)
+                audio_samples = load_web_audio(row["opus"], self.args.sample_rate, speed, normalize=self.args.normalize_audio)
             except Exception as e:
                 print(f"Failed to decode web audio for sample {row.get('__key__', 'unknown')}")
                 print(e)
@@ -149,7 +156,7 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
 
             frames, frame_times = self._get_frames(audio_samples)
             for i, entry in enumerate(parsed_entries):
-                yield from self._get_next_beatmap(audio_samples, frames, frame_times, parsed_entries, i, entry)
+                yield from self._get_next_beatmap(audio_samples, frames, frame_times, parsed_entries, i, entry, speed)
 
     def _get_context_info(self, set_size: int) -> dict[str, list[ContextType]]:
         context_info = random.choices(self.args.context_types, weights=self.args.context_weights)[0].copy()
@@ -161,11 +168,17 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
 
         return context_info
 
-    def _get_difficulty(self, beatmap_metadata: dict[str, Any]) -> float:
+    def _get_difficulty(self, beatmap_metadata: dict[str, Any], speed: float = 1.0) -> float:
+        if speed != 1.0:
+            content = beatmap_metadata.get("content")
+            if content:
+                difficulty = calculate_difficulty(content=content, speed=speed)
+                if difficulty is not None:
+                    return difficulty
         difficulty = beatmap_metadata.get("difficultyrating")
         return float(difficulty) if difficulty is not None else 0.0
 
-    def _add_special_data(self, data: dict[str, Any], beatmap_metadata: dict[str, Any], beatmap: Beatmap, audio_samples) -> None:
+    def _add_special_data(self, data: dict[str, Any], beatmap_metadata: dict[str, Any], beatmap: Beatmap, audio_samples, speed: float = 1.0) -> None:
         gamemode = int(beatmap_metadata["mode"])
         beatmap_id = int(beatmap_metadata["beatmap_id"])
         submitted_date = get_web_submitted_date(beatmap_metadata)
@@ -173,7 +186,7 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
         data["gamemode"] = gamemode
         data["beatmap_id"] = beatmap_id
         data["beatmap_idx"] = self.tokenizer.beatmap_idx.get(beatmap_id, beatmap_id)
-        data["difficulty"] = self._get_difficulty(beatmap_metadata)
+        data["difficulty"] = self._get_difficulty(beatmap_metadata, speed)
         if submitted_date is not None:
             data["year"] = submitted_date.year
         data["hitsounded"] = get_hitsounded_status(beatmap)
@@ -196,6 +209,7 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
             set_entries: list[dict[str, Any]],
             index: int,
             entry: dict[str, Any],
+            speed: float = 1.0,
     ):
         beatmap_metadata = entry["metadata"]
         osu_beatmap = entry["beatmap"]
@@ -206,21 +220,21 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
             if context == ContextType.NONE:
                 data["events"], data["event_times"] = [], []
             elif context == ContextType.TIMING:
-                data["events"], data["event_times"] = self.parser.parse_timing(osu_beatmap)
+                data["events"], data["event_times"] = self.parser.parse_timing(osu_beatmap, speed)
             elif context == ContextType.NO_HS:
-                hs_events, hs_event_times = self.parser.parse(osu_beatmap)
+                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed)
                 data["events"], data["event_times"] = remove_events_of_type(hs_events, hs_event_times, [EventType.HITSOUND, EventType.VOLUME])
             elif context == ContextType.GD:
                 other_entry = random.choice(set_entries[:index] + set_entries[index + 1:])
-                data["events"], data["event_times"] = self.parser.parse(other_entry["beatmap"])
-                self._add_special_data(data["extra"], other_entry["metadata"], other_entry["beatmap"], audio_samples)
+                data["events"], data["event_times"] = self.parser.parse(other_entry["beatmap"], speed)
+                self._add_special_data(data["extra"], other_entry["metadata"], other_entry["beatmap"], audio_samples, speed)
             elif context == ContextType.MAP:
-                data["events"], data["event_times"] = self.parser.parse(osu_beatmap)
+                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed)
             elif context == ContextType.KIAI:
-                data["events"], data["event_times"] = self.parser.parse_kiai(osu_beatmap)
+                data["events"], data["event_times"] = self.parser.parse_kiai(osu_beatmap, speed)
             elif context == ContextType.SV:
                 if int(beatmap_metadata["mode"]) == 3:
-                    data["events"], data["event_times"] = self.parser.parse_scroll_speeds(osu_beatmap)
+                    data["events"], data["event_times"] = self.parser.parse_scroll_speeds(osu_beatmap, speed)
                 else:
                     data["events"], data["event_times"] = [], []
             return data
@@ -238,10 +252,10 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
                 mapper_idx if self.test or random.random() >= self.args.mapper_dropout_prob else self.tokenizer.num_mapper_classes,
                 dtype=torch.long,
             ),
-            "difficulty": torch.tensor(self._get_difficulty(beatmap_metadata), dtype=torch.float32),
+            "difficulty": torch.tensor(self._get_difficulty(beatmap_metadata, speed), dtype=torch.float32),
             "special": {},
         }
-        self._add_special_data(extra_data["special"], beatmap_metadata, osu_beatmap, audio_samples)
+        self._add_special_data(extra_data["special"], beatmap_metadata, osu_beatmap, audio_samples, speed)
 
         out_context = [get_context(context, "out", add_type=self.args.add_out_context_types) for context in context_info["out"]]
         in_context = [get_context(context, "in") for context in context_info["in"]]

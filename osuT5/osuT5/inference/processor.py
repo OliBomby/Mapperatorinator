@@ -14,7 +14,7 @@ from config import InferenceConfig
 from .server import InferenceClient, model_generate, model_forward
 from ..dataset.osu_parser import OsuParser
 from ..dataset.data_utils import (update_event_times, remove_events_of_type, get_hold_note_ratio,
-                                  get_scroll_speed_ratio, get_hitsounded_status)
+                                  get_scroll_speed_ratio, get_hitsounded_status, calculate_difficulty)
 from ..model import Mapperatorinator
 from ..tokenizer import Event, EventType, Tokenizer, ContextType
 
@@ -46,16 +46,7 @@ class GenerationConfig:
 # noinspection PyProtectedMember
 def generation_config_from_beatmap(beatmap: Beatmap, beatmap_path, tokenizer: Optional[Tokenizer] = None) -> GenerationConfig:
     gamemode = int(beatmap.mode)
-
-    difficulty = None
-    try:
-        import rosu_pp_py as rosu
-        rosu_map = rosu.Beatmap(path=str(beatmap_path))
-        rosu_diff = rosu.Difficulty()
-        rosu_attrs = rosu_diff.calculate(rosu_map)
-        difficulty = round(rosu_attrs.stars, 2)
-    except Exception as e:
-        print(f"Failed to calculate difficulty for beatmap {beatmap_path}: {e}")
+    difficulty = calculate_difficulty(path=beatmap_path)
 
     return GenerationConfig(
         gamemode=gamemode,

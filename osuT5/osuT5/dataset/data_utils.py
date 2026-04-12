@@ -9,6 +9,7 @@ import pandas as pd
 import torch
 from pandas import DataFrame
 from pydub import AudioSegment
+from scipy.signal import resample_poly
 
 import numpy.typing as npt
 from slider import Beatmap, HoldNote, TimingPoint
@@ -97,9 +98,35 @@ def load_audio_file(file: str, sample_rate: int, speed: float = 1.0, normalize: 
     audio = audio.set_frame_rate(sample_rate)
     audio = audio.set_channels(1)
     samples = np.array(audio.get_array_of_samples()).astype(np.float32)
-    if normalize:
-        samples *= 1.0 / np.max(np.abs(samples))
-    return samples
+    return normalize_audio_samples(samples) if normalize else samples
+
+
+def load_web_audio(audio_decoder: Any, sample_rate: int, speed: float = 1.0, normalize: bool = True) -> npt.NDArray:
+    """Load audio from a HuggingFace Audio decoder as a numpy time-series array.
+
+    The signals are converted to float32, optionally speed-augmented, and normalized.
+
+    Args:
+        audio_decoder: HuggingFace Audio-decoded dict with 'array' and 'sampling_rate'.
+        sample_rate: Target sample rate (should match the decoder's sampling_rate).
+        speed: Speed multiplier for the audio. >1 is faster/shorter, <1 is slower/longer.
+        normalize: If True, normalize the audio samples to the range [-1, 1].
+
+    Returns:
+        samples: Audio time series.
+    """
+    samples = audio_decoder.get_all_samples().data
+    if hasattr(samples, "detach"):
+        samples = samples.detach().cpu().numpy()
+    samples = np.asarray(samples, dtype=np.float32)
+    if samples.ndim > 1:
+        samples = samples[0]
+
+    if speed != 1.0:
+        # Resample as if the original rate were sample_rate * speed,
+        samples = resample_poly(samples, sample_rate, int(sample_rate * speed)).astype(np.float32)
+
+    return normalize_audio_samples(samples) if normalize else samples
 
 
 def normalize_audio_samples(samples: npt.ArrayLike) -> npt.NDArray:
@@ -110,14 +137,70 @@ def normalize_audio_samples(samples: npt.ArrayLike) -> npt.NDArray:
     return samples
 
 
-def decode_web_audio(audio_decoder: Any, normalize: bool = True) -> npt.NDArray:
-    samples = audio_decoder.get_all_samples().data
-    if hasattr(samples, "detach"):
-        samples = samples.detach().cpu().numpy()
-    samples = np.asarray(samples, dtype=np.float32)
-    if samples.ndim > 1:
-        samples = samples[0]
-    return normalize_audio_samples(samples) if normalize else samples
+def get_speed_augment(
+        test: bool,
+        dt_augment_prob: float,
+        dt_augment_range: list[float],
+        dt_augment_sqrt: bool = False,
+) -> float:
+    """Sample a speed augmentation factor.
+
+    Args:
+        test: Whether we are in test/eval mode (always returns 1.0).
+        dt_augment_prob: Probability of applying speed augmentation.
+        dt_augment_range: [min, max] range for the speed multiplier.
+        dt_augment_sqrt: If True, sample from a sqrt distribution biased towards higher speeds.
+
+    Returns:
+        Speed multiplier (1.0 means no change).
+    """
+    if test or random.random() >= dt_augment_prob:
+        return 1.0
+
+    mi, ma = dt_augment_range
+    base = random.random()
+    if dt_augment_sqrt:
+        base = np.power(base, 0.5)
+    return mi + (ma - mi) * base
+
+
+def calculate_difficulty(
+        content: Optional[str] = None,
+        path: Optional[str] = None,
+        speed: float = 1.0,
+) -> Optional[float]:
+    """Calculate the star rating of a beatmap using rosu_pp_py.
+
+    Provide either `content` (the .osu file content as a string) or `path`
+    (path to the .osu file). Mirrors the rosu.Beatmap(content=..., path=...) API.
+
+    Args:
+        content: The .osu file content as a string.
+        path: Path to the .osu file.
+        speed: Speed multiplier (clock rate).
+
+    Returns:
+        Star rating, or None if calculation fails.
+    """
+    try:
+        import rosu_pp_py as rosu
+
+        if content is not None:
+            rosu_map = rosu.Beatmap(content=content)
+        elif path is not None:
+            rosu_map = rosu.Beatmap(path=str(path))
+        else:
+            raise ValueError("Either 'content' or 'path' must be provided")
+
+        rosu_diff = rosu.Difficulty()
+        if speed != 1.0:
+            rosu_diff.set_clock_rate(clock_rate=float(speed))
+        attrs = rosu_diff.calculate(rosu_map)
+        return round(attrs.stars, 2)
+    except Exception as e:
+        source = path if path is not None else "<content>"
+        print(f"Failed to calculate difficulty for beatmap {source}: {e}")
+        return None
 
 
 def load_mmrs_metadata(path) -> DataFrame:
