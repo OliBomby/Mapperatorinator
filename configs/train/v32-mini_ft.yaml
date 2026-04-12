@@ -57,7 +57,7 @@ data:                  # Data settings
   add_positions: true
   position_precision: 32 # Precision of hit object coordinates
   position_split_axes: false  # Split hit object X and Y coordinates into separate tokens
-  dt_augment_prob: 0.0   # Probability of augmenting the dataset with DT
+  dt_augment_prob: 0.3   # Probability of augmenting the dataset with DT
   dt_augment_range: [1., 1.2]  # Range of DT augmentation
   dt_augment_sqrt: true  # Sample DT augmentation from a square root distribution
   types_first: false       # Put the type token at the start of the group before the timeshift token
