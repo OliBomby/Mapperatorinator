@@ -90,12 +90,15 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
             raise ValueError("Web dataset does not support dt_augment_prob > 0")
 
     def __iter__(self):
-        if self.test:
-            dataset = load_dataset(self.repo_id, data_files=self.files_split, streaming=False, split="train")
-        else:
-            dataset = load_dataset(self.repo_id, data_files=self.files_split, streaming=True, split="train")
-            dataset = dataset.shuffle(seed=42, buffer_size=100)
-            dataset.set_epoch(self.shared.current_epoch)
+        streaming = self.args.test_dataset_streaming if self.test else self.args.train_dataset_streaming
+        dataset = load_dataset(self.repo_id, data_files=self.files_split, streaming=streaming, split="train")
+
+        if not self.test:
+            if streaming:
+                dataset = dataset.shuffle(seed=42, buffer_size=100)
+                dataset.set_epoch(self.shared.current_epoch)
+            else:
+                dataset = dataset.shuffle(seed=42 + self.shared.current_epoch)
 
         dataset = dataset.cast_column("opus", Audio(sampling_rate=self.args.sample_rate, num_channels=1))
 

@@ -156,6 +156,8 @@ class DataConfig:
     tags_metadata_path: str = ''
     ranked_statuses: list[int] = field(default_factory=lambda: [1, 2])
     dataset_subset: Optional[str] = None
+    train_dataset_streaming: bool = True  # Use streaming mode for training dataset
+    test_dataset_streaming: bool = False  # Use streaming mode for testing/validation dataset
 
 
 @dataclass

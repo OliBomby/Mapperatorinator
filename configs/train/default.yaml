@@ -115,6 +115,8 @@ data:                  # Data settings
   tags_metadata_path: "../../../datasets/tags.json"       # Path to file with all beatmap mappers
   ranked_statuses: [1, 2]  # List of ranked statuses to include in the dataset (-2 = graveyard, -1 = wip, 0 = pending, 1 = ranked, 2 = approved, 3 = qualified, 4 = loved)
   dataset_subset: null  # Subset of the dataset to use for web dataset
+  train_dataset_streaming: true  # Use streaming mode for training dataset
+  test_dataset_streaming: false  # Use streaming mode for testing/validation dataset
 
 dataloader:             # Dataloader settings
   num_workers: 8
