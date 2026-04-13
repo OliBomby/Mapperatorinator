@@ -24,7 +24,8 @@ RUN pip install --break-system-packages \
     wandb==0.24.2 \
     peft==0.18.1 \
     datasets==4.8.3 \
-    torchcodec==0.10.0
+    torchcodec==0.10.0 \
+    rosu-pp-py==3.1.0
 
 # Modify .bashrc to include the custom prompt
 RUN echo 'if [ -f /.dockerenv ]; then export PS1="(docker) $PS1"; fi' >> /root/.bashrc
