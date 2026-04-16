@@ -164,6 +164,29 @@ def get_speed_augment(
     return mi + (ma - mi) * base
 
 
+def get_flip_augment(
+        test: bool,
+        flip_horizontal_prob: float,
+        flip_vertical_prob: float,
+) -> tuple[bool, bool]:
+    """Sample a position flip augmentation mode.
+
+    Args:
+        test: Whether we are in test/eval mode (always returns (False, False)).
+        flip_horizontal_prob: Probability of applying a horizontal flip.
+        flip_vertical_prob: Probability of applying a vertical flip.
+
+    Returns:
+        Tuple of (horizontal_flip, vertical_flip).
+    """
+    if test:
+        return False, False
+
+    horizontal = random.random() < flip_horizontal_prob
+    vertical = random.random() < flip_vertical_prob
+    return horizontal, vertical
+
+
 def calculate_difficulty(
         content: Optional[str] = None,
         path: Optional[str] = None,

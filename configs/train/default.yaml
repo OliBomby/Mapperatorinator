@@ -96,6 +96,8 @@ data:                  # Data settings
   dt_augment_prob: 0.0   # Probability of augmenting the dataset with DT
   dt_augment_range: [1.5, 1.5]  # Range of DT augmentation
   dt_augment_sqrt: false  # Sample DT augmentation from a square root distribution
+  flip_horizontal_prob: 0.0  # Probability of horizontally flipping beatmap positions during training
+  flip_vertical_prob: 0.0  # Probability of vertically flipping beatmap positions during training
   types_first: false       # Put the type token at the start of the group before the timeshift token
   add_kiai: false        # Add kiai times to map context
   gamemodes: [0]  # List of gamemodes to include in the dataset

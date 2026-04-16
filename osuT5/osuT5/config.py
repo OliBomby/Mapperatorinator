@@ -137,6 +137,8 @@ class DataConfig:
     dt_augment_prob: float = 0.5  # Probability of augmenting the dataset with DT
     dt_augment_range: list[float] = field(default_factory=lambda: [1.25, 1.5])  # Range of DT augmentation
     dt_augment_sqrt: bool = False  # Sample DT augmentation from a square root distribution
+    flip_horizontal_prob: float = 0.0  # Probability of horizontally flipping beatmap positions during training
+    flip_vertical_prob: float = 0.0  # Probability of vertically flipping beatmap positions during training
     types_first: bool = True  # Put the type token at the start of the group before the timeshift token
     add_kiai: bool = True  # Add kiai times to map context
     gamemodes: list[int] = field(default_factory=lambda: [0, 1, 2, 3])  # List of gamemodes to include in the dataset

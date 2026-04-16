@@ -24,6 +24,7 @@ from .data_utils import (
     get_web_submitted_date,
     remove_events_of_type,
     get_speed_augment,
+    get_flip_augment,
     calculate_difficulty,
 )
 
@@ -146,6 +147,11 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
                 self.args.dt_augment_range,
                 self.args.dt_augment_sqrt,
             )
+            flip = get_flip_augment(
+                self.test,
+                self.args.flip_horizontal_prob,
+                self.args.flip_vertical_prob,
+            )
 
             try:
                 audio_samples = load_web_audio(row["opus"], self.args.sample_rate, speed, normalize=self.args.normalize_audio)
@@ -156,7 +162,7 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
 
             frames, frame_times = self._get_frames(audio_samples)
             for i, entry in enumerate(parsed_entries):
-                yield from self._get_next_beatmap(audio_samples, frames, frame_times, parsed_entries, i, entry, speed)
+                yield from self._get_next_beatmap(audio_samples, frames, frame_times, parsed_entries, i, entry, speed, flip)
 
     def _get_context_info(self, set_size: int) -> dict[str, list[ContextType]]:
         context_info = random.choices(self.args.context_types, weights=self.args.context_weights)[0].copy()
@@ -210,6 +216,7 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
             index: int,
             entry: dict[str, Any],
             speed: float = 1.0,
+            flip: tuple[bool, bool] = (False, False),
     ):
         beatmap_metadata = entry["metadata"]
         osu_beatmap = entry["beatmap"]
@@ -222,14 +229,14 @@ class WebDataset(SequenceDatasetMixin, IterableDataset):
             elif context == ContextType.TIMING:
                 data["events"], data["event_times"] = self.parser.parse_timing(osu_beatmap, speed)
             elif context == ContextType.NO_HS:
-                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed)
+                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed, None, flip)
                 data["events"], data["event_times"] = remove_events_of_type(hs_events, hs_event_times, [EventType.HITSOUND, EventType.VOLUME])
             elif context == ContextType.GD:
                 other_entry = random.choice(set_entries[:index] + set_entries[index + 1:])
-                data["events"], data["event_times"] = self.parser.parse(other_entry["beatmap"], speed)
+                data["events"], data["event_times"] = self.parser.parse(other_entry["beatmap"], speed, None, flip)
                 self._add_special_data(data["extra"], other_entry["metadata"], other_entry["beatmap"], audio_samples, speed)
             elif context == ContextType.MAP:
-                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed)
+                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed, None, flip)
             elif context == ContextType.KIAI:
                 data["events"], data["event_times"] = self.parser.parse_kiai(osu_beatmap, speed)
             elif context == ContextType.SV:

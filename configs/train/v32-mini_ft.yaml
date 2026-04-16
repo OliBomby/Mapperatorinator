@@ -81,6 +81,8 @@ data:                  # Data settings
   tags_metadata_path: "../../../datasets/tags_2026.json"       # Path to file with all beatmap mappers
   mappers_path: "../../../datasets/beatmap_users.json"       # Path to file with all beatmap mappers
   dataset_subset: "compressed"  # Subset of the dataset to use for web dataset
+  flip_horizontal_prob: 0.5  # Probability of horizontally flipping beatmap positions during training
+  flip_vertical_prob: 0.5  # Probability of vertically flipping beatmap positions during training
 
 dataloader:             # Dataloader settings
   num_workers: 8

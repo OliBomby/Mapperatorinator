@@ -13,7 +13,7 @@ import torch
 from slider import Beatmap
 from torch.utils.data import IterableDataset
 
-from .data_utils import load_audio_file, remove_events_of_type
+from .data_utils import load_audio_file, remove_events_of_type, get_speed_augment, get_flip_augment
 from .osu_parser import OsuParser
 from ..tokenizer import Event, EventType, Tokenizer, ContextType
 from ..config import DataConfig
@@ -619,10 +619,6 @@ class BeatmapDatasetIterable:
     def _get_idx(metadata: dict, beatmap_name: str):
         return metadata["Beatmaps"][beatmap_name]["Index"]
 
-    def _get_speed_augment(self):
-        mi, ma = self.args.dt_augment_range
-        return random.random() * (ma - mi) + mi if random.random() < self.args.dt_augment_prob else 1.0
-
     def _get_next_beatmaps(self) -> dict:
         for beatmap_path in self.beatmap_files:
             metadata = self._load_metadata(beatmap_path.parents[1])
@@ -633,11 +629,21 @@ class BeatmapDatasetIterable:
             if self.args.min_difficulty > 0 and self._get_difficulty(metadata, beatmap_path.stem) < self.args.min_difficulty:
                 continue
 
-            speed = self._get_speed_augment()
+            speed = get_speed_augment(
+                self.test,
+                self.args.dt_augment_prob,
+                self.args.dt_augment_range,
+                self.args.dt_augment_sqrt,
+            )
+            flip = get_flip_augment(
+                self.test,
+                self.args.flip_horizontal_prob,
+                self.args.flip_vertical_prob,
+            )
             audio_path = beatmap_path.parents[1] / list(beatmap_path.parents[1].glob('audio.*'))[0]
             audio_samples = load_audio_file(audio_path, self.args.sample_rate, speed, self.args.normalize_audio)
 
-            for sample in self._get_next_beatmap(audio_samples, beatmap_path, metadata, speed):
+            for sample in self._get_next_beatmap(audio_samples, beatmap_path, metadata, speed, flip):
                 yield sample
 
     def _get_next_tracks(self) -> dict:
@@ -651,7 +657,17 @@ class BeatmapDatasetIterable:
                                                     < self.args.min_difficulty for beatmap_name in metadata["Beatmaps"]):
                 continue
 
-            speed = self._get_speed_augment()
+            speed = get_speed_augment(
+                self.test,
+                self.args.dt_augment_prob,
+                self.args.dt_augment_range,
+                self.args.dt_augment_sqrt,
+            )
+            flip = get_flip_augment(
+                self.test,
+                self.args.flip_horizontal_prob,
+                self.args.flip_vertical_prob,
+            )
             audio_path = track_path / list(track_path.glob('audio.*'))[0]
             audio_samples = load_audio_file(audio_path, self.args.sample_rate, speed, self.args.normalize_audio)
 
@@ -663,10 +679,10 @@ class BeatmapDatasetIterable:
                 if self.args.min_difficulty > 0 and self._get_difficulty(metadata, beatmap_name) < self.args.min_difficulty:
                     continue
 
-                for sample in self._get_next_beatmap(audio_samples, beatmap_path, metadata, speed):
+                for sample in self._get_next_beatmap(audio_samples, beatmap_path, metadata, speed, flip):
                     yield sample
 
-    def _get_next_beatmap(self, audio_samples, beatmap_path: Path, metadata: dict, speed: float) -> dict:
+    def _get_next_beatmap(self, audio_samples, beatmap_path: Path, metadata: dict, speed: float, flip: tuple[bool, bool] = (False, False)) -> dict:
         context_info = None
         if len(self.args.context_types) > 0:
             # Randomly select a context type with probabilities of context_weights
@@ -700,17 +716,17 @@ class BeatmapDatasetIterable:
             elif context == "timing":
                 data["events"], data["event_times"] = self.parser.parse_timing(osu_beatmap, speed)
             elif context == "no_hs":
-                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed)
+                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed, None, flip)
                 data["events"], data["event_times"] = remove_events_of_type(hs_events, hs_event_times, [EventType.HITSOUND, EventType.VOLUME])
             elif context == "gd":
                 other_beatmaps = [k for k in metadata["Beatmaps"] if k != beatmap_name]
                 other_name = random.choice(other_beatmaps)
                 other_beatmap_path = (beatmap_path.parent / other_name).with_suffix(".osu")
                 other_beatmap = Beatmap.from_path(other_beatmap_path)
-                data["events"], data["event_times"] = self.parser.parse(other_beatmap, speed)
+                data["events"], data["event_times"] = self.parser.parse(other_beatmap, speed, None, flip)
                 add_special_data(data, other_beatmap, other_name)
             elif context == "map":
-                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed)
+                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed, None, flip)
             if force_special_data:
                 add_special_data(data, osu_beatmap, beatmap_name)
             return data

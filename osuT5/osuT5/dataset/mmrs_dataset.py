@@ -14,7 +14,7 @@ from torch.utils.data import IterableDataset
 
 from .data_utils import load_audio_file, remove_events_of_type, get_hold_note_ratio, get_scroll_speed_ratio, \
     get_hitsounded_status, get_song_length, load_mmrs_metadata, filter_mmrs_metadata, SequenceDatasetMixin, \
-    get_speed_augment
+    get_speed_augment, get_flip_augment
 from .osu_parser import OsuParser
 from ..tokenizer import EventType, Tokenizer, ContextType
 from ..config import DataConfig
@@ -249,6 +249,11 @@ class BeatmapDatasetIterable(SequenceDatasetMixin):
                 self.args.dt_augment_range,
                 self.args.dt_augment_sqrt,
             )
+            flip = get_flip_augment(
+                self.test,
+                self.args.flip_horizontal_prob,
+                self.args.flip_vertical_prob,
+            )
             track_path = self.path / "data" / metadata.iloc[0]["BeatmapSetFolder"]
             audio_path = track_path / metadata.iloc[0]["AudioFile"]
             try:
@@ -259,10 +264,10 @@ class BeatmapDatasetIterable(SequenceDatasetMixin):
                 continue
 
             for i, beatmap_metadata in metadata.iterrows():
-                yield from self._get_next_beatmap(audio_samples, i, beatmap_metadata, metadata, speed)
+                yield from self._get_next_beatmap(audio_samples, i, beatmap_metadata, metadata, speed, flip)
 
     def _get_next_beatmap(self, audio_samples, i, beatmap_metadata: Series, set_metadata: DataFrame,
-                          speed: float) -> Generator[dict, None, None]:
+                          speed: float, flip: tuple[bool, bool] = (False, False)) -> Generator[dict, None, None]:
         context_info = None
         if len(self.args.context_types) > 0:
             # Randomly select a context type with probabilities of context_weights
@@ -310,7 +315,7 @@ class BeatmapDatasetIterable(SequenceDatasetMixin):
             elif context == ContextType.TIMING:
                 data["events"], data["event_times"] = self.parser.parse_timing(osu_beatmap, speed)
             elif context == ContextType.NO_HS:
-                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed)
+                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed, None, flip)
                 data["events"], data["event_times"] = remove_events_of_type(hs_events, hs_event_times,
                                                                             [EventType.HITSOUND, EventType.VOLUME])
             elif context == ContextType.GD:
@@ -318,10 +323,10 @@ class BeatmapDatasetIterable(SequenceDatasetMixin):
                 other_beatmap_path = self.path / "data" / other_metadata["BeatmapSetFolder"] / other_metadata[
                     "BeatmapFile"]
                 other_beatmap = Beatmap.from_path(other_beatmap_path)
-                data["events"], data["event_times"] = self.parser.parse(other_beatmap, speed)
+                data["events"], data["event_times"] = self.parser.parse(other_beatmap, speed, None, flip)
                 add_special_data(data["extra"], other_metadata, other_beatmap)
             elif context == ContextType.MAP:
-                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed)
+                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed, None, flip)
             elif context == ContextType.KIAI:
                 data["events"], data["event_times"] = self.parser.parse_kiai(osu_beatmap, speed)
             elif context == ContextType.SV:
