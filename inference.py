@@ -142,7 +142,7 @@ def compile_paths(args: InferenceConfig):
             beatmap = Beatmap.from_path(beatmap_path)
 
             # Autofill audio path if empty
-            if not audio_path:
+            if not audio_path and beatmap.audio_filename:
                 audio_path = beatmap_path.parent / beatmap.audio_filename
 
             # Autofill output path if empty
