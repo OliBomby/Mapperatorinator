@@ -211,7 +211,7 @@ def compile_args_from_beatmap(args: InferenceConfig, verbose=True):
         "creator": beatmap_config.creator,
         "version": beatmap_config.version,
         "source": beatmap_config.source,
-        "background": str(beatmap_path.parent / beatmap.background),
+        "background": str(beatmap_path.parent / beatmap.background) if beatmap.background else None,
         "preview_time": beatmap_config.preview_time,
     }
 
