@@ -4,7 +4,7 @@ defaults:
   - ../diffusion@diffusion: v1
   - _self_
 
-model_path: './test/v32/'  # Path to trained model
+model_path: './test/v32/RC1'  # Path to trained model
 diff_ckpt: 'OliBomby/osu-diffusion-v2'
 version: 'Mapperatorinator V32'
 in_context: []
