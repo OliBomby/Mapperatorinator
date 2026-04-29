@@ -156,7 +156,7 @@ def load_model_loaders(
         if not ckpt_path:
             tokenizer = get_tokenizer(t5_args)
         elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
-            tokenizer = Tokenizer.from_pretrained(str(ckpt_path))
+            tokenizer = Tokenizer.from_pretrained(ckpt_path.as_posix())
         else:
             tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=pickle_module, weights_only=False)
             tokenizer = Tokenizer()
@@ -172,7 +172,7 @@ def load_model_loaders(
             model.to(device=device, dtype=dtype)
         elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
             model = Mapperatorinator.from_pretrained(
-                str(ckpt_path),
+                ckpt_path.as_posix(),
                 dtype=dtype,
                 attn_implementation=attn_implementation,
                 device_map=device
@@ -203,7 +203,7 @@ def load_model_loaders(
         if eval_mode:
             model.eval()
 
-        print(f"Model loaded: {str(ckpt_path)} on device {device}")
+        print(f"Model loaded: {ckpt_path.as_posix()} on device {device}")
         return model
 
     return model_loader, tokenizer_loader
