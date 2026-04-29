@@ -17,9 +17,11 @@ import uuid
 from typing import Callable, Any, Tuple, Dict
 
 import io
+import hmac
 import multiprocessing as mp
 import queue as queue_mod
 import datetime
+import secrets
 import time
 
 import webview
@@ -80,6 +82,46 @@ def parse_file_dialog_result(result):
 
 app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 app.secret_key = os.urandom(24)  # Set a secret key for Flask
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Strict',
+)
+
+CSRF_HEADER_NAME = 'X-Mapperatorinator-CSRF-Token'
+LOCAL_UI_CSRF_TOKEN = secrets.token_urlsafe(32)
+CSRF_PROTECTED_ENDPOINTS = {
+    'start_inference',
+    'cancel_inference',
+    'save_config',
+    'validate_paths',
+    'open_folder',
+    'open_log_file',
+}
+
+
+def _is_authorized_ui_request() -> bool:
+    token = request.headers.get(CSRF_HEADER_NAME, '')
+    return bool(token) and hmac.compare_digest(token, LOCAL_UI_CSRF_TOKEN)
+
+
+@app.before_request
+def _protect_local_ui_endpoints():
+    if request.endpoint not in CSRF_PROTECTED_ENDPOINTS:
+        return None
+
+    if request.method != 'POST':
+        return jsonify({
+            "status": "error",
+            "message": "This endpoint only accepts authenticated POST requests."
+        }), 405
+
+    if not _is_authorized_ui_request():
+        return jsonify({
+            "status": "error",
+            "message": "Missing or invalid CSRF token. Refresh the UI and try again."
+        }), 403
+
+    return None
 
 
 # --- pywebview API Class ---
@@ -269,7 +311,7 @@ def _inference_worker(cfg: InferenceConfig, out_q: mp.Queue):
 def index():
     """Renders the main HTML page."""
     # Jinja rendering is now handled by Flask's render_template
-    return render_template('index.html')
+    return render_template('index.html', csrf_token=LOCAL_UI_CSRF_TOKEN, csrf_header_name=CSRF_HEADER_NAME)
 
 
 @app.route('/check_bf16_support', methods=['GET'])
@@ -529,10 +571,10 @@ def cancel_inference():
     return jsonify({"status": "success", "message": "Process already finished"}), 200
 
 
-@app.route('/open_folder', methods=['GET'])
+@app.route('/open_folder', methods=['POST'])
 def open_folder():
     """Opens a folder in the file explorer."""
-    folder_path = request.args.get('folder')
+    folder_path = request.form.get('folder')
     print(f"Request received to open folder: {folder_path}")
     if not folder_path:
         return jsonify({"status": "error", "message": "No folder path specified"}), 400
@@ -567,10 +609,10 @@ def open_folder():
         return jsonify({"status": "error", "message": f"Could not open folder: {e}"}), 500
 
 
-@app.route('/open_log_file', methods=['GET'])
+@app.route('/open_log_file', methods=['POST'])
 def open_log_file():
     """Opens a specific log file."""
-    log_path = request.args.get('path')
+    log_path = request.form.get('path')
     print(f"Request received to open log file: {log_path}")
     if not log_path:
         return jsonify({"status": "error", "message": "No log file path specified"}), 400

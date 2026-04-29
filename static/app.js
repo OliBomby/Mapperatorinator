@@ -19,6 +19,23 @@ $(document).ready(function() {
         }
     };
 
+    const Security = {
+        csrfToken: window.APP_BOOTSTRAP?.csrfToken || $('meta[name="mapperatorinator-csrf-token"]').attr('content') || '',
+        csrfHeaderName: window.APP_BOOTSTRAP?.csrfHeaderName || 'X-Mapperatorinator-CSRF-Token',
+
+        init() {
+            $.ajaxSetup({
+                headers: this.csrfToken ? {
+                    [this.csrfHeaderName]: this.csrfToken
+                } : {}
+            });
+
+            if (!this.csrfToken) {
+                console.error('CSRF token bootstrap data is missing; protected UI actions will fail.');
+            }
+        }
+    };
+
     // Utility functions
     const Utils = {
         showFlashMessage(message, type = 'success') {
@@ -1019,7 +1036,11 @@ $(document).ready(function() {
                         .off("click")
                         .on("click", (e) => {
                             e.preventDefault();
-                            $.get("/open_folder", { folder: folderPath })
+                            $.ajax({
+                                url: "/open_folder",
+                                method: "POST",
+                                data: { folder: folderPath }
+                            })
                                 .done(response => console.log("Open folder response:", response))
                                 .fail(() => alert("Failed to open folder via backend."));
                         });
@@ -1110,7 +1131,11 @@ $(document).ready(function() {
             if (job.errorLogFilePath) {
                 job.elements.$errorLogLinkAnchor.off("click").on("click", (e) => {
                     e.preventDefault();
-                    $.get("/open_log_file", { path: job.errorLogFilePath })
+                    $.ajax({
+                        url: "/open_log_file",
+                        method: "POST",
+                        data: { path: job.errorLogFilePath }
+                    })
                         .done(response => console.log("Open log response:", response))
                         .fail(() => alert("Failed to open log file via backend."));
                 });
@@ -1196,6 +1221,7 @@ $(document).ready(function() {
         });
 
         // Initialize all managers
+        Security.init();
         FileBrowser.init();
         UIManager.init();
         ValidationManager.init();
