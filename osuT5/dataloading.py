@@ -1,6 +1,5 @@
-import multiprocessing
-
 import hydra
+import torch
 import tqdm
 from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
@@ -16,6 +15,7 @@ from osuT5.utils import (
     get_tokenizer,
     worker_init_fn,
     get_dataset,
+    get_shared_training_state,
 )
 
 
@@ -50,15 +50,23 @@ def play_hs(audio, tokens, sr, tokenizer):
 
     sd.play(audio_with_hits, samplerate=sr)
 
+def _get_token_context( tokens: torch.Tensor, sos, eos, strict=False):
+    """Get the start and end indices of the token context in the given tokens."""
+    start = (tokens == sos).nonzero(as_tuple=True)[0]
+    start = start[0] + 1 if len(start) > 0 else (None if strict else 0)
+    end = (tokens == eos).nonzero(as_tuple=True)[0]
+    end = end[0] if len(end) > 0 else (None if strict else len(tokens))
+    if start is None or end is None:
+        return 0, 0
+    return start, end
+
 
 @hydra.main(config_path="../configs/train", config_name="v30", version_base="1.1")
 def main(args: TrainConfig):
     args = OmegaConf.to_object(args)
     setup_args(args)
 
-    mgr = multiprocessing.Manager()
-    shared = mgr.Namespace()
-    shared.current_train_step = 1
+    shared = get_shared_training_state()
     tokenizer = get_tokenizer(args)
     parser = OsuParser(args, tokenizer)
     dataset = get_dataset(
@@ -77,7 +85,7 @@ def main(args: TrainConfig):
         pin_memory=True,
         drop_last=False,
         persistent_workers=args.dataloader.num_workers > 0,
-        worker_init_fn=worker_init_fn,
+        worker_init_fn=worker_init_fn if args.data.dataset_type in ["ors", "mmrs"] else None,
     )
 
     transform = MelSpectrogram(
@@ -100,12 +108,18 @@ def main(args: TrainConfig):
     if args.mode == 'lengths':
         # Make histogram of the lengths of the sequences
         lengths = []
+        sv_lengths = []
         for b in tqdm.tqdm(dataloader, smoothing=0.01):
             for i in range(len(b["frames"])):  # batch size
                 length = b['decoder_attention_mask'][i].sum().item()
                 lengths.append(length)
+
+                start, end = _get_token_context(b['decoder_input_ids'][i], 7, 8, strict=True)
+                sv_length = end - start
+                sv_lengths.append(sv_length)
+
             shared.current_train_step += 1
-            if len(lengths) > 100000:
+            if len(lengths) > 10000:
                 break
 
         plt.hist(lengths, bins=100)
@@ -126,6 +140,12 @@ def main(args: TrainConfig):
         print(f"Total number of sequences: {len(lengths)}")
         print(f"Total number of tokens: {sum(lengths)}")
         print(f"Total number of sequences with length 0: {lengths.count(2)}")
+
+        print(f"Max SV length: {max(sv_lengths)}")
+        print(f"Min SV length: {min(sv_lengths)}")
+        print(f"Total number of SV tokens: {sum(sv_lengths)}")
+
+        print(f"Average SV token ratio: {sum(sv_lengths) / sum(lengths)}")
 
     if args.mode == 'plot':
         for b in tqdm.tqdm(dataloader, smoothing=0.01):

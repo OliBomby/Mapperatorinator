@@ -1,8 +1,31 @@
-FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-devel
+FROM pytorch/pytorch:2.10.0-cuda13.0-cudnn9-devel
 
-RUN apt-get -y update && apt-get -y upgrade && apt-get install -y git && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
-RUN pip install accelerate pydub nnAudio PyYAML transformers==4.53.3 hydra-core tensorboard lightning pandas pyarrow einops 'git+https://github.com/OliBomby/slider.git@gedagedigedagedaoh#egg=slider' torch_tb_profiler wandb ninja peft
-RUN MAX_JOBS=4 pip install flash-attn==2.7.4.post1 --no-build-isolation
+RUN apt-get -y update \
+    && apt-get -y upgrade \
+    && apt-get install -y git \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --break-system-packages ninja==1.13.0
+RUN MAX_JOBS=4 pip install --no-build-isolation --break-system-packages flash-attn==2.8.3
+RUN pip install --break-system-packages \
+    accelerate==1.12.0 \
+    pydub==0.25.1 \
+    nnAudio==0.3.4 \
+    PyYAML==6.0.3 \
+    transformers==4.53.3 \
+    hydra-core==1.3.2 \
+    tensorboard==2.20.0 \
+    lightning==2.6.0 \
+    pandas==2.3.3 \
+    pyarrow==22.0.0 \
+    einops==0.8.1 \
+    'git+https://github.com/OliBomby/slider.git#egg=slider' \
+    torch_tb_profiler==0.4.3 \
+    wandb==0.24.2 \
+    peft==0.18.1 \
+    datasets==4.8.3 \
+    torchcodec==0.10.0 \
+    rosu-pp-py==3.1.0
 
 # Modify .bashrc to include the custom prompt
 RUN echo 'if [ -f /.dockerenv ]; then export PS1="(docker) $PS1"; fi' >> /root/.bashrc

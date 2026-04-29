@@ -14,7 +14,7 @@ from config import InferenceConfig
 from .server import InferenceClient, model_generate, model_forward
 from ..dataset.osu_parser import OsuParser
 from ..dataset.data_utils import (update_event_times, remove_events_of_type, get_hold_note_ratio,
-                                  get_scroll_speed_ratio, get_hitsounded_status)
+                                  get_scroll_speed_ratio, get_hitsounded_status, calculate_difficulty)
 from ..model import Mapperatorinator
 from ..tokenizer import Event, EventType, Tokenizer, ContextType
 
@@ -44,14 +44,10 @@ class GenerationConfig:
 
 
 # noinspection PyProtectedMember
-def generation_config_from_beatmap(beatmap: Beatmap, tokenizer: Optional[Tokenizer] = None) -> GenerationConfig:
+def generation_config_from_beatmap(beatmap: Beatmap, beatmap_path, tokenizer: Optional[Tokenizer] = None) -> GenerationConfig:
     gamemode = int(beatmap.mode)
-    difficulty = None
-    if gamemode == 0 and len(beatmap._hit_objects) > 0:  # We don't have diffcalc for other gamemodes
-        try:
-            difficulty = round(float(beatmap.stars()), 2)
-        except Exception:
-            pass
+    difficulty = calculate_difficulty(path=beatmap_path)
+
     return GenerationConfig(
         gamemode=gamemode,
         beatmap_id=beatmap.beatmap_id,
@@ -407,6 +403,7 @@ class Processor(object):
                             sequence,
                             self.tokenizer.context_sos[context["context_type"]],
                             self.tokenizer.context_eos[context["context_type"]],
+                            strict=True,
                         )
                         self.add_predicted_tokens_to_context(context, sequence[start:end], frame_time)
                 else:
@@ -498,6 +495,7 @@ class Processor(object):
                             seq_prompt,
                             self.tokenizer.context_sos[context["context_type"]],
                             self.tokenizer.context_eos[context["context_type"]],
+                            strict=True,
                         )
                     else:
                         start, end = self._get_token_context(seq_prompt, self.tokenizer.sos_id, self.tokenizer.eos_id)
@@ -683,7 +681,7 @@ class Processor(object):
 
     def _batched_inference(
             self,
-            genereate_func,
+            generate_func,
             cond_prompts: list[torch.Tensor],
             uncond_prompts: list[torch.Tensor],
             frames: torch.Tensor,
@@ -709,7 +707,7 @@ class Processor(object):
                                   model_kwarg_keys}
 
             # Start generation
-            result = genereate_func(
+            result = generate_func(
                 model_kwargs_batch | dict(
                     inputs=frames_batch,
                     decoder_input_ids=cond_prompt_batch,
@@ -724,12 +722,14 @@ class Processor(object):
 
         torch.cuda.empty_cache()
 
-    def _get_token_context(self, tokens: torch.Tensor, sos, eos):
+    def _get_token_context(self, tokens: torch.Tensor, sos, eos, strict=False):
         """Get the start and end indices of the token context in the given tokens."""
         start = (tokens == sos).nonzero(as_tuple=True)[0]
-        start = start[0] + 1 if len(start) > 0 else 1
+        start = start[0] + 1 if len(start) > 0 else (None if strict else 0)
         end = (tokens == eos).nonzero(as_tuple=True)[0]
-        end = end[0] if len(end) > 0 else len(tokens)
+        end = end[0] if len(end) > 0 else (None if strict else len(tokens))
+        if start is None or end is None:
+            return 0, 0
         return start, end
 
     def split_into_batches(self, tensor, max_batch_size, batch_size=1):
@@ -812,7 +812,8 @@ class Processor(object):
                 beatmap = Beatmap.from_path(beatmap_path)
                 data["events"], data["event_times"] = parser.parse(beatmap, song_length=song_length)
                 if add_class:
-                    data["class"] = self.get_class_vector(generation_config_from_beatmap(beatmap, self.tokenizer), song_length)
+                    data["class"] = self.get_class_vector(
+                        generation_config_from_beatmap(beatmap, beatmap_path, self.tokenizer), song_length)
             elif context == ContextType.NO_HS:
                 beatmap = Beatmap.from_path(beatmap_path)
                 hs_events, hs_event_times = parser.parse(beatmap, song_length=song_length)
@@ -822,7 +823,8 @@ class Processor(object):
                 beatmap = Beatmap.from_path(beatmap_path)
                 data["events"], data["event_times"] = parser.parse(beatmap, song_length=song_length)
                 if add_class:
-                    data["class"] = self.get_class_vector(generation_config_from_beatmap(beatmap, self.tokenizer), song_length)
+                    data["class"] = self.get_class_vector(
+                        generation_config_from_beatmap(beatmap, beatmap_path, self.tokenizer), song_length)
             elif context == ContextType.KIAI:
                 beatmap = Beatmap.from_path(beatmap_path)
                 data["events"], data["event_times"] = parser.parse_kiai(beatmap)

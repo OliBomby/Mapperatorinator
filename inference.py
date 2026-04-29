@@ -142,7 +142,7 @@ def compile_paths(args: InferenceConfig):
             beatmap = Beatmap.from_path(beatmap_path)
 
             # Autofill audio path if empty
-            if not audio_path:
+            if not audio_path and beatmap.audio_filename:
                 audio_path = beatmap_path.parent / beatmap.audio_filename
 
             # Autofill output path if empty
@@ -183,7 +183,7 @@ def compile_args_from_beatmap(args: InferenceConfig, verbose=True):
 
     if verbose:
         print(f"Using metadata from beatmap: {beatmap.display_name}")
-    generation_config = generation_config_from_beatmap(beatmap)
+    generation_config = generation_config_from_beatmap(beatmap, beatmap_path)
     beatmap_config = beatmap_config_from_beatmap(beatmap)
 
     beatmap_args = {
@@ -211,7 +211,7 @@ def compile_args_from_beatmap(args: InferenceConfig, verbose=True):
         "creator": beatmap_config.creator,
         "version": beatmap_config.version,
         "source": beatmap_config.source,
-        "background": str(beatmap_path.parent / beatmap.background),
+        "background": str(beatmap_path.parent / beatmap.background) if beatmap.background else None,
         "preview_time": beatmap_config.preview_time,
     }
 
@@ -508,19 +508,11 @@ def generate(
     return result, result_path, osz_path
 
 
-def load_model_with_server(
-        ckpt_path_str: str,
-        t5_args: TrainConfig,
-        device,
-        max_batch_size: int = 8,
-        use_server: bool = False,
-        precision: str = "fp32",
-        attn_implementation: str = "sdpa",
-        eval_mode: bool = True,
-        lora_path=None,
-):
+def load_model_with_server(ckpt_path: str | Path | None, t5_args: TrainConfig, device, max_batch_size: int = 8,
+                           use_server: bool = False, precision: str = "fp32", attn_implementation: str = "sdpa",
+                           eval_mode: bool = True, lora_path=None):
     model_loader, tokenizer_loader = load_model_loaders(
-        ckpt_path_str=ckpt_path_str,
+        ckpt_path=ckpt_path,
         t5_args=t5_args,
         device=device,
         precision=precision,
@@ -533,7 +525,7 @@ def load_model_with_server(
         model_loader,
         tokenizer_loader,
         max_batch_size=max_batch_size,
-        socket_path=get_server_address(ckpt_path_str),
+        socket_path=get_server_address(str(ckpt_path)),
     ) if use_server else model_loader(), tokenizer_loader()
 
 
@@ -584,16 +576,10 @@ def main(args: InferenceConfig):
     compile_args(args)
     setup_inference_environment(args.seed)
 
-    model, tokenizer = load_model_with_server(
-        args.model_path,
-        args.train,
-        args.device,
-        max_batch_size=args.max_batch_size,
-        use_server=args.use_server,
-        precision=args.precision,
-        attn_implementation=args.attn_implementation,
-        lora_path=args.lora_path,
-    )
+    model, tokenizer = load_model_with_server(args.model_path, args.train, args.device,
+                                              max_batch_size=args.max_batch_size, use_server=args.use_server,
+                                              precision=args.precision, attn_implementation=args.attn_implementation,
+                                              lora_path=args.lora_path)
 
     diff_model, diff_tokenizer, refine_model = None, None, None
     if args.generate_positions:

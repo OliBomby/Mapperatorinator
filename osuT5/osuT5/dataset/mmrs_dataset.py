@@ -3,20 +3,20 @@ from __future__ import annotations
 import os
 import random
 from multiprocessing.managers import Namespace
-from typing import Optional, Callable
+from typing import Optional, Callable, Any, Generator
 from pathlib import Path
 
 import numpy as np
-import numpy.typing as npt
 import torch
 from pandas import Series, DataFrame
 from slider import Beatmap
 from torch.utils.data import IterableDataset
 
 from .data_utils import load_audio_file, remove_events_of_type, get_hold_note_ratio, get_scroll_speed_ratio, \
-    get_hitsounded_status, get_song_length, load_mmrs_metadata, filter_mmrs_metadata
+    get_hitsounded_status, get_song_length, load_mmrs_metadata, filter_mmrs_metadata, SequenceDatasetMixin, \
+    get_speed_augment, get_flip_augment
 from .osu_parser import OsuParser
-from ..tokenizer import Event, EventType, Tokenizer, ContextType
+from ..tokenizer import EventType, Tokenizer, ContextType
 from ..config import DataConfig
 
 OSZ_FILE_EXTENSION = ".osz"
@@ -87,6 +87,7 @@ class MmrsDataset(IterableDataset):
             end=self.end,
             subset_ids=self.subset_ids,
             gamemodes=self.args.gamemodes,
+            ranked_statuses=self.args.ranked_statuses,
             min_year=self.args.min_year,
             max_year=self.args.max_year,
             min_difficulty=self.args.min_difficulty,
@@ -157,7 +158,7 @@ class InterleavingBeatmapDatasetIterable:
     def __iter__(self) -> "InterleavingBeatmapDatasetIterable":
         return self
 
-    def __next__(self) -> tuple[any, int]:
+    def __next__(self) -> tuple[Any, int]:
         num = len(self.workers)
         for _ in range(num):
             try:
@@ -170,7 +171,7 @@ class InterleavingBeatmapDatasetIterable:
         raise StopIteration
 
 
-class BeatmapDatasetIterable:
+class BeatmapDatasetIterable(SequenceDatasetMixin):
     __slots__ = (
         "subset_ids",
         "args",
@@ -224,470 +225,6 @@ class BeatmapDatasetIterable:
         self.add_pre_tokens = args.add_pre_tokens
         self.add_empty_sequences = args.add_empty_sequences
 
-    def _get_frames(self, samples: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
-        """Segment audio samples into frames.
-
-        Each frame has `frame_size` audio samples.
-        It will also calculate and return the time of each audio frame, in miliseconds.
-
-        Args:
-            samples: Audio time-series.
-
-        Returns:
-            frames: Audio frames.
-            frame_times: Audio frame times.
-        """
-        samples = np.pad(samples, [0, self.args.hop_length - len(samples) % self.args.hop_length])
-        frames = np.reshape(samples, (-1, self.args.hop_length))
-        frames_per_milisecond = (
-                self.args.sample_rate / self.args.hop_length / MILISECONDS_PER_SECOND
-        )
-        frame_times = np.arange(len(frames)) / frames_per_milisecond
-        return frames, frame_times
-
-    def _create_sequences(
-            self,
-            frames: npt.NDArray,
-            frame_times: npt.NDArray,
-            out_context: list[dict],
-            in_context: list[dict],
-            extra_data: Optional[dict] = None,
-    ) -> list[dict[str, int | npt.NDArray | list[Event] | list[dict]]]:
-        """Create frame and token sequences for training/testing.
-
-        Args:
-            frames: Audio frames.
-
-        Returns:
-            A list of source and target sequences.
-        """
-
-        def get_event_indices(events2: list[Event], event_times2: list[int]) -> tuple[list[int], list[int]]:
-            # Corresponding start event index for every audio frame.
-            start_indices = []
-            event_index = 0
-
-            for current_time in frame_times:
-                while event_index < len(events2) and event_times2[event_index] < current_time:
-                    event_index += 1
-                start_indices.append(event_index)
-
-            # Corresponding end event index for every audio frame.
-            end_indices = start_indices[1:] + [start_indices[-1]]
-
-            return start_indices, end_indices
-
-        start_indices, end_indices = {}, {}
-        for context in in_context + out_context:
-            (start_indices[context["extra"]["id"]], end_indices[context["extra"]["id"]]) = (
-                get_event_indices(context["events"], context["event_times"]))
-
-        sequences = []
-        n_frames = len(frames)
-        offset = random.randint(0, min(self.frame_seq_len, 2000)) if not self.test and random.random() < self.args.frame_offset_augment_prob else 0
-        gen_start_frame_x = int(round(self.args.lookback * self.frame_seq_len)) if not self.test and random.random() < self.args.lookback_prob else 0
-        gen_end_frame_x = int(round((1 - self.args.lookahead) * self.frame_seq_len))
-        last_kiai = {}
-        last_sv = {}
-
-        # Divide audio frames into splits
-        for frame_start_idx in range(offset, n_frames - gen_start_frame_x, self.frame_seq_len):
-            frame_end_idx = min(frame_start_idx + self.frame_seq_len, n_frames)
-
-            gen_start_frame = min(frame_start_idx + gen_start_frame_x, n_frames - 1)
-            gen_end_frame = min(frame_start_idx + gen_end_frame_x, n_frames)
-
-            frame_pre_idx = max(frame_start_idx - self.frame_seq_len, 0)
-
-            def slice_events(context, frame_start_idx, frame_end_idx):
-                if len(context["events"]) == 0:
-                    return []
-                identifier = context["extra"]["id"]
-                event_start_idx = start_indices[identifier][frame_start_idx]
-                event_end_idx = end_indices[identifier][frame_end_idx - 1]
-                return context["events"][event_start_idx:event_end_idx]
-
-            def slice_context(context, frame_start_idx, frame_end_idx):
-                result = {"events": slice_events(context, frame_start_idx, frame_end_idx)} | context["extra"]
-                result["time"] = frame_times[frame_start_idx]
-                result["labels_offset"] = start_indices[context["extra"]["id"]][gen_start_frame] - start_indices[context["extra"]["id"]][frame_start_idx]
-                return result
-
-            # Create the sequence
-            sequence: dict[str, str | int | list[Event] | dict] = {
-                           "frames": frames[frame_start_idx:frame_end_idx],
-                           "out_context": [slice_context(context, frame_start_idx, gen_end_frame) for context in
-                                           out_context],
-                           "in_context": [slice_context(context, frame_start_idx, frame_end_idx) for context in
-                                          in_context],
-                           "song_position": torch.tensor([frame_start_idx / n_frames, frame_end_idx / n_frames], dtype=torch.float32),
-                       } | extra_data
-
-            sequence["special"] = sequence["special"].copy()
-            sequence["special"]["time"] = frame_times[frame_start_idx]
-
-            if self.args.add_pre_tokens or self.args.add_pre_tokens_at_step >= 0:
-                sequence["pre_events"] = slice_events(out_context[0], frame_pre_idx, frame_start_idx)
-
-            def add_last_kiai(sequence_context, last_kiai):
-                if (sequence_context["context_type"] != ContextType.KIAI and
-                        not (self.args.add_kiai and sequence_context["context_type"] in [ContextType.GD, ContextType.MAP])):
-                    return
-                if sequence_context["id"] in last_kiai:
-                    sequence_context["last_kiai"] = last_kiai[sequence_context["id"]]
-                else:
-                    sequence_context["last_kiai"] = Event(EventType.KIAI, 0)
-                # Find the last kiai event in the out context
-                for event in reversed(sequence_context["events"]):
-                    if event.type == EventType.KIAI:
-                        last_kiai[sequence_context["id"]] = event
-                        break
-
-            if self.args.add_kiai_special_token:
-                for sequence_context in sequence["in_context"]:
-                    add_last_kiai(sequence_context, last_kiai)
-                for sequence_context in sequence["out_context"]:  # type: dict
-                    add_last_kiai(sequence_context, last_kiai)
-                    if "last_kiai" in sequence_context:
-                        sequence["special"]["last_kiai"] = sequence_context["last_kiai"]
-
-            def add_last_sv(sequence_context, last_sv):
-                if (sequence_context["context_type"] != ContextType.SV and
-                        not ((self.args.add_sv or self.args.add_mania_sv) and sequence_context["context_type"] in [ContextType.GD, ContextType.MAP])):
-                    return
-                if sequence_context["id"] in last_sv:
-                    sequence_context["last_sv"] = last_sv[sequence_context["id"]]
-                else:
-                    sequence_context["last_sv"] = Event(EventType.SCROLL_SPEED, 100)
-                # Find the last sv event in the out context
-                for event in reversed(sequence_context["events"]):
-                    if event.type == EventType.SCROLL_SPEED:
-                        last_sv[sequence_context["id"]] = event
-                        break
-
-            if self.args.add_sv_special_token:
-                for sequence_context in sequence["in_context"]:
-                    add_last_sv(sequence_context, last_sv)
-                for sequence_context in sequence["out_context"]:  # type: dict
-                    add_last_sv(sequence_context, last_sv)
-                    if "last_sv" in sequence_context:
-                        sequence["special"]["last_sv"] = sequence_context["last_sv"]
-
-            sequences.append(sequence)
-
-        return sequences
-
-    def _normalize_time_shifts(self, sequence: dict, beatmap_path) -> dict:
-        """Make all time shifts in the sequence relative to the start time of the sequence,
-        and normalize time values.
-
-        Args:
-            sequence: The input sequence.
-
-        Returns:
-            The same sequence with trimmed time shifts.
-        """
-
-        min_t = self.tokenizer.event_range[EventType.TIME_SHIFT].min_value
-        max_t = self.tokenizer.event_range[EventType.TIME_SHIFT].max_value
-
-        def process(events: list[Event], start_time) -> list[Event] | tuple[list[Event], int]:
-            for i, event in enumerate(events):
-                if event.type == EventType.TIME_SHIFT:
-                    # We cant modify the event objects themselves because that will affect subsequent sequences
-                    t = int((event.value - start_time) * STEPS_PER_MILLISECOND)
-                    if t < min_t or t > max_t:
-                        print(f"WARNING: Time shift out of range ({t}) in beatmap {beatmap_path}")
-                        t = np.clip(t, min_t, max_t)
-                    events[i] = Event(EventType.TIME_SHIFT, t)
-
-            return events
-
-        if "pre_events" in sequence:
-            sequence["pre_events"] = process(sequence["pre_events"], sequence["out_context"]["time"])
-
-        for context in sequence["in_context"] + sequence["out_context"]:
-            context["events"] = process(context["events"], context["time"])
-
-        return sequence
-
-    def _get_special_tokens(self, context: dict) -> list:
-        special_tokens = []
-
-        if "beatmap_id" in context:
-            if self.args.add_gamemode_token:
-                special_tokens.append(self.tokenizer.encode_gamemode(context["gamemode"]))
-
-            if self.args.add_style_token:
-                special_tokens.append(self.tokenizer.encode_style_idx(context["beatmap_idx"])
-                                      if self.test or random.random() >= self.args.class_dropout_prob else self.tokenizer.style_unk)
-
-            if self.args.add_diff_token:
-                special_tokens.append(self.tokenizer.encode_diff(context["difficulty"])
-                                      if self.test or random.random() >= self.args.diff_dropout_prob else self.tokenizer.diff_unk)
-
-            if self.args.add_mapper_token:
-                special_tokens.append(self.tokenizer.encode_mapper(context["beatmap_id"])
-                                      if self.test or random.random() >= self.args.mapper_dropout_prob else self.tokenizer.mapper_unk)
-
-            if self.args.add_year_token:
-                special_tokens.append(self.tokenizer.encode_year(context["year"])
-                                      if self.test or random.random() >= self.args.year_dropout_prob else self.tokenizer.year_unk)
-
-            if self.args.add_hitsounded_token:
-                special_tokens.append(self.tokenizer.encode(Event(EventType.HITSOUNDED, int(context["hitsounded"]))))
-
-            if self.args.add_song_length_token:
-                special_tokens.append(self.tokenizer.encode_song_length(context["song_length"]))
-
-            if self.args.add_global_sv_token and "global_sv" in context:
-                special_tokens.append(self.tokenizer.encode_global_sv(context["global_sv"]))
-
-            if self.args.add_cs_token and "circle_size" in context:
-                special_tokens.append(self.tokenizer.encode_cs(context["circle_size"])
-                                      if self.test or random.random() >= self.args.cs_dropout_prob else self.tokenizer.cs_unk)
-
-            if self.args.add_keycount_token and "keycount" in context:
-                special_tokens.append(self.tokenizer.encode(Event(EventType.MANIA_KEYCOUNT, context["keycount"])))
-
-            if self.args.add_hold_note_ratio_token and "hold_note_ratio" in context:
-                special_tokens.append(self.tokenizer.encode_hold_note_ratio(context["hold_note_ratio"])
-                                      if self.test or random.random() >= self.args.hold_note_ratio_dropout_prob else self.tokenizer.hold_note_ratio_unk)
-
-            if self.args.add_scroll_speed_ratio_token and "scroll_speed_ratio" in context:
-                special_tokens.append(self.tokenizer.encode_scroll_speed_ratio(context["scroll_speed_ratio"])
-                                      if self.test or random.random() >= self.args.scroll_speed_ratio_dropout_prob else self.tokenizer.scroll_speed_ratio_unk)
-
-            if self.args.add_descriptors:
-                special_tokens.extend(self.tokenizer.encode_descriptor(context["beatmap_id"])
-                                      if self.test or random.random() >= self.args.descriptor_dropout_prob else [
-                    self.tokenizer.descriptor_unk])
-
-            if self.args.add_kiai_special_token and "last_kiai" in context:
-                special_tokens.append(self.tokenizer.encode(context["last_kiai"]))
-
-            if self.args.add_sv_special_token and "last_sv" in context:
-                special_tokens.append(self.tokenizer.encode(context["last_sv"]))
-
-            if self.args.add_song_position_token:
-                special_tokens.append(self.tokenizer.encode_song_position(context["time"], context["song_length"]))
-
-        return special_tokens
-
-    def _tokenize_sequence(self, sequence: dict) -> dict:
-        """Tokenize the event sequence.
-
-        Begin token sequence with `[SOS]` token (start-of-sequence).
-        End token sequence with `[EOS]` token (end-of-sequence).
-
-        Args:
-            sequence: The input sequence.
-
-        Returns:
-            The same sequence with tokenized events.
-        """
-        sequence["special_tokens"] = self._get_special_tokens(sequence["special"])
-
-        for context in sequence["in_context"] + sequence["out_context"]:
-            tokens = torch.empty(len(context["events"]), dtype=torch.long)
-            for i, event in enumerate(context["events"]):
-                tokens[i] = self.tokenizer.encode(event)
-            context["tokens"] = tokens
-            context["special_tokens"] = self._get_special_tokens(context)
-
-        if "pre_events" in sequence:
-            pre_tokens = torch.empty(len(sequence["pre_events"]), dtype=torch.long)
-            for i, event in enumerate(sequence["pre_events"]):
-                pre_tokens[i] = self.tokenizer.encode(event)
-            sequence["pre_tokens"] = pre_tokens
-            del sequence["pre_events"]
-
-        return sequence
-
-    def _pad_and_split_token_sequence(self, sequence: dict) -> dict:
-        """Pad token sequence to a fixed length and split decoder input and labels.
-
-        Pad with `[PAD]` tokens until `tgt_seq_len`.
-
-        Token sequence (w/o last token) is the input to the transformer decoder,
-        token sequence (w/o first token) is the label, a.k.a. decoder ground truth.
-
-        Prefix the token sequence with the pre_tokens sequence.
-
-        Args:
-            sequence: The input sequence.
-
-        Returns:
-            The same sequence with padded tokens.
-        """
-        # Count irreducable tokens for SOS/EOS tokens
-        stl = 1
-
-        # Count irreducable tokens for all contexts
-        stl += len(sequence["special_tokens"])
-        for context in sequence["in_context"] + sequence["out_context"]:
-            if context["add_type"]:
-                stl += 2
-
-            stl += len(context["special_tokens"])
-
-        # Count reducible tokens, pre_tokens and context tokens
-        num_tokens = sum(len(context["tokens"]) for context in sequence["out_context"])
-        num_pre_tokens = len(sequence["pre_tokens"]) if "pre_tokens" in sequence else 0
-
-        if self.args.max_pre_token_len > 0:
-            num_pre_tokens = min(num_pre_tokens, self.args.max_pre_token_len)
-
-        num_other_tokens = sum(len(context["tokens"]) for context in sequence["in_context"])
-
-        # Trim tokens to target sequence length
-        if self.args.center_pad_decoder:
-            n = min(self.args.tgt_seq_len - self.pre_token_len - 1, num_tokens)
-            m = min(self.pre_token_len - stl + 1, num_pre_tokens)
-            o = min(self.pre_token_len - m - stl + 1, num_other_tokens)
-            si = self.pre_token_len - m - stl + 1 - o
-        else:
-            # n + m + stl + o + padding = tgt_seq_len
-            n = min(self.args.tgt_seq_len - stl - min(self.min_pre_token_len, num_pre_tokens), num_tokens)
-            m = min(self.args.tgt_seq_len - stl - n, num_pre_tokens)
-            o = min(self.args.tgt_seq_len - stl - n - m, num_other_tokens)
-            si = 0
-
-        input_tokens = torch.full((self.args.tgt_seq_len,), self.tokenizer.pad_id, dtype=torch.long)
-        label_tokens = torch.full((self.args.tgt_seq_len,), LABEL_IGNORE_ID, dtype=torch.long)
-
-        def add_special_tokens(special_tokens, si):
-            for token in special_tokens:
-                input_tokens[si] = token
-                si += 1
-            return si
-
-        def add_context(context, si, max_tokens, add_labels=False):
-            if context["add_type"]:
-                input_tokens[si] = self.tokenizer.context_sos[context["context_type"]]
-                if add_labels:
-                    label_tokens[si - 1] = self.tokenizer.context_sos[context["context_type"]]
-                si += 1
-
-            start_label_index = si + context["labels_offset"]
-            si = add_special_tokens(context["special_tokens"], si)
-
-            num_other_tokens_to_add = min(len(context["tokens"]), max_tokens)
-            input_tokens[si:si + num_other_tokens_to_add] = context["tokens"][:num_other_tokens_to_add]
-            si += num_other_tokens_to_add
-            max_tokens -= num_other_tokens_to_add
-
-            if context["add_type"]:
-                input_tokens[si] = self.tokenizer.context_eos[context["context_type"]]
-                si += 1
-
-            if add_labels:
-                label_tokens[start_label_index - 1:si - 1] = input_tokens[start_label_index:si]
-
-            return si, max_tokens
-
-        for context in sequence["in_context"]:
-            si, o = add_context(context, si, o)
-
-        si = add_special_tokens(sequence["special_tokens"], si)
-        start_random_index = si
-
-        if m > 0:
-            input_tokens[si:si + m] = sequence["pre_tokens"][-m:]
-            si += m
-
-        input_tokens[si] = self.tokenizer.sos_id
-        si += 1
-        for context in sequence["out_context"]:
-            si, n = add_context(context, si, n, True)
-        end_index = si
-
-        label_tokens[end_index - 1] = self.tokenizer.eos_id
-
-        # Randomize some input tokens
-        def randomize_tokens(tokens):
-            offset_tokens = tokens.clone()
-
-            if random.random() < self.args.timing_random_offset_prob:
-                offset_tokens += torch.randint(low=-self.args.timing_random_offset, high=self.args.timing_random_offset + 1,
-                                               size=tokens.shape)
-
-            if random.random() < self.args.timing_random_offset_prob:
-                offset_tokens += torch.randint(low=-self.args.timing_random_offset_2, high=self.args.timing_random_offset_2 + 1,
-                                               size=(1,))
-
-            return torch.where((self.tokenizer.event_start[EventType.TIME_SHIFT] <= tokens) & (
-                    tokens < self.tokenizer.event_end[EventType.TIME_SHIFT]),
-                               torch.clamp(offset_tokens,
-                                           self.tokenizer.event_start[EventType.TIME_SHIFT],
-                                           self.tokenizer.event_end[EventType.TIME_SHIFT] - 1),
-                               tokens)
-
-        if self.args.timing_random_offset > 0 or self.args.timing_random_offset_2 > 0:
-            input_tokens[start_random_index:end_index] = randomize_tokens(input_tokens[start_random_index:end_index])
-        # input_tokens = torch.where((self.tokenizer.event_start[EventType.DISTANCE] <= input_tokens) & (input_tokens < self.tokenizer.event_end[EventType.DISTANCE]),
-        #                               torch.clamp(input_tokens + torch.randint_like(input_tokens, -10, 10), self.tokenizer.event_start[EventType.DISTANCE], self.tokenizer.event_end[EventType.DISTANCE] - 1),
-        #                               input_tokens)
-
-        if self.args.snapping_random_prob > 0:
-            random_snappings = torch.randint_like(input_tokens,
-                                                  low=self.tokenizer.event_start[EventType.SNAPPING],
-                                                  high=self.tokenizer.event_end[EventType.SNAPPING])
-            mask = (self.tokenizer.event_start[EventType.SNAPPING] <= input_tokens) & (input_tokens < self.tokenizer.event_end[EventType.SNAPPING])
-            mask &= torch.rand_like(input_tokens, dtype=torch.float32) < self.args.snapping_random_prob
-            input_tokens = torch.where(mask, random_snappings, input_tokens)
-
-        sequence["decoder_input_ids"] = input_tokens
-        sequence["decoder_attention_mask"] = input_tokens != self.tokenizer.pad_id
-        sequence["labels"] = label_tokens
-
-        del sequence["out_context"]
-        del sequence["in_context"]
-        del sequence["special_tokens"]
-        del sequence["special"]
-        if "pre_tokens" in sequence:
-            del sequence["pre_tokens"]
-
-        return sequence
-
-    def _pad_frame_sequence(self, sequence: dict) -> dict:
-        """Pad frame sequence with zeros until `frame_seq_len`.
-
-        Frame sequence can be further processed into Mel spectrogram frames,
-        which is the input to the transformer encoder.
-
-        Args:
-            sequence: The input sequence.
-
-        Returns:
-            The same sequence with padded frames.
-        """
-        frames = torch.from_numpy(sequence["frames"]).to(torch.float32)
-
-        if frames.shape[0] != self.frame_seq_len:
-            n = min(self.frame_seq_len, len(frames))
-            padded_frames = torch.zeros(
-                self.frame_seq_len,
-                frames.shape[-1],
-                dtype=frames.dtype,
-                device=frames.device,
-            )
-            padded_frames[:n] = frames[:n]
-            sequence["frames"] = torch.flatten(padded_frames)
-        else:
-            sequence["frames"] = torch.flatten(frames)
-
-        return sequence
-
-    def maybe_change_dataset(self):
-        if self.shared is None:
-            return
-        step = self.shared.current_train_step
-        if 0 <= self.args.add_empty_sequences_at_step <= step and not self.add_empty_sequences:
-            self.add_empty_sequences = True
-        if 0 <= self.args.add_pre_tokens_at_step <= step and not self.add_pre_tokens:
-            self.add_pre_tokens = True
-
     def __iter__(self):
         return self._get_next_tracks()
 
@@ -699,24 +236,24 @@ class BeatmapDatasetIterable:
         speed_ratios = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
         return np.interp(speed, speed_ratios, star_ratings)  # type: ignore
 
-    def _get_speed_augment(self):
-        if self.test or random.random() >= self.args.dt_augment_prob:
-            return 1.0
-
-        mi, ma = self.args.dt_augment_range
-        base = random.random()
-        if self.args.dt_augment_sqrt:
-            base = np.power(base, 0.5)
-        return mi + (ma - mi) * base
-
-    def _get_next_tracks(self) -> dict:
+    def _get_next_tracks(self) -> Generator[dict, None, None]:
         for beatmapset_id in self.metadata.index.get_level_values(0).unique():
             metadata = self.metadata.loc[beatmapset_id]
 
             if self.args.add_gd_context and len(metadata) <= 1:
                 continue
 
-            speed = self._get_speed_augment()
+            speed = get_speed_augment(
+                self.test,
+                self.args.dt_augment_prob,
+                self.args.dt_augment_range,
+                self.args.dt_augment_sqrt,
+            )
+            flip = get_flip_augment(
+                self.test,
+                self.args.flip_horizontal_prob,
+                self.args.flip_vertical_prob,
+            )
             track_path = self.path / "data" / metadata.iloc[0]["BeatmapSetFolder"]
             audio_path = track_path / metadata.iloc[0]["AudioFile"]
             try:
@@ -727,11 +264,10 @@ class BeatmapDatasetIterable:
                 continue
 
             for i, beatmap_metadata in metadata.iterrows():
-                for sample in self._get_next_beatmap(audio_samples, i, beatmap_metadata, metadata, speed):
-                    yield sample
+                yield from self._get_next_beatmap(audio_samples, i, beatmap_metadata, metadata, speed, flip)
 
     def _get_next_beatmap(self, audio_samples, i, beatmap_metadata: Series, set_metadata: DataFrame,
-                          speed: float) -> dict:
+                          speed: float, flip: tuple[bool, bool] = (False, False)) -> Generator[dict, None, None]:
         context_info = None
         if len(self.args.context_types) > 0:
             # Randomly select a context type with probabilities of context_weights
@@ -747,8 +283,8 @@ class BeatmapDatasetIterable:
 
             # Make sure we only generate scroll speed contexts for mania
             # Other gamemodes already model all SVs in the map context
-            if beatmap_metadata["ModeInt"] != 3 and ContextType.SV in context_info["out"]:
-                context_info["out"].remove(ContextType.SV)
+            # if beatmap_metadata["ModeInt"] != 3 and ContextType.SV in context_info["out"]:
+            #     context_info["out"].remove(ContextType.SV)
 
         beatmap_path = self.path / "data" / beatmap_metadata["BeatmapSetFolder"] / beatmap_metadata["BeatmapFile"]
         frames, frame_times = self._get_frames(audio_samples)
@@ -770,7 +306,7 @@ class BeatmapDatasetIterable:
                 data["keycount"] = int(beatmap.circle_size)
                 data["hold_note_ratio"] = get_hold_note_ratio(beatmap)
             if gamemode in [1, 3]:
-                data["scroll_speed_ratio"] = get_scroll_speed_ratio(beatmap)
+                data["scroll_speed_ratio"] = get_scroll_speed_ratio(beatmap, self.args.mania_bpm_normalized_scroll_speed)
 
         def get_context(context: ContextType, identifier, add_type=True):
             data = {"extra": {"context_type": context, "add_type": add_type, "id": identifier + '_' + context.value}}
@@ -779,7 +315,7 @@ class BeatmapDatasetIterable:
             elif context == ContextType.TIMING:
                 data["events"], data["event_times"] = self.parser.parse_timing(osu_beatmap, speed)
             elif context == ContextType.NO_HS:
-                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed)
+                hs_events, hs_event_times = self.parser.parse(osu_beatmap, speed, None, flip)
                 data["events"], data["event_times"] = remove_events_of_type(hs_events, hs_event_times,
                                                                             [EventType.HITSOUND, EventType.VOLUME])
             elif context == ContextType.GD:
@@ -787,14 +323,17 @@ class BeatmapDatasetIterable:
                 other_beatmap_path = self.path / "data" / other_metadata["BeatmapSetFolder"] / other_metadata[
                     "BeatmapFile"]
                 other_beatmap = Beatmap.from_path(other_beatmap_path)
-                data["events"], data["event_times"] = self.parser.parse(other_beatmap, speed)
+                data["events"], data["event_times"] = self.parser.parse(other_beatmap, speed, None, flip)
                 add_special_data(data["extra"], other_metadata, other_beatmap)
             elif context == ContextType.MAP:
-                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed)
+                data["events"], data["event_times"] = self.parser.parse(osu_beatmap, speed, None, flip)
             elif context == ContextType.KIAI:
                 data["events"], data["event_times"] = self.parser.parse_kiai(osu_beatmap, speed)
             elif context == ContextType.SV:
-                data["events"], data["event_times"] = self.parser.parse_scroll_speeds(osu_beatmap, speed)
+                if beatmap_metadata["ModeInt"] == 3:
+                    data["events"], data["event_times"] = self.parser.parse_scroll_speeds(osu_beatmap, speed)
+                else:
+                    data["events"], data["event_times"] = [], []
             return data
 
         extra_data = {
@@ -809,7 +348,10 @@ class BeatmapDatasetIterable:
         add_special_data(extra_data["special"], beatmap_metadata, osu_beatmap)
 
         if self.sample_weights is not None:
-            extra_data["sample_weights"] = self.sample_weights.get(osu_beatmap.beatmap_id, 1.0)
+            extra_data["sample_weights"] = torch.tensor(
+                self.sample_weights.get(osu_beatmap.beatmap_id, 1.0),
+                dtype=torch.float32,
+            )
 
         out_context = [get_context(context, "out", add_type=self.args.add_out_context_types) for context in context_info["out"]]
         in_context = [get_context(context, "in") for context in context_info["in"]]
@@ -825,16 +367,4 @@ class BeatmapDatasetIterable:
             extra_data,
         )
 
-        for sequence in sequences:
-            self.maybe_change_dataset()
-            sequence = self._normalize_time_shifts(sequence, beatmap_path)
-            sequence = self._tokenize_sequence(sequence)
-            sequence = self._pad_frame_sequence(sequence)
-            sequence = self._pad_and_split_token_sequence(sequence)
-            # noinspection PyUnresolvedReferences
-            if not self.add_empty_sequences and ((sequence["labels"] == self.tokenizer.eos_id) | (
-                    sequence["labels"] == LABEL_IGNORE_ID)).all():
-                continue
-            # if sequence["decoder_input_ids"][self.pre_token_len - 1] != self.tokenizer.pad_id:
-            #     continue
-            yield sequence
+        yield from self.process_sequences(sequences, beatmap_path)

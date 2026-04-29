@@ -4,13 +4,13 @@ import pickle
 from pathlib import Path
 from typing import Union, Optional
 
+from huggingface_hub import list_repo_files
 import numpy as np
-import pandas as pd
 from pandas import DataFrame
 from tqdm import tqdm
 from transformers.utils import PushToHubMixin, cached_file
 
-from .dataset.data_utils import load_mmrs_metadata, filter_mmrs_metadata
+from .dataset.data_utils import load_mmrs_metadata, filter_mmrs_metadata, filter_web_beatmaps
 from .event import Event, EventType, EventRange, ContextType
 from .config import TrainConfig
 
@@ -105,7 +105,7 @@ class Tokenizer(PushToHubMixin):
 
             if args.model.do_style_embed or args.data.add_style_token:
                 self._init_beatmap_idx(args)
-                self.num_classes = args.data.num_classes
+                self.num_classes = max(args.data.num_classes, len(self.beatmap_idx))
                 if args.data.add_style_token:
                     self.input_event_ranges.append(EventRange(EventType.STYLE, 0, self.num_classes))
 
@@ -477,9 +477,11 @@ class Tokenizer(PushToHubMixin):
             self._init_beatmap_idx_ors(args)
         elif args.data.dataset_type == "mmrs":
             self._init_beatmap_idx_mmrs(args)
+        elif args.data.dataset_type == "web":
+            self._init_beatmap_idx_web(args)
 
     def _init_beatmap_idx_ors(self, args: TrainConfig) -> None:
-        if args is None or "train_dataset_path" not in args.data:
+        if args is None or not getattr(args.data, "train_dataset_path", None):
             return
 
         path = Path(args.data.train_dataset_path)
@@ -508,12 +510,44 @@ class Tokenizer(PushToHubMixin):
     def _init_beatmap_idx_mmrs(self, args: TrainConfig) -> None:
         self.beatmap_idx = self.metadata.reset_index().set_index(["Id"])["BeatmapIdx"].to_dict()
 
+    def _init_beatmap_idx_web(self, args: TrainConfig) -> None:
+        from datasets import load_dataset
+        repo_id = args.data.train_dataset_path
+        dataset_start = args.data.train_dataset_start
+        dataset_end = args.data.train_dataset_end
+        all_files = [f for f in list_repo_files(repo_id, repo_type="dataset") if f.startswith("compressed/")]
+        all_files.sort()
+        files_split = all_files[dataset_start:dataset_end]
+
+        beatmap_idx = {}
+        dataset = load_dataset(repo_id, data_files=files_split, streaming=True, split="train")
+        for row in tqdm(dataset, desc="Caching web beatmap index"):
+            beatmaps = filter_web_beatmaps(
+                (row.get("json") or {}).get("beatmaps") or [],
+                gamemodes=args.data.gamemodes,
+                ranked_statuses=args.data.ranked_statuses,
+                min_year=args.data.min_year,
+                max_year=args.data.max_year,
+                min_difficulty=args.data.min_difficulty,
+                max_difficulty=args.data.max_difficulty,
+            )
+            for beatmap in beatmaps:
+                beatmap_id = beatmap.get("beatmap_id")
+                if beatmap_id is None:
+                    continue
+                beatmap_id = int(beatmap_id)
+                if beatmap_id not in beatmap_idx:
+                    beatmap_idx[beatmap_id] = len(beatmap_idx)
+
+        self.beatmap_idx = beatmap_idx
+
     def _get_metadata(self, args: TrainConfig) -> DataFrame:
         return filter_mmrs_metadata(
             load_mmrs_metadata(args.data.train_dataset_path),
             start=args.data.train_dataset_start,
             end=args.data.train_dataset_end,
             gamemodes=args.data.gamemodes,
+            ranked_statuses=args.data.ranked_statuses,
             min_year=args.data.min_year,
             max_year=args.data.max_year,
             min_difficulty=args.data.min_difficulty,
@@ -522,13 +556,13 @@ class Tokenizer(PushToHubMixin):
 
     def _init_mapper_idx(self, args):
         """Indexes beatmap mappers and mapper idx."""
-        if args.data.dataset_type == "ors":
-            self._init_mapper_idx_ors(args)
+        if args.data.dataset_type in ["ors", "web"]:
+            self._init_mapper_idx_local(args)
         elif args.data.dataset_type == "mmrs":
             self._init_mapper_idx_mmrs(args)
 
-    def _init_mapper_idx_ors(self, args):
-        if args is None or "mappers_path" not in args.data:
+    def _init_mapper_idx_local(self, args):
+        if args is None or not getattr(args.data, "mappers_path", None):
             raise ValueError("mappers_path not found in args")
 
         path = Path(args.data.mappers_path)
@@ -541,8 +575,8 @@ class Tokenizer(PushToHubMixin):
             data = json.load(file)
 
         # Populate beatmap_mapper
-        for item in data:
-            self.beatmap_mapper[item['id']] = item['user_id']
+        for beatmap_id in data:
+            self.beatmap_mapper[int(beatmap_id)] = data[beatmap_id]
 
         # Get unique user_ids from beatmap_mapper values
         unique_user_ids = list(set(self.beatmap_mapper.values()))
@@ -563,13 +597,15 @@ class Tokenizer(PushToHubMixin):
 
     def _init_descriptor_idx(self, args):
         """"Indexes beatmap descriptors and descriptor idx."""
-        if args.data.dataset_type == "ors":
-            self._init_descriptor_idx_ors(args)
+        if args.data.descriptor_source == "local" or args.data.dataset_type == "ors":
+            self._init_descriptor_idx_local(args)
+        elif args.data.descriptor_source == "web":
+            self._init_descriptor_idx_web(args)
         elif args.data.dataset_type == "mmrs":
             self._init_descriptor_idx_mmrs(args)
 
-    def _init_descriptor_idx_ors(self, args):
-        if args is None or "descriptors_path" not in args.data:
+    def _init_descriptor_idx_local(self, args):
+        if args is None or not getattr(args.data, "descriptors_path", None):
             raise ValueError("descriptors_path not found in args")
 
         path = Path(args.data.descriptors_path)
@@ -612,19 +648,6 @@ class Tokenizer(PushToHubMixin):
 
             self.num_descriptor_classes = len(self.descriptor_idx)
         elif args.data.descriptor_source == "user_tags":
-            path = Path(args.data.tags_metadata_path)
-
-            if not path.exists():
-                raise ValueError(f"tags_metadata_path {path} not found")
-
-            # The tags metadata file is a JSON file with the following format:
-            #  { "tags": [ { "id": tag_idx, "name": tag_name }, ... ] }
-            with open(path, 'r', encoding="utf-8") as file:
-                data = json.load(file)
-            tags = data["tags"]
-            self.descriptor_idx = {tag["name"]: tag["id"] for tag in tags}
-            self.num_descriptor_classes = max(self.descriptor_idx.values()) + 1
-
             def filter_tags(row):
                 # Zip the two lists together and keep pairs where count >= 2
                 filtered_pairs = [(t, c) for t, c in zip(row['TopTagIds'], row['TopTagCounts']) if c >= args.data.min_top_tag_count]
@@ -638,10 +661,44 @@ class Tokenizer(PushToHubMixin):
                 ids, _ = zip(*filtered_pairs)
                 return list(ids)
 
+            self._init_user_tag_idx(args)
             self.beatmap_descriptors = (self.metadata.reset_index().set_index(["Id"])[["TopTagIds", "TopTagCounts"]]
                                         .apply(filter_tags, axis=1).dropna().to_dict())
         else:
             raise ValueError(f"descriptor_source {args.data.descriptor_source} not supported")
+
+    def _init_descriptor_idx_web(self, args):
+        from datasets import load_dataset
+        self._init_user_tag_idx(args)
+
+        tags_ds = load_dataset(args.data.descriptors_path, split="train")
+        df = tags_ds.to_pandas()
+        id_col = df.columns[0]
+        df_long = df.melt(id_vars=[id_col], var_name='tag', value_name='votes')
+        df_filtered = df_long[df_long['votes'] >= args.data.min_top_tag_count].copy()
+        df_filtered.sort_values(by=[id_col, 'votes'], ascending=[True, False], inplace=True)
+        df_filtered["tag"] = (
+            df_filtered["tag"]
+            .map(self.descriptor_idx)  # tag name -> id
+            .fillna(self.num_descriptor_classes)  # unknown tag fallback
+            .astype(int)
+        )
+        tags_series = df_filtered.groupby(id_col)['tag'].apply(list)
+        self.beatmap_descriptors = tags_series.to_dict()
+
+    def _init_user_tag_idx(self, args):
+        path = Path(args.data.tags_metadata_path)
+
+        if not path.exists():
+            raise ValueError(f"tags_metadata_path {path} not found")
+
+        # The tags metadata file is a JSON file with the following format:
+        #  { "tags": [ { "id": tag_idx, "name": tag_name }, ... ] }
+        with open(path, 'r', encoding="utf-8") as file:
+            data = json.load(file)
+        tags = data["tags"]
+        self.descriptor_idx = {tag["name"]: tag["id"] for tag in tags}
+        self.num_descriptor_classes = max(self.descriptor_idx.values()) + 1
 
     def save_pretrained(self, save_directory: str, **kwargs):
         """Save the tokenizer to the given directory as a JSON file."""

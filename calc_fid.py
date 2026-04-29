@@ -34,6 +34,125 @@ from logging.handlers import QueueHandler, QueueListener
 logger = logging.getLogger(__name__)
 
 
+# --- Extra metrics helpers (Drain/BPM/SR) ---
+
+def _drain_time_seconds(beatmap: Beatmap, *, break_threshold_seconds: float = 8.0) -> float:
+    """Drain time in seconds.
+
+    Defined as the time between the first and last hit object minus any breaks.
+    Breaks are gaps between consecutive hit object start times larger than `break_threshold_seconds`.
+    """
+    times_ms = [int(obj.time.total_seconds() * 1000) for obj in beatmap.hit_objects(stacking=False)]
+    if len(times_ms) < 2:
+        return 0.0
+
+    times_ms.sort()
+    span_ms = times_ms[-1] - times_ms[0]
+    if span_ms <= 0:
+        return 0.0
+
+    thresh_ms = int(break_threshold_seconds * 1000)
+    break_ms = 0
+    for a, b in zip(times_ms, times_ms[1:]):
+        gap = b - a
+        if gap > thresh_ms:
+            break_ms += gap
+
+    return max(0.0, (span_ms - break_ms) / 1000.0)
+
+
+def _song_length_seconds(beatmap: Beatmap) -> float:
+    """Integration domain length in seconds.
+
+    Uses the last hit object's start time as a proxy for song length.
+    """
+    times = [obj.time.total_seconds() for obj in beatmap.hit_objects(stacking=False)]
+    if not times:
+        return 0.0
+    return max(times)
+
+
+def _timing_points_sorted(beatmap: Beatmap):
+    tps = list(getattr(beatmap, "timing_points", []) or [])
+    tps.sort(key=lambda tp: float(tp.offset.total_seconds()))
+    return tps
+
+
+def _bpm_segments(beatmap: Beatmap) -> list[tuple[float, float]]:
+    """Piecewise-constant BPM segments from uninherited timing points.
+
+    Returns [(start_time_seconds, bpm), ...] sorted by start time.
+    """
+    segs: list[tuple[float, float]] = []
+    for tp in _timing_points_sorted(beatmap):
+        ms_per_beat = getattr(tp, "ms_per_beat", None)
+        if ms_per_beat is None or ms_per_beat <= 0:
+            # ignore inherited/invalid timing points
+            continue
+        bpm = 60000.0 / float(ms_per_beat)
+        segs.append((float(tp.offset.total_seconds()), bpm))
+
+    if not segs:
+        return [(0.0, 0.0)]
+
+    segs.sort(key=lambda x: x[0])
+
+    # If multiple points share the same timestamp, keep the last one.
+    deduped: list[tuple[float, float]] = []
+    for s, bpm in segs:
+        if deduped and abs(deduped[-1][0] - s) < 1e-12:
+            deduped[-1] = (s, bpm)
+        else:
+            deduped.append((s, bpm))
+    return deduped
+
+
+def _bpm_at(segments: list[tuple[float, float]], t: float) -> float:
+    """BPM at time t given piecewise segments [(start, bpm), ...]."""
+    current = segments[0][1]
+    for s, bpm in segments:
+        if s <= t + 1e-12:
+            current = bpm
+        else:
+            break
+    return current
+
+
+def _bpm_mse_for_pair(real: Beatmap, generated: Beatmap) -> tuple[float, float]:
+    """Return (integral_0^L (r(t)-g(t))^2 dt, L) for one pair."""
+    length_s = max(_song_length_seconds(real), _song_length_seconds(generated))
+    if length_s <= 0:
+        return 0.0, 0.0
+
+    r_segs = _bpm_segments(real)
+    g_segs = _bpm_segments(generated)
+
+    change_points = {0.0, float(length_s)}
+    change_points.update(s for s, _ in r_segs if 0.0 <= s <= length_s)
+    change_points.update(s for s, _ in g_segs if 0.0 <= s <= length_s)
+    cps = sorted(change_points)
+
+    integrated = 0.0
+    for a, b in zip(cps, cps[1:]):
+        if b <= a:
+            continue
+        mid = (a + b) / 2.0
+        diff = _bpm_at(r_segs, mid) - _bpm_at(g_segs, mid)
+        integrated += (diff * diff) * (b - a)
+
+    return integrated, float(length_s)
+
+
+def _sr_stars(beatmap_path: Path) -> Optional[float]:
+    """Star rating via rosu_pp_py."""
+    import rosu_pp_py as rosu
+
+    rosu_map = rosu.Beatmap(path=str(beatmap_path))
+    rosu_diff = rosu.Difficulty()
+    attrs = rosu_diff.calculate(rosu_map)
+    return attrs.stars
+
+
 def _configure_generation_log_parent(log_file: Path) -> tuple[QueueListener, multiprocessing.Queue]:
     """Configure a QueueListener in the parent process that writes generation logs to a file."""
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -79,6 +198,16 @@ def _configure_generation_log_worker(queue: multiprocessing.Queue) -> logging.Lo
     return gen_logger
 
 
+def _read_gamemode_from_osu(path: Path) -> int:
+    """Read the Mode field from an .osu file without fully parsing it."""
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            stripped = line.strip()
+            if stripped.startswith("Mode:"):
+                return int(stripped.split(":")[1].strip())
+    return 0  # default to std
+
+
 def get_beatmap_paths(args: FidConfig) -> list[Path]:
     """Get all beatmap paths (.osu) from the dataset directory."""
     dataset_path = Path(args.dataset_path)
@@ -103,6 +232,45 @@ def get_beatmap_paths(args: FidConfig) -> list[Path]:
         raise ValueError(f"Unknown dataset type: {args.dataset_type}")
 
     return beatmap_files
+
+
+def get_beatmap_paths_by_gamemode(args: FidConfig) -> dict[int, list[Path]]:
+    """Get beatmap paths grouped by gamemode.
+
+    For mmrs datasets the gamemode comes from the metadata.
+    For ors datasets the Mode field is read from each .osu file.
+
+    Returns:
+        Dictionary mapping gamemode (int) to the list of beatmap paths for that mode.
+    """
+    dataset_path = Path(args.dataset_path)
+    paths_by_gm: dict[int, list[Path]] = {}
+
+    if args.dataset_type == "mmrs":
+        metadata = load_mmrs_metadata(dataset_path)
+        filtered_metadata = filter_mmrs_metadata(
+            metadata,
+            start=args.dataset_start,
+            end=args.dataset_end,
+            gamemodes=args.gamemodes,
+        )
+        for _, item in filtered_metadata.iterrows():
+            gm = int(item["ModeInt"])
+            path = dataset_path / "data" / item["BeatmapSetFolder"] / item["BeatmapFile"]
+            paths_by_gm.setdefault(gm, []).append(path)
+    elif args.dataset_type == "ors":
+        track_names = ["Track" + str(i).zfill(5) for i in range(args.dataset_start, args.dataset_end)]
+        for track_name in track_names:
+            for beatmap_file in (dataset_path / track_name / "beatmaps").iterdir():
+                path = dataset_path / track_name / "beatmaps" / beatmap_file.name
+                gm = _read_gamemode_from_osu(path)
+                if gm in args.gamemodes:
+                    paths_by_gm.setdefault(gm, []).append(path)
+    else:
+        raise ValueError(f"Unknown dataset type: {args.dataset_type}")
+
+    # Sort keys so generation order is deterministic (0, 1, 2, 3)
+    return dict(sorted(paths_by_gm.items()))
 
 
 def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
@@ -251,15 +419,9 @@ def generate_beatmaps(beatmap_paths, args: InferenceConfig, dataset_type, idx, l
     gen_logger = _configure_generation_log_worker(log_queue)
 
     model, tokenizer, diff_model, diff_tokenizer, refine_model = None, None, None, None, None
-    model, tokenizer = load_model_with_server(
-        args.model_path,
-        args.train,
-        args.device,
-        max_batch_size=args.max_batch_size,
-        use_server=args.use_server,
-        precision=args.precision,
-        attn_implementation=args.attn_implementation,
-    )
+    model, tokenizer = load_model_with_server(args.model_path, args.train, args.device,
+                                              max_batch_size=args.max_batch_size, use_server=args.use_server,
+                                              precision=args.precision, attn_implementation=args.attn_implementation)
 
     if args.compile:
         model.transformer.forward = torch.compile(model.transformer.forward, mode="reduce-overhead", fullgraph=True)
@@ -296,7 +458,7 @@ def generate_beatmaps(beatmap_paths, args: InferenceConfig, dataset_type, idx, l
                 else:
                     other_beatmap_path = beatmap_path
 
-                generation_config = generation_config_from_beatmap(beatmap, tokenizer)
+                generation_config = generation_config_from_beatmap(beatmap, beatmap_path, tokenizer)
                 beatmap_config = beatmap_config_from_beatmap(beatmap)
                 beatmap_config.version = args.version
 
@@ -355,6 +517,16 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
     active_rhythm_stats = {}
     passive_rhythm_stats = {}
 
+    # Extra metrics accumulators
+    drain_se_sum = 0.0
+    drain_n = 0
+
+    bpm_integrated_se_sum = 0.0
+    bpm_length_sum = 0.0
+
+    sr_se_sum = 0.0
+    sr_n = 0
+
     for beatmap_path in tqdm(beatmap_paths, desc=f"Metrics"):
         try:
             beatmap = Beatmap.from_path(beatmap_path)
@@ -366,7 +538,8 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
                 audio_path = beatmap_path.parent / beatmap.audio_filename
 
             if generated_path.exists() and len(list(generated_path.glob("*.osu"))) > 0:
-                generated_beatmap = Beatmap.from_path(list(generated_path.glob("*.osu"))[0])
+                generated_osu_path = list(generated_path.glob("*.osu"))[0]
+                generated_beatmap = Beatmap.from_path(generated_osu_path)
             else:
                 logger.warning(f"Skipping {beatmap_path.stem} as no generated beatmap found")
                 continue
@@ -411,6 +584,28 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
                 real_passive_rhythm = get_rhythm(beatmap, passive=True)
                 generated_passive_rhythm = get_rhythm(generated_beatmap, passive=True)
                 add_to_dict(calculate_rhythm_stats(real_passive_rhythm, generated_passive_rhythm), passive_rhythm_stats)
+
+            if args.extra_stats:
+                # --- Extra metrics per pair ---
+                # Drain time MSE
+                real_drain = _drain_time_seconds(beatmap)
+                gen_drain = _drain_time_seconds(generated_beatmap)
+                drain_diff = real_drain - gen_drain
+                drain_se_sum += float(drain_diff * drain_diff)
+                drain_n += 1
+
+                # BPM MSE (accumulate integral and length so final is sum(integrals)/sum(lengths)
+                integ, length_s = _bpm_mse_for_pair(beatmap, generated_beatmap)
+                bpm_integrated_se_sum += float(integ)
+                bpm_length_sum += float(length_s)
+
+                # SR MSE (rosu)
+                real_sr = _sr_stars(beatmap_path)
+                gen_sr = _sr_stars(generated_osu_path)
+                sr_diff = float(real_sr - gen_sr)
+                sr_se_sum += sr_diff * sr_diff
+                sr_n += 1
+
         except Exception as e:
             print(f"Error processing {beatmap_path}: {e}")
             traceback.print_exc()
@@ -446,6 +641,17 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
         logger.info(f"Passive Rhythm Recall: {passive_recall}")
         logger.info(f"Passive Rhythm F1: {passive_f1}")
 
+    if args.extra_stats:
+        # --- Log extra metrics ---
+        if drain_n > 0:
+            logger.info(f"Drain RMSE: {np.sqrt(drain_se_sum / drain_n)}")
+
+        if bpm_length_sum > 0:
+            logger.info(f"BPM RMSE: {np.sqrt(bpm_integrated_se_sum / bpm_length_sum)}")
+
+        if sr_n > 0:
+            logger.info(f"SR RMSE: {np.sqrt(sr_se_sum / sr_n)}")
+
 
 def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: Optional[str]):
     if training_set_ids_path is None:
@@ -480,12 +686,15 @@ def main(args: FidConfig):
     print(f"Logging to directory: {os.getcwd()}")
 
     # Fix inference model path
-    if args.inference.model_path.startswith("./"):
-        args.inference.model_path = os.path.join(Path(__file__).parent, args.inference.model_path[2:])
+    base_model_path = args.inference.model_path
+    if base_model_path.startswith("./"):
+        base_model_path = os.path.join(Path(__file__).parent, base_model_path[2:])
 
-    beatmap_paths = get_beatmap_paths(args)
+    # Group beatmaps by gamemode so each stage uses the correct checkpoint
+    paths_by_gm = get_beatmap_paths_by_gamemode(args)
+    all_beatmap_paths = [p for gm_paths in paths_by_gm.values() for p in gm_paths]
 
-    test_training_set_overlap(beatmap_paths, args.training_set_ids_path)
+    test_training_set_overlap(all_beatmap_paths, args.training_set_ids_path)
 
     listener = None
     try:
@@ -493,25 +702,47 @@ def main(args: FidConfig):
         listener, log_queue = _configure_generation_log_parent(Path(os.getcwd()) / "generation.log")
 
         if not args.skip_generation:
-            # Assign beatmaps to processes in a round-robin fashion
-            num_processes = max(args.num_processes, 1)
-            chunks = [[] for _ in range(num_processes)]
-            for i, path in enumerate(beatmap_paths):
-                chunks[i % num_processes].append(path)
+            gamemode_names = {0: "std", 1: "taiko", 2: "catch", 3: "mania"}
+            for gm, gm_beatmap_paths in paths_by_gm.items():
+                gm_name = gamemode_names.get(gm, f"gamemode {gm}")
+                gm_model_path = os.path.join(base_model_path, f"gamemode={gm}")
 
-            if args.num_processes <= 0:
-                generate_beatmaps(chunks[0], args.inference, args.dataset_type, 0, log_queue=log_queue)
-            else:
-                processes = []
-                for i in range(num_processes):
-                    p = Process(target=generate_beatmaps, args=(chunks[i], args.inference, args.dataset_type, i, log_queue))
-                    processes.append(p)
-                    p.start()
+                if not os.path.exists(gm_model_path):
+                    logger.warning(
+                        "Checkpoint folder %s does not exist, falling back to base model path for %s",
+                        gm_model_path, gm_name,
+                    )
+                    gm_model_path = base_model_path
 
-                for p in processes:
-                    p.join()
+                logger.info(
+                    "=== Generating %s beatmaps (%d maps) with checkpoint %s ===",
+                    gm_name, len(gm_beatmap_paths), gm_model_path,
+                )
 
-        calculate_metrics(args, beatmap_paths)
+                # Override model path for this gamemode
+                args.inference.model_path = gm_model_path
+
+                # Assign beatmaps to processes in a round-robin fashion
+                num_processes = max(args.num_processes, 1)
+                chunks = [[] for _ in range(num_processes)]
+                for i, path in enumerate(gm_beatmap_paths):
+                    chunks[i % num_processes].append(path)
+
+                if args.num_processes <= 0:
+                    generate_beatmaps(chunks[0], args.inference, args.dataset_type, 0, log_queue=log_queue)
+                else:
+                    processes = []
+                    for i in range(num_processes):
+                        p = Process(target=generate_beatmaps, args=(chunks[i], args.inference, args.dataset_type, i, log_queue))
+                        processes.append(p)
+                        p.start()
+
+                    for p in processes:
+                        p.join()
+
+                logger.info("=== Finished generating %s beatmaps ===", gm_name)
+
+        calculate_metrics(args, all_beatmap_paths)
     finally:
         if listener is not None:
             listener.stop()

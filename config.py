@@ -74,6 +74,7 @@ class InferenceConfig:
     use_server: bool = True  # Use server for optimized multiprocess inference
     max_batch_size: int = 16  # Maximum batch size for inference (only used for parallel sampling or super timing)
     resnap_events: bool = True  # Resnap notes to the timing after generation
+    snap_near_perfect_overlaps: bool = True  # Snap nearly overlapping positions to each other
 
     # Metadata settings
     bpm: Optional[int] = None  # Beats per minute of input audio
@@ -119,6 +120,7 @@ class FidConfig:
     fid: bool = True
     fid_cm3p: bool = True
     rhythm_stats: bool = True
+    extra_stats: bool = True
 
     dataset_type: str = 'ors'
     dataset_path: str = '/workspace/datasets/ORS16291'

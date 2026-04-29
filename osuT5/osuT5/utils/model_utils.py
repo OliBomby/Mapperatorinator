@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 import numpy as np
 from torch.optim import Optimizer
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, IterableDataset
 from torch.optim.lr_scheduler import (
     LRScheduler,
     SequentialLR,
@@ -14,9 +14,7 @@ from torch.optim.lr_scheduler import (
     CosineAnnealingLR, ConstantLR,
 )
 
-from ..dataset.ors_dataset import OrsDataset
 from ..dataset.osu_parser import OsuParser
-from ..dataset.mmrs_dataset import MmrsDataset
 from ..event import EventType
 from ..model.configuration_mapperatorinator import MapperatorinatorConfig
 from ..model.modeling_mapperatorinator import Mapperatorinator
@@ -122,17 +120,10 @@ def _precision_to_dtype(precision: str) -> torch.dtype:
         raise ValueError(f"Unsupported precision: {precision}")
 
 
-def load_model(
-        ckpt_path_str: str,
-        t5_args: TrainConfig,
-        device,
-        precision: str = "fp32",
-        attn_implementation: str = "sdpa",
-        eval_mode: bool = True,
-        pickle_module=None,
-):
+def load_model(ckpt_path: str | Path | None, t5_args: TrainConfig, device, precision: str = "fp32", attn_implementation: str = "sdpa",
+               eval_mode: bool = True, pickle_module=None):
     model_loader, tokenizer_loader = load_model_loaders(
-        ckpt_path_str,
+        ckpt_path,
         t5_args,
         device,
         precision,
@@ -144,7 +135,7 @@ def load_model(
 
 
 def load_model_loaders(
-        ckpt_path_str: str,
+        ckpt_path: str | Path | None,
         t5_args: TrainConfig,
         device,
         precision: str = "fp32",
@@ -153,19 +144,19 @@ def load_model_loaders(
         pickle_module=None,
         lora_path=None,
 ):
-    if ckpt_path_str == "":
+    if not ckpt_path:
         if eval_mode:
             raise ValueError("Model path is empty.")
         else:
             print("No pretrained model path provided, training from scratch.")
 
-    ckpt_path = Path(ckpt_path_str)
+    ckpt_path = Path(ckpt_path) if ckpt_path else None
 
     def tokenizer_loader():
-        if ckpt_path_str == "":
+        if not ckpt_path:
             tokenizer = get_tokenizer(t5_args)
         elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
-            tokenizer = Tokenizer.from_pretrained(ckpt_path_str)
+            tokenizer = Tokenizer.from_pretrained(str(ckpt_path))
         else:
             tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=pickle_module, weights_only=False)
             tokenizer = Tokenizer()
@@ -176,12 +167,12 @@ def load_model_loaders(
 
     def model_loader():
         dtype = _precision_to_dtype(precision)
-        if ckpt_path_str == "":
+        if not ckpt_path:
             model = _get_model(t5_args, tokenizer, dtype=dtype, attn_implementation=attn_implementation)
             model.to(device=device, dtype=dtype)
         elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
             model = Mapperatorinator.from_pretrained(
-                ckpt_path_str,
+                str(ckpt_path),
                 dtype=dtype,
                 attn_implementation=attn_implementation,
                 device_map=device
@@ -212,7 +203,7 @@ def load_model_loaders(
         if eval_mode:
             model.eval()
 
-        print(f"Model loaded: {ckpt_path_str} on device {device}")
+        print(f"Model loaded: {str(ckpt_path)} on device {device}")
         return model
 
     return model_loader, tokenizer_loader
@@ -342,11 +333,16 @@ def get_scheduler(optimizer: Optimizer, args: TrainConfig, accelerator) -> LRSch
     return scheduler
 
 
-def get_dataset(args: TrainConfig, test: bool, **kwargs) -> Dataset:
+def get_dataset(args: TrainConfig, **kwargs) -> IterableDataset:
     if args.data.dataset_type == "ors":
-        return OrsDataset(args=args.data, test=test, **kwargs)
+        from ..dataset.ors_dataset import OrsDataset
+        return OrsDataset(args=args.data, **kwargs)
     elif args.data.dataset_type == "mmrs":
+        from ..dataset.mmrs_dataset import MmrsDataset
         return MmrsDataset(args=args.data, **kwargs)
+    elif args.data.dataset_type == "web":
+        from ..dataset.web_dataset import WebDataset
+        return WebDataset(args=args.data, **kwargs)
     else:
         raise NotImplementedError
 
@@ -381,7 +377,7 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
             pin_memory=args.dataloader.pin_memory,
             drop_last=args.dataloader.drop_last,
             persistent_workers=args.dataloader.num_workers > 0,
-            worker_init_fn=worker_init_fn,
+            worker_init_fn=worker_init_fn if args.data.dataset_type in ["ors", "mmrs"] else None,
         )
 
     return dataloaders["train"], dataloaders["test"]

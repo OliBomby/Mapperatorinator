@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os
 import zipfile
 from datetime import timedelta
-import logging
 from string import Template
 from typing import Optional
 
@@ -60,9 +60,9 @@ def background_line(background: str) -> str:
 
 def beatmap_config_from_beatmap(beatmap: Beatmap) -> BeatmapConfig:
     return BeatmapConfig(
-        bpm=beatmap.bpm_max(),
-        offset=int(round((min(tp.offset.total_seconds() * 1000 for tp in beatmap.timing_points)))),
         audio_filename=beatmap.audio_filename,
+        preview_time=int(beatmap.preview_time.total_seconds() * 1000 + 1e-5),
+        mode=int(beatmap.mode),
         title=beatmap.title,
         title_unicode=beatmap.title_unicode,
         artist=beatmap.artist,
@@ -71,20 +71,21 @@ def beatmap_config_from_beatmap(beatmap: Beatmap) -> BeatmapConfig:
         version=beatmap.version,
         source=beatmap.source,
         tags=" ".join(beatmap.tags),
-        background_line=background_line(beatmap.background),
-        preview_time=int(beatmap.preview_time.total_seconds() * 1000 + 1e-5),
         hp_drain_rate=beatmap.hp_drain_rate,
         circle_size=beatmap.circle_size,
         overall_difficulty=beatmap.overall_difficulty,
         approach_rate=beatmap.approach_rate,
         slider_multiplier=beatmap.slider_multiplier,
         slider_tick_rate=beatmap.slider_tick_rate,
+        bpm=beatmap.bpm_max(),
+        offset=int(round((min(tp.offset.total_seconds() * 1000 for tp in beatmap.timing_points)))),
+        background_line=background_line(beatmap.background),
     )
 
 
 def calculate_coordinates(last_pos, dist, num_samples, playfield_size):
     # Generate a set of angles
-    angles = np.linspace(0, 2*np.pi, num_samples)
+    angles = np.linspace(0, 2 * np.pi, num_samples)
 
     # Calculate the x and y coordinates for each angle
     x_coords = last_pos[0] + dist * np.cos(angles)
@@ -136,6 +137,7 @@ class Postprocessor(object):
         self.start_time = args.start_time
         self.end_time = args.end_time
         self.has_sv = args.train.data.add_sv
+        self.snap_near_perfect_overlaps_enabled = args.snap_near_perfect_overlaps
 
         self.logger = logging.getLogger(__name__) if logger is None else logger.getChild(__name__)
 
@@ -173,7 +175,8 @@ class Postprocessor(object):
         groups, _ = get_groups(events, types_first=self.types_first)
         last_x, last_y = 256, 192
 
-        self.snap_near_perfect_overlaps(groups)
+        if self.snap_near_perfect_overlaps_enabled:
+            self.snap_near_perfect_overlaps(groups)
 
         # Prepare unnormalizing scroll speed changes in mania
         last_time = max(group.time for group in groups) if len(groups) > 0 else 0
@@ -192,7 +195,9 @@ class Postprocessor(object):
                 # Maybe the model forgot to add any distance or position tokens, so let's just assume the last position
                 group.x, group.y = last_x, last_y
 
-            if hit_type in [EventType.CIRCLE, EventType.SLIDER_HEAD, EventType.BEZIER_ANCHOR, EventType.PERFECT_ANCHOR, EventType.CATMULL_ANCHOR, EventType.RED_ANCHOR, EventType.LAST_ANCHOR, EventType.SLIDER_END]:
+            if hit_type in [EventType.CIRCLE, EventType.SLIDER_HEAD, EventType.BEZIER_ANCHOR, EventType.PERFECT_ANCHOR,
+                            EventType.CATMULL_ANCHOR, EventType.RED_ANCHOR, EventType.LAST_ANCHOR,
+                            EventType.SLIDER_END]:
                 last_x, last_y = group.x, group.y
 
             if beatmap_config.mode == 1:
@@ -206,7 +211,8 @@ class Postprocessor(object):
                 sampleset = group.samplesets[0] if len(group.samplesets) > 0 else 0
                 addition = group.additions[0] if len(group.additions) > 0 else 0
                 volume = group.volumes[0] if len(group.volumes) > 0 and beatmap_config.mode == 3 else 0
-                hit_object_strings.append(f"{int(round(group.x))},{int(round(group.y))},{int(round(group.time))},{5 if group.new_combo else 1},{hitsound},{sampleset}:{addition}:-1:{volume}:")
+                hit_object_strings.append(
+                    f"{int(round(group.x))},{int(round(group.y))},{int(round(group.time))},{5 if group.new_combo else 1},{hitsound},{sampleset}:{addition}:-1:{volume}:")
                 if len(group.volumes) > 0 and beatmap_config.mode != 3:
                     timing = self.set_volume(timedelta(milliseconds=int(round(group.time))), group.volumes[0], timing)
                 if beatmap_config.mode == 1 and group.scroll_speed is not None:
@@ -219,12 +225,14 @@ class Postprocessor(object):
                 hitsound = hold_note_start.hitsounds[0] if len(hold_note_start.hitsounds) > 0 else 0
                 sampleset = hold_note_start.samplesets[0] if len(hold_note_start.samplesets) > 0 else 0
                 addition = hold_note_start.additions[0] if len(hold_note_start.additions) > 0 else 0
-                volume = hold_note_start.volumes[0] if len(hold_note_start.volumes) > 0 and beatmap_config.mode == 3 else 0
+                volume = hold_note_start.volumes[0] if len(
+                    hold_note_start.volumes) > 0 and beatmap_config.mode == 3 else 0
                 hit_object_strings.append(
                     f"{int(round(hold_note_start.x))},{192},{int(round(hold_note_start.time))},{128},{hitsound},{int(round(group.time))}:{sampleset}:{addition}:-1:{volume}:"
                 )
                 if len(hold_note_start.volumes) > 0 and beatmap_config.mode != 3:
-                    timing = self.set_volume(timedelta(milliseconds=int(round(hold_note_start.time))), hold_note_start.volumes[0], timing)
+                    timing = self.set_volume(timedelta(milliseconds=int(round(hold_note_start.time))),
+                                             hold_note_start.volumes[0], timing)
                 hold_note_start = None
 
             elif hit_type == EventType.DRUMROLL:
@@ -242,9 +250,11 @@ class Postprocessor(object):
                 sampleset = drumroll_start.samplesets[0] if len(drumroll_start.samplesets) > 0 else 0
                 addition = drumroll_start.additions[0] if len(drumroll_start.additions) > 0 else 0
                 if len(drumroll_start.volumes) > 0:
-                    timing = self.set_volume(timedelta(milliseconds=int(round(drumroll_start.time))), drumroll_start.volumes[0], timing)
+                    timing = self.set_volume(timedelta(milliseconds=int(round(drumroll_start.time))),
+                                             drumroll_start.volumes[0], timing)
                 if beatmap_config.mode == 1 and drumroll_start.scroll_speed is not None:
-                    timing = self.set_sv(timedelta(milliseconds=int(round(drumroll_start.time))), drumroll_start.scroll_speed, timing)
+                    timing = self.set_sv(timedelta(milliseconds=int(round(drumroll_start.time))),
+                                         drumroll_start.scroll_speed, timing)
 
                 tp = self.timing_point_at(timedelta(milliseconds=drumroll_start_time), timing)
                 redline = tp if tp.parent is None else tp.parent
@@ -255,7 +265,7 @@ class Postprocessor(object):
                 control_points = "|".join(f"{cp[0]}:{cp[1]}" for cp in anchor_info)
 
                 hit_object_strings.append(
-                    f"{start_pos[0]},{start_pos[1]},{drumroll_start_time},{2},{hitsound},L|{control_points},{1},{length},0:0,0:0|0:0,{sampleset}:{addition}:-1:0:"
+                    f"{start_pos[0]},{start_pos[1]},{drumroll_start_time},{2},{hitsound},L|{control_points},{1},{length},0|0,0:0|0:0,{sampleset}:{addition}:-1:0:"
                 )
 
                 drumroll_start = None
@@ -271,9 +281,11 @@ class Postprocessor(object):
                     f"{256},{192},{int(round(denden_start.time))},{12},{hitsound},{int(round(group.time))},{sampleset}:{addition}:-1:0:"
                 )
                 if len(denden_start.volumes) > 0:
-                    timing = self.set_volume(timedelta(milliseconds=int(round(denden_start.time))), denden_start.volumes[0], timing)
+                    timing = self.set_volume(timedelta(milliseconds=int(round(denden_start.time))),
+                                             denden_start.volumes[0], timing)
                 if beatmap_config.mode == 1 and denden_start.scroll_speed is not None:
-                    timing = self.set_sv(timedelta(milliseconds=int(round(denden_start.time))), denden_start.scroll_speed, timing)
+                    timing = self.set_sv(timedelta(milliseconds=int(round(denden_start.time))),
+                                         denden_start.scroll_speed, timing)
                 denden_start = None
 
             elif hit_type == EventType.SPINNER:
@@ -332,7 +344,8 @@ class Postprocessor(object):
 
                 slides = max(int(round(total_duration / span_duration)), 1)
                 span_duration = total_duration / slides
-                slider_path = SliderPath(self.curve_type_shorthand[curve_type], np.array([(slider_head.x, slider_head.y)] + [(cp[1], cp[2]) for cp in anchor_info], dtype=float))
+                slider_path = SliderPath(self.curve_type_shorthand[curve_type], np.array(
+                    [(slider_head.x, slider_head.y)] + [(cp[1], cp[2]) for cp in anchor_info], dtype=float))
                 max_length = slider_path.get_distance()
 
                 tp = self.timing_point_at(timedelta(milliseconds=slider_start_time), timing)
@@ -343,12 +356,14 @@ class Postprocessor(object):
                     req_length = max_length * position_to_progress(
                         slider_path,
                         np.array((group.x, group.y)),
-                    ) if self.has_pos else max_length - np.linalg.norm(np.array((group.x, group.y)) - np.array((last_anchor.x, last_anchor.y)))
+                    ) if self.has_pos else max_length - np.linalg.norm(
+                        np.array((group.x, group.y)) - np.array((last_anchor.x, last_anchor.y)))
 
                     if req_length < 1e-4:
                         continue
 
-                    sv, length = self.get_human_sv_and_length(req_length, max_length, span_duration, last_sv, redline, slider_head.new_combo, beatmap_config.slider_multiplier)
+                    sv, length = self.get_human_sv_and_length(req_length, max_length, span_duration, last_sv, redline,
+                                                              slider_head.new_combo, beatmap_config.slider_multiplier)
                 else:
                     sv = slider_head.scroll_speed
                     length = self.calc_length(sv, span_duration, redline, beatmap_config.slider_multiplier)
@@ -362,7 +377,8 @@ class Postprocessor(object):
                 # If the adjusted length is too long, scale the control points to fit the max_length
                 if length > max_length + 1e-4:
                     scale = length / max_length
-                    anchor_info = [(cp[0], (cp[1] - slider_head.x) * scale + slider_head.x, (cp[2] - slider_head.y) * scale + slider_head.y) for cp in anchor_info]
+                    anchor_info = [(cp[0], (cp[1] - slider_head.x) * scale + slider_head.x,
+                                    (cp[2] - slider_head.y) * scale + slider_head.y) for cp in anchor_info]
 
                 if sv != last_sv:
                     timing = self.set_sv(timedelta(milliseconds=slider_start_time), sv, timing)
@@ -390,7 +406,8 @@ class Postprocessor(object):
                     node_volume = node_volumes[i]
                     timing = self.set_volume(timedelta(milliseconds=t), node_volume, timing)
 
-                    if len(last_anchor.volumes) > 0 and last_anchor.volumes[0] != node_volume and i < slides and span_duration > 6:
+                    if len(last_anchor.volumes) > 0 and last_anchor.volumes[
+                        0] != node_volume and i < slides and span_duration > 6:
                         # Add a volume change after each node sample to make sure the body volume is maintained
                         timing = self.set_volume(timedelta(milliseconds=t + 6), last_anchor.volumes[0], timing)
 
@@ -404,11 +421,9 @@ class Postprocessor(object):
             elif hit_type == EventType.SCROLL_SPEED_CHANGE and group.scroll_speed is not None:
                 if self.mania_bpm_normalized_scroll_speed:
                     # Unnormalize scroll speed changes in mania
-                    tp = self.timing_point_at(timedelta(milliseconds=group.time), timing)
-                    redline = tp if tp.parent is None else tp.parent
-                    group.scroll_speed = group.scroll_speed * redline.ms_per_beat / median_mpb
-
-                timing = self.set_sv(timedelta(milliseconds=group.time), group.scroll_speed, timing)
+                    timing = self.set_normalized_sroll_speed(group.time, group.scroll_speed, timing, median_mpb)
+                else:
+                    timing = self.set_sv(timedelta(milliseconds=group.time), group.scroll_speed, timing)
 
         # Remove any greenlines before the first timingpoint where parent is None
         if len(timing) > 0:
@@ -464,8 +479,10 @@ class Postprocessor(object):
 
             result_redline = result_tp if result_tp.parent is None else result_tp.parent
             beatmap_redline = beatmap_tp if beatmap_tp.parent is None else beatmap_tp.parent
-            result_counter = ((start_time - result_redline.offset).total_seconds() * 1000 / result_redline.ms_per_beat + 1e-4) % result_redline.meter
-            beatmap_counter = ((start_time - beatmap_redline.offset).total_seconds() * 1000 / beatmap_redline.ms_per_beat + 1e-4) % beatmap_redline.meter
+            result_counter = ((
+                                          start_time - result_redline.offset).total_seconds() * 1000 / result_redline.ms_per_beat + 1e-4) % result_redline.meter
+            beatmap_counter = ((
+                                           start_time - beatmap_redline.offset).total_seconds() * 1000 / beatmap_redline.ms_per_beat + 1e-4) % beatmap_redline.meter
             if (result_redline.meter != beatmap_redline.meter or
                     abs(result_counter - beatmap_counter) > 1e-4 or
                     abs(result_redline.ms_per_beat - beatmap_redline.ms_per_beat) > 1e-4):
@@ -510,6 +527,25 @@ class Postprocessor(object):
         tp_change = TimingPointsChange(tp, mpb=True)
         return tp_change.add_change(timing, True)
 
+    def set_normalized_sroll_speed(self, time: int, normalized_scroll_speed, timing: list[TimingPoint], median_mpb) -> \
+    list[TimingPoint]:
+        """Set a BPM-normalized scroll speed change at a specific time."""
+        def apply_norm(td, r, t):
+            scroll_speed = normalized_scroll_speed * r.ms_per_beat / median_mpb
+            return self.set_sv(td, scroll_speed, t)
+
+        time_d = timedelta(milliseconds=time)
+        tp = self.timing_point_at(time_d, timing)
+        redline = tp if tp.parent is None else tp.parent
+        timing = apply_norm(time_d, redline, timing)
+
+        # Apply for all redlines after
+        for tp in timing:
+            if tp.offset > time_d and tp.parent is None:
+                timing = apply_norm(tp.offset, tp, timing)
+
+        return timing
+
     @staticmethod
     def set_kiai(time: timedelta, kiai: bool, timing: list[TimingPoint]) -> list[TimingPoint]:
         """Set the kiai mode at a specific time."""
@@ -526,7 +562,8 @@ class Postprocessor(object):
             control_points.append((x, y))
         return control_points
 
-    def get_human_sv_and_length(self, req_length, length, span_duration, last_sv, redline, new_combo, slider_multiplier):
+    def get_human_sv_and_length(self, req_length, length, span_duration, last_sv, redline, new_combo,
+                                slider_multiplier):
         # Only change sv if the difference is more than 10%
         sv = req_length / 100 / span_duration * redline.ms_per_beat / slider_multiplier
         leniency = 0.05 if new_combo else 0.15
@@ -820,7 +857,8 @@ class Postprocessor(object):
             if marker.is_measure:
                 # Add a redline in case the measure counter is out of sync
                 if counter % redline.meter != 0:
-                    tp = TimingPoint(timedelta(milliseconds=time), redline.ms_per_beat, redline.meter, 2, -1, 100, None, False)
+                    tp = TimingPoint(timedelta(milliseconds=time), redline.ms_per_beat, redline.meter, 2, -1, 100, None,
+                                     False)
                     tp_change = TimingPointsChange(tp, mpb=True, uninherited=True)
                     timing = tp_change.add_change(timing, True)
                 counter = 0
@@ -921,10 +959,12 @@ class Postprocessor(object):
                 continue
 
             # Filter previous groups to only include groups that are close in time
-            prev_groups = [prev_group for prev_group in prev_groups if abs(group.time - prev_group.time) <= time_leniency]
+            prev_groups = [prev_group for prev_group in prev_groups if
+                           abs(group.time - prev_group.time) <= time_leniency]
 
             for prev_group in prev_groups:
-                if np.linalg.norm(np.array([group.x, group.y]) - np.array([prev_group.x, prev_group.y])) < space_leniency:
+                if np.linalg.norm(
+                        np.array([group.x, group.y]) - np.array([prev_group.x, prev_group.y])) < space_leniency:
                     group.x = prev_group.x
                     group.y = prev_group.y
                     break

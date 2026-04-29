@@ -240,14 +240,8 @@ def main(args: TrainConfig):
         }
     )
 
-    model, tokenizer = load_model(
-        args.checkpoint_path,
-        args,
-        device=accelerator.device,
-        # Ignore precision argument because that is handled by accelerator
-        attn_implementation=args.attn_implementation,
-        eval_mode=True,
-    )
+    model, tokenizer = load_model(args.checkpoint_path, args, device=accelerator.device,
+                                  attn_implementation=args.attn_implementation, eval_mode=True)
 
     # noinspection PyTypeChecker
     model = accelerator.prepare(model)

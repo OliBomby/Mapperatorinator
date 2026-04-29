@@ -137,6 +137,8 @@ class DataConfig:
     dt_augment_prob: float = 0.5  # Probability of augmenting the dataset with DT
     dt_augment_range: list[float] = field(default_factory=lambda: [1.25, 1.5])  # Range of DT augmentation
     dt_augment_sqrt: bool = False  # Sample DT augmentation from a square root distribution
+    flip_horizontal_prob: float = 0.0  # Probability of horizontally flipping beatmap positions during training
+    flip_vertical_prob: float = 0.0  # Probability of vertically flipping beatmap positions during training
     types_first: bool = True  # Put the type token at the start of the group before the timeshift token
     add_kiai: bool = True  # Add kiai times to map context
     gamemodes: list[int] = field(default_factory=lambda: [0, 1, 2, 3])  # List of gamemodes to include in the dataset
@@ -154,6 +156,10 @@ class DataConfig:
     descriptor_source: str = 'omdb'
     min_top_tag_count: int = 2
     tags_metadata_path: str = ''
+    ranked_statuses: list[int] = field(default_factory=lambda: [1, 2])
+    dataset_subset: Optional[str] = None
+    train_dataset_streaming: bool = True  # Use streaming mode for training dataset
+    test_dataset_streaming: bool = False  # Use streaming mode for testing/validation dataset
 
 
 @dataclass
@@ -188,6 +194,9 @@ class EvalConfig:
 @dataclass
 class CheckpointConfig:
     every_steps: int = 5000
+    local_total_limit: int = 2
+    cleanup_wandb_cache_before_save: bool = True
+    wandb_cache_cleanup_size: str = "1GB"
 
 
 @dataclass
@@ -197,6 +206,7 @@ class LoggingConfig:
     grad_l2: bool = True
     weights_l2: bool = True
     mode: str = 'online'
+    run_name: Optional[str] = None  # Custom run name for the wandb tracker
 
 
 @dataclass
@@ -213,7 +223,8 @@ class ProfileConfig:
 class TrainConfig:
     compile: bool = True
     device: str = "gpu"
-    precision: str = "bf16"
+    mixed_precision: Optional[str] = "bf16"
+    precision: Optional[str] = None
     attn_implementation: str = "sdpa"
     seed: int = 42
     checkpoint_path: str = ""
