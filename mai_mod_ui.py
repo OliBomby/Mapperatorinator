@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 import datetime
+import traceback
 from typing import Callable, Any, Tuple, Dict
 
 import webview
@@ -561,6 +562,39 @@ def find_available_port(start_port=5000, max_tries=100):
     raise IOError("Could not find an available port.")
 
 
+def launch_browser_fallback(flask_url, flask_thread):
+    """Keep the server alive when an embedded window cannot be created."""
+    print(f"Running without an embedded window. Open {flask_url} in your browser.")
+    print("Press Ctrl+C to stop the server.")
+
+    try:
+        while flask_thread.is_alive():
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nStopping server...")
+
+
+def launch_webview_window(window_title, flask_url, window_width, window_height, api):
+    """Create the embedded pywebview window when a GUI backend is available."""
+    print(f"Creating pywebview window loading URL: {flask_url}")
+    try:
+        webview.create_window(
+            window_title,
+            url=flask_url,
+            width=window_width,
+            height=window_height,
+            resizable=True,
+            js_api=api,
+        )
+        webview.start(debug=False)
+        print("Pywebview window closed. Exiting application.")
+        return True
+    except Exception as e:
+        print(f"pywebview could not start an embedded window: {e}")
+        print(traceback.format_exc())
+        return False
+
+
 # --- Main Execution ---
 if __name__ == '__main__':
     # Find an available port for Flask
@@ -593,23 +627,8 @@ if __name__ == '__main__':
     window_title = 'MaiMod'
     flask_url = f'http://127.0.0.1:{flask_port}/'
 
-    print(f"Creating pywebview window loading URL: {flask_url}")
-
     # Instantiate the API class (doesn't need window object anymore)
     api = Api()
 
-    # Pass api instance directly to create_window via js_api
-    window = webview.create_window(
-        window_title,
-        url=flask_url,
-        width=window_width,  # Use calculated width
-        height=window_height,  # Use calculated height
-        resizable=True,
-        js_api=api  # Expose Python API class here
-    )
-
-    # Start the pywebview event loop (no args needed here now)
-    webview.start(debug=False)
-
-    print("Pywebview window closed. Exiting application.")
-    # Flask thread will exit automatically as it's a daemon
+    if not launch_webview_window(window_title, flask_url, window_width, window_height, api):
+        launch_browser_fallback(flask_url, flask_thread)
