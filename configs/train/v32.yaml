@@ -57,7 +57,7 @@ data:                  # Data settings
   add_positions: true
   position_precision: 32 # Precision of hit object coordinates
   position_split_axes: false  # Split hit object X and Y coordinates into separate tokens
-  dt_augment_prob: 0.0   # Probability of augmenting the dataset with DT
+  dt_augment_prob: 0.3   # Probability of augmenting the dataset with DT
   dt_augment_range: [1., 1.2]  # Range of DT augmentation
   dt_augment_sqrt: true  # Sample DT augmentation from a square root distribution
   types_first: false       # Put the type token at the start of the group before the timeshift token
@@ -81,6 +81,8 @@ data:                  # Data settings
   tags_metadata_path: "../../../datasets/tags_2026.json"       # Path to file with all beatmap mappers
   mappers_path: "../../../datasets/beatmap_users.json"       # Path to file with all beatmap mappers
   dataset_subset: "compressed"  # Subset of the dataset to use for web dataset
+  flip_horizontal_prob: 0.5  # Probability of horizontally flipping beatmap positions during training
+  flip_vertical_prob: 0.5  # Probability of vertically flipping beatmap positions during training
 
 dataloader:             # Dataloader settings
   num_workers: 8
@@ -90,9 +92,9 @@ optim:                  # Optimizer settings
   name: muon
   base_lr: 0.002         # Should be scaled with the number of devices present
   base_lr_2: 0.001        # Secondary learning rate for the internal optimizer
-  batch_size: 33
-  grad_acc: 3
-  total_steps: 622000
+  batch_size: 32
+  grad_acc: 2
+  total_steps: 700000
   warmup_steps: 0
   sustain_steps: 20000      # Steps to sustain the learning rate after warmup
   weight_decay: 0.01
