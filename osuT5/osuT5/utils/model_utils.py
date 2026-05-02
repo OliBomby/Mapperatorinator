@@ -203,7 +203,7 @@ def load_model_loaders(
         if eval_mode:
             model.eval()
 
-        print(f"Model loaded: {ckpt_path.as_posix()} on device {device}")
+        print(f"Model loaded: {ckpt_path.as_posix() if ckpt_path else ''} on device {device}")
         return model
 
     return model_loader, tokenizer_loader
