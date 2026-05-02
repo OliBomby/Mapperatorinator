@@ -85,7 +85,7 @@ data:                  # Data settings
   flip_vertical_prob: 0.5  # Probability of vertically flipping beatmap positions during training
 
 dataloader:             # Dataloader settings
-  num_workers: 8
+  num_workers: 16
   drop_last: true
 
 optim:                  # Optimizer settings
