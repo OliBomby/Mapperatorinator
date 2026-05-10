@@ -13,9 +13,14 @@ data:                  # Data settings
   train_dataset_path: "/workspace/datasets/Kroytz"
   test_dataset_path: "/workspace/datasets/Kroytz"
   train_dataset_start: 0
-  train_dataset_end: 45
-  test_dataset_start: 45
-  test_dataset_end: 46
+  train_dataset_end: 46
+  test_dataset_start: 0
+  test_dataset_end: 0
+  ranked_statuses: [-2, -1, 0, 1, 2, 3, 4]  # List of ranked statuses to include in the dataset (-2 = graveyard, -1 = wip, 0 = pending, 1 = ranked, 2 = approved, 3 = qualified, 4 = loved)
+
+dataloader:             # Dataloader settings
+  num_workers: 8
+  drop_last: false
 
 optim:                  # Optimizer settings
   name: muon
