@@ -369,14 +369,20 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
     dataloaders = {}
     for split in ["train", "test"]:
         batch_size = args.optim.batch_size // args.optim.grad_acc
+        num_indices = args.data.train_dataset_end - args.data.train_dataset_start if split == "train" else args.data.test_dataset_end - args.data.test_dataset_start
+        if num_indices < args.dataloader.num_workers:
+            print(f"Warning: Number of {split} samples ({num_indices}) is less than the number of dataloader workers ({args.dataloader.num_workers}). Reducing num_workers to {num_indices}.")
+            num_workers = num_indices
+        else:
+            num_workers = args.dataloader.num_workers
 
         dataloaders[split] = DataLoader(
             dataset[split],
             batch_size=batch_size,
-            num_workers=args.dataloader.num_workers,
+            num_workers=num_workers,
             pin_memory=args.dataloader.pin_memory,
             drop_last=args.dataloader.drop_last,
-            persistent_workers=args.dataloader.num_workers > 0,
+            persistent_workers=num_workers > 0,
             worker_init_fn=worker_init_fn if args.data.dataset_type in ["ors", "mmrs"] else None,
         )
 
