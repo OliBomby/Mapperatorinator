@@ -126,7 +126,7 @@ def maybe_save_checkpoint(model, accelerator: Accelerator, args: TrainConfig, sh
                     "spectrogram": args.model.spectrogram,
                     "current_train_step": shared.current_train_step,
                     "current_epoch": shared.current_epoch,
-                    "current_loss": shared.current_loss,
+                    "current_loss": shared.current_loss if np.isfinite(shared.current_loss) else None,
                 },
             )
 
