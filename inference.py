@@ -415,7 +415,7 @@ def generate(
 
     # Auto generate timing if not provided in in_context and required for the model and this output_type
     timing_events, timing_times, timing = None, None, None
-    if args.super_timing and ContextType.NONE in args.in_context:
+    if args.super_timing and (len(args.in_context) == 0 or ContextType.NONE in args.in_context):
         super_timing_generator = SuperTimingGenerator(args, model, tokenizer)
         timing_events, timing_times = super_timing_generator.generate(audio, generation_config, verbose=verbose)
         timing = postprocessor.generate_timing(timing_events)
