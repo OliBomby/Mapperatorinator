@@ -127,6 +127,10 @@ class FidConfig:
     dataset_start: int = 16200
     dataset_end: int = 16291
     gamemodes: list[int] = field(default_factory=lambda: [0])  # List of gamemodes to include in the dataset
+    min_year: Optional[int] = None
+    max_year: Optional[int] = None
+    min_difficulty: Optional[float] = None
+    max_difficulty: Optional[float] = None
 
     classifier_ckpt: str = 'OliBomby/osu-classifier'
     classifier_batch_size: int = 16

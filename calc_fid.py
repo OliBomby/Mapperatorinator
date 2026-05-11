@@ -253,6 +253,10 @@ def get_beatmap_paths_by_gamemode(args: FidConfig) -> dict[int, list[Path]]:
             start=args.dataset_start,
             end=args.dataset_end,
             gamemodes=args.gamemodes,
+            min_year=args.min_year,
+            max_year=args.max_year,
+            min_difficulty=args.min_difficulty,
+            max_difficulty=args.max_difficulty,
         )
         for _, item in filtered_metadata.iterrows():
             gm = int(item["ModeInt"])

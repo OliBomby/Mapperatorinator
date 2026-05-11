@@ -25,6 +25,10 @@ dataset_path: C:/Users/Olivier/Documents/Collections/Beatmap ML Datasets/MMRS202
 dataset_start: 0
 dataset_end: 106  # Contains 324 std beatmaps
 gamemodes: [0, 1, 2, 3]  # List of gamemodes to include in the dataset
+min_year: null
+max_year: null
+min_difficulty: null
+max_difficulty: null
 
 inference:
   seed: 0
