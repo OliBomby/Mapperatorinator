@@ -389,6 +389,7 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
 
         if args.dataloader.balancer_buffer_size > 0:
             dataloader_kwargs["batch_size"] = None
+            dataloader_kwargs["drop_last"] = None
             dataset = TokenBalancedBatcher(
                 dataset,
                 batch_size=batch_size,
