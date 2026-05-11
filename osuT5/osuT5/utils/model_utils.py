@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 import numpy as np
 from torch.optim import Optimizer
-from torch.utils.data import DataLoader, IterableDataset
+from torch.utils.data import DataLoader, IterableDataset, default_collate
 from torch.optim.lr_scheduler import (
     LRScheduler,
     SequentialLR,
@@ -349,7 +349,7 @@ def get_dataset(args: TrainConfig, **kwargs) -> IterableDataset:
 
 def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) -> tuple[DataLoader, DataLoader]:
     parser = OsuParser(args, tokenizer)
-    dataset = {
+    datasets = {
         "train": get_dataset(
             args=args,
             test=False,
@@ -368,6 +368,7 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
 
     dataloaders = {}
     for split in ["train", "test"]:
+        dataset = datasets[split]
         batch_size = args.optim.batch_size // args.optim.grad_acc
         num_indices = args.data.train_dataset_end - args.data.train_dataset_start if split == "train" else args.data.test_dataset_end - args.data.test_dataset_start
         if num_indices < args.dataloader.num_workers:
@@ -376,15 +377,25 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
         else:
             num_workers = args.dataloader.num_workers
 
-        dataloaders[split] = DataLoader(
-            dataset[split],
+        dataloader_kwargs = dict(
             batch_size=batch_size,
             num_workers=num_workers,
+            collate_fn=default_collate,
             pin_memory=args.dataloader.pin_memory,
             drop_last=args.dataloader.drop_last,
             persistent_workers=num_workers > 0,
             worker_init_fn=worker_init_fn if args.data.dataset_type in ["ors", "mmrs"] else None,
         )
+
+        if args.dataloader.balancer_buffer_size > 0:
+            dataloader_kwargs["batch_size"] = None
+            dataset = TokenBalancedBatcher(
+                dataset,
+                batch_size=batch_size,
+                buffer_size=args.dataloader.balancer_buffer_size,
+            )
+
+        dataloaders[split] = DataLoader(dataset, **dataloader_kwargs)
 
     return dataloaders["train"], dataloaders["test"]
 
@@ -403,3 +414,53 @@ def worker_init_fn(worker_id: int) -> None:
     )
     dataset.start = overall_start + worker_id * per_worker
     dataset.end = min(dataset.start + per_worker, overall_end)
+
+
+class TokenBalancedBatcher(torch.utils.data.IterableDataset):
+    def __init__(self, source_dataset, batch_size=16, buffer_size=2048):
+        assert buffer_size % batch_size == 0, "Buffer size must be an integer multiple of batch_size."
+        self.source_dataset = source_dataset
+        self.batch_size = batch_size
+        self.buffer_size = buffer_size
+
+    def __iter__(self):
+        buffer = []
+
+        for sample in self.source_dataset:
+            length = sample["decoder_attention_mask"].sum()
+            buffer.append((length, sample))
+
+            if len(buffer) == self.buffer_size:
+                yield from self._emit_batches(buffer)
+                buffer = []
+
+        if buffer:
+            yield from self._emit_batches(buffer)
+
+    def _emit_batches(self, buffer):
+        import heapq
+
+        batch_size = self.batch_size
+        num_batches = len(buffer) // batch_size
+        usable = num_batches * batch_size
+
+        buffer = sorted(buffer[:usable], key=lambda x: x[0], reverse=True)
+
+        batches = [[] for _ in range(num_batches)]
+        totals = [0 for _ in range(num_batches)]
+
+        heap = [(0, i) for i in range(num_batches)]
+        heapq.heapify(heap)
+
+        for length, sample in buffer:
+            total, batch_idx = heapq.heappop(heap)
+
+            batches[batch_idx].append(sample)
+            totals[batch_idx] += length
+
+            if len(batches[batch_idx]) < batch_size:
+                heapq.heappush(heap, (totals[batch_idx], batch_idx))
+
+        for batch in batches:
+            if len(batch) == batch_size:
+                yield batch

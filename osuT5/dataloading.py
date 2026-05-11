@@ -3,19 +3,16 @@ import torch
 import tqdm
 from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
-from torch.utils.data import DataLoader
 
 from osuT5.config import TrainConfig
-from osuT5.dataset.osu_parser import OsuParser
 from osuT5.dataset.ors_dataset import STEPS_PER_MILLISECOND
 from osuT5.model.spectrogram import MelSpectrogram
+from osuT5.osuT5.utils import get_dataloaders
 from osuT5.tokenizer import EventType
 from osuT5.utils import (
     setup_args,
     get_tokenizer,
-    worker_init_fn,
-    get_dataset,
-    get_shared_training_state,
+    get_shared_training_state
 )
 
 
@@ -68,25 +65,7 @@ def main(args: TrainConfig):
 
     shared = get_shared_training_state()
     tokenizer = get_tokenizer(args)
-    parser = OsuParser(args, tokenizer)
-    dataset = get_dataset(
-        args=args,
-        test=False,
-        parser=parser,
-        tokenizer=tokenizer,
-        shared=shared,
-        # subset_ids=[2933, 1891, 4131],
-    )
-
-    dataloader = DataLoader(
-        dataset,
-        batch_size=args.optim.batch_size,
-        num_workers=args.dataloader.num_workers,
-        pin_memory=True,
-        drop_last=False,
-        persistent_workers=args.dataloader.num_workers > 0,
-        worker_init_fn=worker_init_fn if args.data.dataset_type in ["ors", "mmrs"] else None,
-    )
+    dataloader, _ = get_dataloaders(tokenizer, args, shared)
 
     transform = MelSpectrogram(
         args.model.spectrogram.implementation,
@@ -108,18 +87,21 @@ def main(args: TrainConfig):
     if args.mode == 'lengths':
         # Make histogram of the lengths of the sequences
         lengths = []
-        sv_lengths = []
+        # sv_lengths = []
         for b in tqdm.tqdm(dataloader, smoothing=0.01):
-            for i in range(len(b["frames"])):  # batch size
-                length = b['decoder_attention_mask'][i].sum().item()
-                lengths.append(length)
+            # for i in range(len(b["frames"])):  # batch size
+            #     length = b['decoder_attention_mask'][i].sum().item()
+            #     lengths.append(length)
 
-                start, end = _get_token_context(b['decoder_input_ids'][i], 7, 8, strict=True)
-                sv_length = end - start
-                sv_lengths.append(sv_length)
+                # start, end = _get_token_context(b['decoder_input_ids'][i], 7, 8, strict=True)
+                # sv_length = end - start
+                # sv_lengths.append(sv_length)
+
+            length = b['decoder_attention_mask'].sum().item()
+            lengths.append(length)
 
             shared.current_train_step += 1
-            if len(lengths) > 10000:
+            if len(lengths) > 40000 // 32:
                 break
 
         plt.hist(lengths, bins=100)
@@ -141,11 +123,11 @@ def main(args: TrainConfig):
         print(f"Total number of tokens: {sum(lengths)}")
         print(f"Total number of sequences with length 0: {lengths.count(2)}")
 
-        print(f"Max SV length: {max(sv_lengths)}")
-        print(f"Min SV length: {min(sv_lengths)}")
-        print(f"Total number of SV tokens: {sum(sv_lengths)}")
-
-        print(f"Average SV token ratio: {sum(sv_lengths) / sum(lengths)}")
+        # print(f"Max SV length: {max(sv_lengths)}")
+        # print(f"Min SV length: {min(sv_lengths)}")
+        # print(f"Total number of SV tokens: {sum(sv_lengths)}")
+        #
+        # print(f"Average SV token ratio: {sum(sv_lengths) / sum(lengths)}")
 
     if args.mode == 'plot':
         for b in tqdm.tqdm(dataloader, smoothing=0.01):

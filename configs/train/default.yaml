@@ -124,6 +124,7 @@ dataloader:             # Dataloader settings
   num_workers: 8
   pin_memory: true
   drop_last: false
+  balancer_buffer_size: 0  # Buffer size for the dataset balancer. Set to 0 to disable balancing.
 
 optim:                  # Optimizer settings
   name: adamwscale
