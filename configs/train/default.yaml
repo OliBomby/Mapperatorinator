@@ -125,6 +125,7 @@ dataloader:             # Dataloader settings
   pin_memory: true
   drop_last: false
   balancer_buffer_size: 0  # Buffer size for the dataset balancer. Set to 0 to disable balancing.
+  balancer_prefetch_factor: 0.5  # Prefetch factor for the dataloader when using the dataset balancer. Determines how much of the balancer buffer is prefetched into the dataloader buffer.
 
 optim:                  # Optimizer settings
   name: adamwscale

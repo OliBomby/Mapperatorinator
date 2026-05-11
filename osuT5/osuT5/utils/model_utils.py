@@ -388,6 +388,8 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
         )
 
         if args.dataloader.balancer_buffer_size > 0:
+            # Empty the whole balancer buffer into the prefetch buffer, so it starts filling the balancer buffer immediately while training
+            dataloader_kwargs["prefetch_factor"] = int(args.dataloader.balancer_buffer_size / batch_size * args.dataloader.balancer_prefetch_factor)
             dataloader_kwargs["batch_size"] = None
             dataloader_kwargs["drop_last"] = None
             dataset = TokenBalancedBatcher(
