@@ -4,9 +4,9 @@ defaults:
   - ../diffusion@diffusion: v1
   - _self_
 
-model_path: './test/v32/RC1'  # Path to trained model
+model_path: './test/v32/RC2/gamemode=0'  # Path to trained model
 diff_ckpt: 'OliBomby/osu-diffusion-v2'
-version: 'Mapperatorinator V32'
+version: 'Mapperatorinator V32 RC2'
 in_context: []
 output_type: [TIMING, MAP, SV]    # Output type (map, timing)
 temperature: 0.9        # Sampling temperature
