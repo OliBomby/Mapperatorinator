@@ -16,7 +16,7 @@ services:
         - ../datasets:/workspace/datasets
         network_mode: host
         container_name: mapperatorinator_space
-        shm_size: 8gb
+        shm_size: 16gb
         build: .
         # image: my_fixed_image
         command: /bin/bash
