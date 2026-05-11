@@ -7,12 +7,12 @@ from omegaconf import OmegaConf
 from osuT5.config import TrainConfig
 from osuT5.dataset.ors_dataset import STEPS_PER_MILLISECOND
 from osuT5.model.spectrogram import MelSpectrogram
-from osuT5.osuT5.utils import get_dataloaders
 from osuT5.tokenizer import EventType
 from osuT5.utils import (
     setup_args,
     get_tokenizer,
-    get_shared_training_state
+    get_shared_training_state,
+get_dataloaders
 )
 
 
