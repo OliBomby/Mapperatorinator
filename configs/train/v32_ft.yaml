@@ -87,6 +87,7 @@ data:                  # Data settings
 dataloader:             # Dataloader settings
   num_workers: 8
   drop_last: true
+  balancer_buffer_size: 2048
 
 optim:                  # Optimizer settings
   name: muon

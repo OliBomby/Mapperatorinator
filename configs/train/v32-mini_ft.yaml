@@ -85,8 +85,9 @@ data:                  # Data settings
   flip_vertical_prob: 0.5  # Probability of vertically flipping beatmap positions during training
 
 dataloader:             # Dataloader settings
-  num_workers: 16
+  num_workers: 8
   drop_last: true
+  balancer_buffer_size: 2048
 
 optim:                  # Optimizer settings
   name: muon
