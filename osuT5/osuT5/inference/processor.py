@@ -880,6 +880,9 @@ class Processor(object):
     ) -> list[dict[str, Any]]:
         out = []
         for i, context in enumerate(out_context):
+            context_is_provided = context in given_context or (
+                extra_in_context is not None and context in extra_in_context
+            )
             context_data = self.get_context(
                 context,
                 beatmap_path=beatmap_path,
@@ -887,7 +890,7 @@ class Processor(object):
                 song_length=song_length,
                 add_type=self.add_out_context_types,
                 add_class=False,
-                finished=context in given_context,
+                finished=context_is_provided,
                 partial=self.add_to_beatmap and self.start_time is not None,
             )
 
