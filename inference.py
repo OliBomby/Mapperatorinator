@@ -29,7 +29,7 @@ from osuT5.osuT5.inference.server import InferenceClient
 from osuT5.osuT5.inference.super_timing_generator import SuperTimingGenerator
 from osuT5.osuT5.model import Mapperatorinator
 from osuT5.osuT5.tokenizer import ContextType
-from osuT5.osuT5.utils import load_model_loaders
+from osuT5.osuT5.utils import load_model_loaders, resolve_model_checkpoint_path
 from osu_diffusion import DiT_models
 from osu_diffusion.config import DiffusionTrainConfig
 
@@ -510,7 +510,8 @@ def generate(
 
 def load_model_with_server(ckpt_path: str | Path | None, t5_args: TrainConfig, device, max_batch_size: int = 8,
                            use_server: bool = False, precision: str = "fp32", attn_implementation: str = "sdpa",
-                           eval_mode: bool = True, lora_path=None):
+                           eval_mode: bool = True, lora_path=None, gamemode: int | None = None,
+                           auto_select_gamemode_model: bool = True):
     model_loader, tokenizer_loader = load_model_loaders(
         ckpt_path=ckpt_path,
         t5_args=t5_args,
@@ -520,19 +521,38 @@ def load_model_with_server(ckpt_path: str | Path | None, t5_args: TrainConfig, d
         eval_mode=eval_mode,
         pickle_module=routed_pickle,
         lora_path=lora_path,
+        gamemode=gamemode,
+        auto_select_gamemode_model=auto_select_gamemode_model,
     )
+
     return InferenceClient(
         model_loader,
         tokenizer_loader,
         max_batch_size=max_batch_size,
-        socket_path=get_server_address(str(ckpt_path)),
+        socket_path=get_server_address(
+            ckpt_path,
+            gamemode=gamemode,
+            auto_select_gamemode_model=auto_select_gamemode_model,
+        ),
     ) if use_server else model_loader(), tokenizer_loader()
 
 
-def get_server_address(ckpt_path_str: str):
+def get_server_address(
+        ckpt_path_str: str | Path | None,
+        gamemode: int | None = None,
+        auto_select_gamemode_model: bool = True,
+):
     """
     Get a valid socket address for the OS and model version.
     """
+    resolved_ckpt_path, subfolder = resolve_model_checkpoint_path(
+        ckpt_path_str,
+        gamemode=gamemode,
+        auto_select_gamemode_model=auto_select_gamemode_model,
+    )
+    ckpt_path_str = "" if not resolved_ckpt_path else (resolved_ckpt_path.as_posix() if isinstance(resolved_ckpt_path, Path) else str(resolved_ckpt_path))
+    if subfolder:
+        ckpt_path_str = f"{ckpt_path_str}/{subfolder}"
     ckpt_path_str = ckpt_path_str.replace(" ", "_").replace("/", "_").replace("\\", "_").replace(".", "_")
     # Check if the OS supports Unix sockets
     if os.name == 'posix':
@@ -579,7 +599,8 @@ def main(args: InferenceConfig):
     model, tokenizer = load_model_with_server(args.model_path, args.train, args.device,
                                               max_batch_size=args.max_batch_size, use_server=args.use_server,
                                               precision=args.precision, attn_implementation=args.attn_implementation,
-                                              lora_path=args.lora_path)
+                                              lora_path=args.lora_path, gamemode=args.gamemode,
+                                              auto_select_gamemode_model=args.auto_select_gamemode_model)
 
     diff_model, diff_tokenizer, refine_model = None, None, None
     if args.generate_positions:

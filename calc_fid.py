@@ -425,7 +425,9 @@ def generate_beatmaps(beatmap_paths, args: InferenceConfig, dataset_type, idx, l
     model, tokenizer, diff_model, diff_tokenizer, refine_model = None, None, None, None, None
     model, tokenizer = load_model_with_server(args.model_path, args.train, args.device,
                                               max_batch_size=args.max_batch_size, use_server=args.use_server,
-                                              precision=args.precision, attn_implementation=args.attn_implementation)
+                                              precision=args.precision, attn_implementation=args.attn_implementation,
+                                              gamemode=args.gamemode,
+                                              auto_select_gamemode_model=args.auto_select_gamemode_model)
 
     if args.compile:
         model.transformer.forward = torch.compile(model.transformer.forward, mode="reduce-overhead", fullgraph=True)
@@ -693,6 +695,7 @@ def main(args: FidConfig):
     base_model_path = args.inference.model_path
     if base_model_path.startswith("./"):
         base_model_path = os.path.join(Path(__file__).parent, base_model_path[2:])
+    args.inference.model_path = base_model_path
 
     # Group beatmaps by gamemode so each stage uses the correct checkpoint
     paths_by_gm = get_beatmap_paths_by_gamemode(args)
@@ -709,22 +712,12 @@ def main(args: FidConfig):
             gamemode_names = {0: "std", 1: "taiko", 2: "catch", 3: "mania"}
             for gm, gm_beatmap_paths in paths_by_gm.items():
                 gm_name = gamemode_names.get(gm, f"gamemode {gm}")
-                gm_model_path = os.path.join(base_model_path, f"gamemode={gm}")
-
-                if not os.path.exists(gm_model_path):
-                    logger.warning(
-                        "Checkpoint folder %s does not exist, falling back to base model path for %s",
-                        gm_model_path, gm_name,
-                    )
-                    gm_model_path = base_model_path
-
                 logger.info(
-                    "=== Generating %s beatmaps (%d maps) with checkpoint %s ===",
-                    gm_name, len(gm_beatmap_paths), gm_model_path,
+                    "=== Generating %s beatmaps (%d maps) with base checkpoint %s ===",
+                    gm_name, len(gm_beatmap_paths), base_model_path,
                 )
 
-                # Override model path for this gamemode
-                args.inference.model_path = gm_model_path
+                args.inference.gamemode = gm
 
                 # Assign beatmaps to processes in a round-robin fashion
                 num_processes = max(args.num_processes, 1)

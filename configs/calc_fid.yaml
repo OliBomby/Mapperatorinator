@@ -1,6 +1,6 @@
 defaults:
   - base_fid
-  - inference: v32-mini
+  - inference: v32
   - _self_
 
 num_processes: 32
@@ -41,6 +41,7 @@ inference:
   year: 2023
   resnap_events: true
   use_server: true
+  auto_select_gamemode_model: true
 
 hydra:
   job:
@@ -48,7 +49,7 @@ hydra:
     name: calc_fid
   run:
 #    dir: ./logs_fid/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    dir: ./logs_fid/sweeps/test_a/inference=v32-mini_rc6
+    dir: ./logs_fid/sweeps/test_a/inference=v32
   sweep:
     dir: ./logs_fid/sweeps/test_a
     subdir: ${hydra.job.override_dirname}

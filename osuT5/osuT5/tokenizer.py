@@ -715,6 +715,7 @@ class Tokenizer(PushToHubMixin):
             local_files_only: bool = False,
             token: Optional[Union[str, bool]] = None,
             revision: str = "main",
+            subfolder: Optional[str] = None,
             **kwargs,
     ):
         user_agent = {"file_type": "tokenizer", "from_auto_class": False, "is_fast": False}
@@ -725,6 +726,7 @@ class Tokenizer(PushToHubMixin):
             pretrained_model_name_or_path,
             "tokenizer.json",
             cache_dir=cache_dir,
+            subfolder=subfolder,
             token=token,
             revision=revision,
             local_files_only=local_files_only,

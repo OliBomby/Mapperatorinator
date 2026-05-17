@@ -7,6 +7,7 @@ audio_path: ''          # Path to input audio
 output_path: ''         # Path to output directory
 beatmap_path: ''        # Path to .osu file to autofill metadata and use as reference
 lora_path: null         # Path to LoRA weights
+auto_select_gamemode_model: true  # Automatically use a gamemode=<id> subdirectory in a local checkpoint or Hugging Face repo when available
 
 # Conditional generation settings
 gamemode: null             # Gamemode of the beatmap

@@ -13,6 +13,7 @@ from torch.optim.lr_scheduler import (
     LinearLR,
     CosineAnnealingLR, ConstantLR,
 )
+from transformers.utils import cached_file
 
 from ..dataset.osu_parser import OsuParser
 from ..event import EventType
@@ -120,8 +121,64 @@ def _precision_to_dtype(precision: str) -> torch.dtype:
         raise ValueError(f"Unsupported precision: {precision}")
 
 
+def _normalize_ckpt_path(ckpt_path: str | Path | None) -> str | Path | None:
+    if not ckpt_path:
+        return None
+
+    path = Path(ckpt_path)
+    return path if path.exists() else str(ckpt_path)
+
+
+def _is_local_custom_checkpoint(ckpt_path: str | Path | None) -> bool:
+    return isinstance(ckpt_path, Path) and (ckpt_path / "pytorch_model.bin").exists() and (ckpt_path / "custom_checkpoint_0.pkl").exists()
+
+
+def _format_model_source(ckpt_path: str | Path | None, subfolder: str | None = None) -> str:
+    if not ckpt_path:
+        return ""
+
+    source = ckpt_path.as_posix() if isinstance(ckpt_path, Path) else str(ckpt_path)
+    return f"{source}/{subfolder}" if subfolder else source
+
+
+def resolve_model_checkpoint_path(
+        ckpt_path: str | Path | None,
+        gamemode: int | None = None,
+        auto_select_gamemode_model: bool = True,
+) -> tuple[str | Path | None, str | None]:
+    ckpt_path = _normalize_ckpt_path(ckpt_path)
+    if not ckpt_path or gamemode is None or not auto_select_gamemode_model:
+        return ckpt_path, None
+
+    subfolder = f"gamemode={gamemode}"
+
+    if isinstance(ckpt_path, Path):
+        gamemode_path = ckpt_path / subfolder
+        if gamemode_path.is_dir():
+            return gamemode_path, None
+        return ckpt_path, None
+
+    try:
+        subdir_tokenizer = cached_file(
+            ckpt_path,
+            "tokenizer.json",
+            subfolder=subfolder,
+            _raise_exceptions_for_gated_repo=False,
+            _raise_exceptions_for_missing_entries=False,
+            _raise_exceptions_for_connection_errors=False,
+        )
+    except Exception:
+        subdir_tokenizer = None
+
+    if subdir_tokenizer is not None:
+        return ckpt_path, subfolder
+
+    return ckpt_path, None
+
+
 def load_model(ckpt_path: str | Path | None, t5_args: TrainConfig, device, precision: str = "fp32", attn_implementation: str = "sdpa",
-               eval_mode: bool = True, pickle_module=None):
+               eval_mode: bool = True, pickle_module=None, gamemode: int | None = None,
+               auto_select_gamemode_model: bool = True):
     model_loader, tokenizer_loader = load_model_loaders(
         ckpt_path,
         t5_args,
@@ -130,6 +187,8 @@ def load_model(ckpt_path: str | Path | None, t5_args: TrainConfig, device, preci
         attn_implementation,
         eval_mode,
         pickle_module,
+        gamemode=gamemode,
+        auto_select_gamemode_model=auto_select_gamemode_model,
     )
     return model_loader(), tokenizer_loader()
 
@@ -143,6 +202,8 @@ def load_model_loaders(
         eval_mode: bool = True,
         pickle_module=None,
         lora_path=None,
+        gamemode: int | None = None,
+        auto_select_gamemode_model: bool = True,
 ):
     if not ckpt_path:
         if eval_mode:
@@ -150,13 +211,26 @@ def load_model_loaders(
         else:
             print("No pretrained model path provided, training from scratch.")
 
-    ckpt_path = Path(ckpt_path) if ckpt_path else None
+    requested_ckpt_path = _normalize_ckpt_path(ckpt_path)
+    ckpt_path, ckpt_subfolder = resolve_model_checkpoint_path(
+        ckpt_path,
+        gamemode=gamemode,
+        auto_select_gamemode_model=auto_select_gamemode_model,
+    )
+
+    requested_source = _format_model_source(requested_ckpt_path)
+    resolved_source = _format_model_source(ckpt_path, ckpt_subfolder)
+    if requested_source and requested_source != resolved_source:
+        print(f"Using gamemode-specific model checkpoint: {resolved_source}")
 
     def tokenizer_loader():
         if not ckpt_path:
             tokenizer = get_tokenizer(t5_args)
-        elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
-            tokenizer = Tokenizer.from_pretrained(ckpt_path.as_posix())
+        elif not _is_local_custom_checkpoint(ckpt_path):
+            tokenizer = Tokenizer.from_pretrained(
+                ckpt_path.as_posix() if isinstance(ckpt_path, Path) else ckpt_path,
+                subfolder=ckpt_subfolder,
+            )
         else:
             tokenizer_state = torch.load(ckpt_path / "custom_checkpoint_0.pkl", pickle_module=pickle_module, weights_only=False)
             tokenizer = Tokenizer()
@@ -170,12 +244,13 @@ def load_model_loaders(
         if not ckpt_path:
             model = _get_model(t5_args, tokenizer, dtype=dtype, attn_implementation=attn_implementation)
             model.to(device=device, dtype=dtype)
-        elif not (ckpt_path / "pytorch_model.bin").exists() or not (ckpt_path / "custom_checkpoint_0.pkl").exists():
+        elif not _is_local_custom_checkpoint(ckpt_path):
             model = Mapperatorinator.from_pretrained(
-                ckpt_path.as_posix(),
+                ckpt_path.as_posix() if isinstance(ckpt_path, Path) else ckpt_path,
                 dtype=dtype,
                 attn_implementation=attn_implementation,
-                device_map=device
+                device_map=device,
+                subfolder=ckpt_subfolder,
             )
             model.generation_config.disable_compile = True
         else:
@@ -203,7 +278,7 @@ def load_model_loaders(
         if eval_mode:
             model.eval()
 
-        print(f"Model loaded: {ckpt_path.as_posix() if ckpt_path else ''} on device {device}")
+        print(f"Model loaded: {resolved_source} on device {device}")
         return model
 
     return model_loader, tokenizer_loader

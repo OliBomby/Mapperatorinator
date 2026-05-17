@@ -224,12 +224,18 @@ def _ensure_inference_server(args):
         eval_mode=True,
         pickle_module=routed_pickle,
         lora_path=args.lora_path,
+        gamemode=args.gamemode,
+        auto_select_gamemode_model=args.auto_select_gamemode_model,
     )
     _server_owner_client = InferenceClient(
         model_loader,
         tokenizer_loader,
         max_batch_size=args.max_batch_size,
-        socket_path=get_server_address(args.model_path),
+        socket_path=get_server_address(
+            args.model_path,
+            gamemode=args.gamemode,
+            auto_select_gamemode_model=args.auto_select_gamemode_model,
+        ),
     )
 
     # Start the server in a dedicated thread that outlives per-job workers.
