@@ -16,6 +16,10 @@ $(document).ready(function() {
                 hideHitsoundsOption: true,
                 supportsDescriptors: false,
             },
+            "v31": {},
+            "v32": {
+                supportedInContextOptions: ['TIMING'],
+            },
         }
     };
 

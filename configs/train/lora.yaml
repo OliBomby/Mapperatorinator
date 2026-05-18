@@ -6,7 +6,7 @@ compile: true          # PyTorch 2.0 optimization
 mixed_precision: 'bf16'         # Enable mixed precision (no/fp16/bf16)
 enable_lora: true              # Use LoRA for finetuning
 
-pretrained_path: "OliBomby/Mapperatorinator-v30"     # Path to pretrained model weights
+pretrained_path: "OliBomby/Mapperatorinator-v32"     # Path to pretrained model weights
 
 data:                  # Data settings
   dataset_type: "mmrs"

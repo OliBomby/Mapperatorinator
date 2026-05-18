@@ -627,7 +627,7 @@ def load_diff_model(
     return model, tokenizer
 
 
-@hydra.main(config_path="configs/inference", config_name="v30", version_base="1.1")
+@hydra.main(config_path="configs/inference", config_name="v32", version_base="1.1")
 def main(args: InferenceConfig):
     args = OmegaConf.to_object(args) if isinstance(args, DictConfig) else args
     compile_args(args)

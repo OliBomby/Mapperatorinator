@@ -462,7 +462,7 @@ class InferenceClient:
 
 
 if __name__ == "__main__":
-    ckpt_path_str = "OliBomby/Mapperatorinator-v30"
+    ckpt_path_str = "OliBomby/Mapperatorinator-v32"
 
     # Example usage
     def model_loader():
