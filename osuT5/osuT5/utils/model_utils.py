@@ -148,7 +148,7 @@ def resolve_model_checkpoint_path(
 ) -> tuple[str | Path | None, str | None]:
     ckpt_path = _normalize_ckpt_path(ckpt_path)
     if not ckpt_path or gamemode is None or not auto_select_gamemode_model:
-        return ckpt_path, None
+        return ckpt_path, ""
 
     subfolder = f"gamemode={gamemode}"
 
@@ -156,7 +156,7 @@ def resolve_model_checkpoint_path(
         gamemode_path = ckpt_path / subfolder
         if gamemode_path.is_dir():
             return gamemode_path, None
-        return ckpt_path, None
+        return ckpt_path, ""
 
     try:
         subdir_tokenizer = cached_file(
@@ -173,7 +173,7 @@ def resolve_model_checkpoint_path(
     if subdir_tokenizer is not None:
         return ckpt_path, subfolder
 
-    return ckpt_path, None
+    return ckpt_path, ""
 
 
 def load_model(ckpt_path: str | Path | None, t5_args: TrainConfig, device, precision: str = "fp32", attn_implementation: str = "sdpa",
