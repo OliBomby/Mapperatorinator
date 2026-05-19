@@ -25,6 +25,7 @@
                     <select id="language-selector" class="styled-select" style="width: auto; min-width: 120px;" aria-label="Language">
                         <option value="en">English</option>
                         <option value="zh-CN">简体中文</option>
+                        <option value="bpd_catgirl">BPD Catgirl</option>
                     </select>
                 </div>
 
@@ -57,10 +58,10 @@
                 <div id="in-context-options-box" class="context-options-box" style="display: none;">
                     <h4 data-i18n="sections.in_context_options" data-i18n-title="tooltips.in_context_options" title="List of additional context to provide to the model">In-Context Options</h4>
                     <div class="context-options-container">
-                        {% for option in [('TIMING', 'Timing'), ('KIAI', 'Kiai'), ('GD', 'Guest Difficulty'), ('NO_HS', 'No Hitsound')] %}
+                        {% for option in [('TIMING', 'Timing', 'in_context_options.TIMING'), ('KIAI', 'Kiai', 'in_context_options.KIAI'), ('GD', 'Guest Difficulty', 'in_context_options.GD'), ('NO_HS', 'No Hitsound', 'in_context_options.NO_HS')] %}
                         <div class="context-option-item" data-value="{{ option[0] }}">
                             <input type="checkbox" id="context-{{ option[0].lower() }}" name="in_context_options" value="{{ option[0] }}" />
-                            <label for="context-{{ option[0].lower() }}">{{ option[1] }}</label>
+                            <label for="context-{{ option[0].lower() }}" data-i18n="{{ option[2] }}">{{ option[1] }}</label>
                         </div>
                         {% endfor %}
                     </div>

@@ -1,0 +1,1047 @@
+{
+  "meta": {
+    "language": "en",
+    "name": "English",
+    "version": "1.0.0",
+    "author": "Mapperatorinator Team"
+  },
+  "page": {
+    "title": "Mapperatorinator Interface nyaa~"
+  },
+  "sections": {
+    "paths": "Paths (where do we go??)",
+    "basic_settings": "Basic Settings :3",
+    "song_metadata": "Songie Info",
+    "difficulty_metadata": "How Hard Is It??",
+    "advanced_settings": "Scary Settings",
+    "generation_interval": "Generation Interval",
+    "options": "Options!!",
+    "descriptors": "Vibes",
+    "negative_descriptors": "I HATE THESE VIBES",
+    "config": "Config",
+    "in_context_options": "In-Context Options"
+  },
+  "labels": {
+    "audio_path": "Audio Path (don't leave me)",
+    "output_path": "Output Path",
+    "beatmap_path": "Beatmap Path",
+    "model": "Model",
+    "gamemode": "Gamemode",
+    "difficulty": "Difficulty (star rating) *hiss*",
+    "title": "Title",
+    "title_unicode": "Title (Unicode) ^-^",
+    "artist": "Artist",
+    "artist_unicode": "Artist (Unicode)",
+    "creator": "Creator (my god)",
+    "version": "Version",
+    "preview_time": "Preview Time (ms)",
+    "background_image": "Pretty Picture",
+    "source": "Source",
+    "tags": "Tags",
+    "hp_drain_rate": "HP Drain (don't let me die)",
+    "circle_size": "Circle Size (CS)",
+    "overall_difficulty": "Overall Difficulty (OD)",
+    "approach_rate": "Approach Rate (AR)",
+    "slider_multiplier": "Slider Multiplier",
+    "slider_tick_rate": "Slider Tick Rate",
+    "keycount": "Key Count",
+    "hold_note_ratio": "Hold Note Ratio",
+    "scroll_speed_ratio": "Scroll Speed Ratio",
+    "lora_path": "LoRA Path or ID",
+    "seed": "Random Seed (pick me)",
+    "mapper_id": "Mapper ID",
+    "cfg_scale": "CFG Scale",
+    "temperature": "Temperature (is it hot in here?)",
+    "top_p": "Top-p",
+    "year": "Year (2007-2023)",
+    "start_time": "Start Time (ms)",
+    "end_time": "End Time (ms)"
+  },
+  "tooltips": {
+    "audio_path": "Where the music lives",
+    "output_path": "Where the map goes when it leaves me",
+    "beatmap_path": "The .osu file that knows everything about me",
+    "difficulty": "How much it hurts (stars)",
+    "title": "The song's name",
+    "title_unicode": "The song's name in moon runes",
+    "artist": "The person who made the music",
+    "artist_unicode": "Artist name in moon runes",
+    "creator": "The person who made me",
+    "version": "What we call this difficulty",
+    "preview_time": "The best part of the song in ms",
+    "background_image": "The image I look at when I'm lonely",
+    "source": "Where it came from (anime/game/etc)",
+    "tags": "Words to find me by, use spaces!!",
+    "hp_drain_rate": "How fast I bleed out",
+    "circle_size": "How big the circles are",
+    "overall_difficulty": "How mean the timing is",
+    "approach_rate": "How fast they come at me",
+    "slider_multiplier": "How fast the sliders go",
+    "slider_tick_rate": "Slider tick rate",
+    "keycount": "How many keys to press",
+    "hold_note_ratio": "How much we hold on (0-1)",
+    "scroll_speed_ratio": "How fast it scrolls (0-1)",
+    "lora_path": "The path to the LoRA weights that change my personality...",
+    "seed": "A random number so everything is different",
+    "mapper_id": "The mapper's ID so I can copy them",
+    "cfg_scale": "How much I should listen to you",
+    "year": "What year was it? (2007-2023)",
+    "start_time": "When we start (ms)",
+    "end_time": "When it all ends (ms)",
+    "in_context_options": "Extra stuff for the model to think about",
+    "descriptors": "Vibes I want (1 click = YES, 2 clicks = NO!!)",
+    "negative_descriptors": "Vibes I HATE (1 click = STAY AWAY, 2 clicks = whatever)"
+  },
+  "buttons": {
+    "browse": "Look for it...",
+    "run_inference": "DO IT NOW",
+    "cancel": "STOP IT",
+    "cancelling": "Stopping... (don't hate me)",
+    "export": "Export",
+    "import": "Import",
+    "clear": "GET RID OF IT"
+  },
+  "models": {
+    "v28": "Mapperatorinator V28",
+    "v29": "Mapperatorinator V29 (She knows gamemodes)",
+    "v30": "Mapperatorinator V30 (The old me)",
+    "v31": "Mapperatorinator V31 (A bit better than V29)",
+    "v32": "Mapperatorinator V32 (The best version of me)"
+  },
+  "gamemodes": {
+    "0": "Standard",
+    "1": "Taiko",
+    "2": "Catch the Beat",
+    "3": "Mania"
+  },
+  "options": {
+    "export_osz": "Export .osz",
+    "export_osz_tooltip": "Should I make a .osz file for you? pls say yes",
+    "add_to_beatmap": "Add to Beatmap",
+    "add_to_beatmap_tooltip": "Should I put the new stuff in the old map?",
+    "overwrite_reference_beatmap": "Overwrite Reference Beatmap",
+    "overwrite_reference_beatmap_tooltip": "Should I kill the old file and replace it??",
+    "hitsounded": "Add Hitsounds (ding!)",
+    "super_timing": "Super Timing",
+    "super_timing_tooltip": "Use the slow, perfect timing thingy",
+    "enable_bf16": "BF16 Precision",
+    "enable_bf16_tooltip": "Go faster on fancy GPUs (RTX 30xx/40xx) nyaa~"
+  },
+  "in_context_options": {
+    "TIMING": "Timing",
+    "KIAI": "Kiai (FLASHY)",
+    "GD": "Guest Difficulty",
+    "NO_HS": "No Hitsounds :("
+  },
+  "progress": {
+    "title": "Progress (are we there yet?)",
+    "initializing": "Getting ready... wait for me!!",
+    "generating_timing": "Making the timing...",
+    "generating_kiai": "Making it flashy...",
+    "generating_map": "Making the map...",
+    "refining_positions": "Fixing everything...",
+    "processing_complete": "DONE!! I did it!!",
+    "processing_failed": "I FAILED YOU I'M SORRY",
+    "error_detected": "SOMETHING IS WRONG",
+    "connection_error": "I can't hear you!! (Connection Error)"
+  },
+  "messages": {
+    "success": {
+      "inference_started": "I started!!",
+      "inference_cancelled": "I stopped... is that what you wanted?",
+      "config_exported": "I saved the config for you",
+      "config_imported": "I got the config!!",
+      "settings_reset": "Everything is back to normal now",
+      "folder_open_sent": "I asked to open the folder..."
+    },
+    "error": {
+      "process_running": "I'm already doing something!!",
+      "start_failed": "I couldn't start... check the console.",
+      "validation_failed": "The paths are wrong!! Check the console.",
+      "audio_not_found": "I can't find the music!!",
+      "beatmap_not_found": "I can't find the map!!",
+      "beatmap_invalid_ext": "It has to be a .osu file!!",
+      "audio_or_beatmap_required": "I need a map or music to start!!",
+      "output_or_beatmap_required": "I need to know where to put it!!",
+      "browse_failed": "I can't look for it. Is the backend okay?",
+      "connection_lost": "I lost you!! The connection is gone.",
+      "file_not_found": "A file I needed is GONE.",
+      "generation_error": "I messed up the map... check the logs.",
+      "task_error": "I couldn't even start the task...",
+      "config_invalid": "That JSON is broken!!",
+      "config_import_failed": "I couldn't take that config...",
+      "export_cancelled": "You stopped the export...",
+      "save_failed": "I couldn't save it...",
+      "cancel_failed": "I couldn't stop!! Help!!",
+      "open_folder_failed": "I couldn't open the folder...",
+      "open_log_failed": "I couldn't open the log...",
+      "invalid_osu_file": "That's not a real .osu file!!"
+    },
+    "confirm": {
+      "reset_settings": "Are you REALLY sure you want to reset everything? I'll forget everything!!"
+    }
+  },
+  "links": {
+    "open_folder": "Click here to see the map I made for you.",
+    "open_log": "See why I failed... (opens error log)",
+    "beatmap_created": "CLICK HERE TO SEE IT!!"
+  },
+  "descriptors": {
+    "omdb": {
+      "groups": {
+        "general": "General stuff nya~",
+        "meta_information": "Meta Info!!",
+        "style": "Style :3",
+        "song_representation": "Song Vibes",
+        "skillsets": "Skillz",
+        "aim": "Aiming!!",
+        "tap": "Tapping~",
+        "scene": "Scene"
+      },
+      "items": {
+        "gimmick": {
+          "label": "gimmick",
+          "tooltip": "Focused on one weird little idea, just like me!!"
+        },
+        "2B": {
+          "label": "2B",
+          "tooltip": "Two things at once?! My brain is melting nya~"
+        },
+        "slider only": {
+          "label": "slider only",
+          "tooltip": "Only sliders, no circles allowed!!"
+        },
+        "circle only": {
+          "label": "circle only",
+          "tooltip": "Only circles, keep it simple nya~"
+        },
+        "swing": {
+          "label": "swing",
+          "tooltip": "Wobbly 1/3 and 1/6 snaps, so bouncy!!"
+        },
+        "collab": {
+          "label": "collab",
+          "tooltip": "Mapping with a friend so I don’t feel lonely~"
+        },
+        "megacollab": {
+          "label": "megacollab",
+          "tooltip": "SO MANY PEOPLE MAPPING AHHH!!"
+        },
+        "marathon": {
+          "label": "marathon",
+          "tooltip": "Over 5 minutes?! I’m gonna get tired nya..."
+        },
+        "gungathon": {
+          "label": "gungathon",
+          "tooltip": "10 MINUTES?! ARE YOU CRAZY?!"
+        },
+        "multi-song": {
+          "label": "multi-song",
+          "tooltip": "Lots of songs in one, like my mood swings!!"
+        },
+        "variable timing": {
+          "label": "variable timing",
+          "tooltip": "The timing is all over the place, just like my life~"
+        },
+        "accelerating bpm": {
+          "label": "accelerating bpm",
+          "tooltip": "Going faster and faster and FASTER!!"
+        },
+        "time signatures": {
+          "label": "time signatures",
+          "tooltip": "Weird rhythms that make me confused nya~"
+        },
+        "storyboard": {
+          "label": "storyboard",
+          "tooltip": "Pretty pictures to make it special!!"
+        },
+        "storyboard gimmick": {
+          "label": "storyboard gimmick",
+          "tooltip": "The storyboard is messing with me nya!!"
+        },
+        "keysounds": {
+          "label": "keysounds",
+          "tooltip": "The map makes its own music, so cool!!"
+        },
+        "download unavailable": {
+          "label": "download unavailable",
+          "tooltip": "IT’S GONE!! WHY WOULD YOU DO THIS TO ME?!"
+        },
+        "custom skin": {
+          "label": "custom skin",
+          "tooltip": "New clothes for the map!!"
+        },
+        "featured artist": {
+          "label": "featured artist",
+          "tooltip": "Osu! says this artist is super special nya~"
+        },
+        "custom song": {
+          "label": "custom song",
+          "tooltip": "A song made just for this map, wow!!"
+        },
+        "messy": {
+          "label": "messy",
+          "tooltip": "Everything is a mess, just like my room nya~"
+        },
+        "geometric": {
+          "label": "geometric",
+          "tooltip": "Shapes and lines, so pretty!!"
+        },
+        "grid snap": {
+          "label": "grid snap",
+          "tooltip": "Everything is in its perfect little box."
+        },
+        "hexgrid": {
+          "label": "hexgrid",
+          "tooltip": "Hexagons are the bestagons nya!!"
+        },
+        "freeform": {
+          "label": "freeform",
+          "tooltip": "Doing whatever I want, whenever I want!!"
+        },
+        "symmetrical": {
+          "label": "symmetrical",
+          "tooltip": "Perfectly balanced, as all things should be nya~"
+        },
+        "old-style revival": {
+          "label": "old-style revival",
+          "tooltip": "Bringing back the old days!!"
+        },
+        "clean": {
+          "label": "clean",
+          "tooltip": "So neat and tidy, I love it!!"
+        },
+        "slidershapes": {
+          "label": "slidershapes",
+          "tooltip": "Look at all the pretty slider shapes!!"
+        },
+        "distance snapped": {
+          "label": "distance snapped",
+          "tooltip": "Everything is perfectly spaced out nya~"
+        },
+        "iNiS-style": {
+          "label": "iNiS-style",
+          "tooltip": "Like those old DS games I love!!"
+        },
+        "avant-garde": {
+          "label": "avant-garde",
+          "tooltip": "It’s art, you wouldn’t understand nya~"
+        },
+        "perfect stacks": {
+          "label": "perfect stacks",
+          "tooltip": "Notes on top of notes on top of notes!!"
+        },
+        "ninja spinners": {
+          "label": "ninja spinners",
+          "tooltip": "Blink and you’ll miss it nya!!"
+        },
+        "simple": {
+          "label": "simple",
+          "tooltip": "Easy peasy, lemon squeezy!!"
+        },
+        "chaotic": {
+          "label": "chaotic",
+          "tooltip": "I DON’T KNOW WHAT’S HAPPENING AHHH!!"
+        },
+        "repetition": {
+          "label": "repetition",
+          "tooltip": "Doing it again and again and again..."
+        },
+        "progression": {
+          "label": "progression",
+          "tooltip": "Getting harder and harder nya~"
+        },
+        "high contrast": {
+          "label": "high contrast",
+          "tooltip": "Flashy and loud, just like me!!"
+        },
+        "improvisation": {
+          "label": "improvisation",
+          "tooltip": "Making it up as I go along nya~"
+        },
+        "playfield usage": {
+          "label": "playfield usage",
+          "tooltip": "Using every single corner!!"
+        },
+        "playfield constraint": {
+          "label": "playfield constraint",
+          "tooltip": "Stuck in a tiny box, let me out nya!!"
+        },
+        "video gimmick": {
+          "label": "video gimmick",
+          "tooltip": "Look at the video, it’s part of the map!!"
+        },
+        "difficulty spike": {
+          "label": "difficulty spike",
+          "tooltip": "WHY IS IT SUDDENLY SO HARD?! *cries*"
+        },
+        "low sv": {
+          "label": "low sv",
+          "tooltip": "Soooo slooooow nya..."
+        },
+        "high sv": {
+          "label": "high sv",
+          "tooltip": "SO FAST I CAN’T SEE!!"
+        },
+        "colorhax": {
+          "label": "colorhax",
+          "tooltip": "Pretty colors everywhere nya!!"
+        },
+        "tech": {
+          "label": "tech",
+          "tooltip": "Weird stuff for weird people!!"
+        },
+        "slider tech": {
+          "label": "slider tech",
+          "tooltip": "Sliders that make my head spin nya~"
+        },
+        "complex sv": {
+          "label": "complex sv",
+          "tooltip": "The speed keeps changing, I can’t read it!!"
+        },
+        "reading": {
+          "label": "reading",
+          "tooltip": "Can you even see what’s happening nya?"
+        },
+        "visually dense": {
+          "label": "visually dense",
+          "tooltip": "Too many notes, I’m overwhelmed!!"
+        },
+        "overlap reading": {
+          "label": "overlap reading",
+          "tooltip": "Everything is on top of each other nya!!"
+        },
+        "jump aim": {
+          "label": "jump aim",
+          "tooltip": "Jumping all over the place!!"
+        },
+        "sharp aim": {
+          "label": "sharp aim",
+          "tooltip": "Sharp turns, don’t get cut nya~"
+        },
+        "wide aim": {
+          "label": "wide aim",
+          "tooltip": "Big wide movements, so much work!!"
+        },
+        "linear aim": {
+          "label": "linear aim",
+          "tooltip": "Straight lines only nya!!"
+        },
+        "aim control": {
+          "label": "aim control",
+          "tooltip": "Stop and go, stop and go!!"
+        },
+        "flow aim": {
+          "label": "flow aim",
+          "tooltip": "Smooth like butter nya~"
+        },
+        "precision": {
+          "label": "precision",
+          "tooltip": "Be very, very careful!!"
+        },
+        "finger control": {
+          "label": "finger control",
+          "tooltip": "My fingers are doing a dance nya!!"
+        },
+        "complex snap divisors": {
+          "label": "complex snap divisors",
+          "tooltip": "Math is hard, why are these snaps so weird?!"
+        },
+        "bursts": {
+          "label": "bursts",
+          "tooltip": "Short little taps, like a kitty pounce!!"
+        },
+        "streams": {
+          "label": "streams",
+          "tooltip": "Tapping forever and ever nya~"
+        },
+        "spaced streams": {
+          "label": "spaced streams",
+          "tooltip": "Streams but they’re so far apart!!"
+        },
+        "cutstreams": {
+          "label": "cutstreams",
+          "tooltip": "Broken streams, just like my heart nya..."
+        },
+        "stamina": {
+          "label": "stamina",
+          "tooltip": "Don’t give up, keep going!!"
+        },
+        "aspire": {
+          "label": "aspire",
+          "tooltip": "Breaking the game for fun nya!!"
+        },
+        "mapping contest": {
+          "label": "mapping contest",
+          "tooltip": "I hope I win, please love me!!"
+        },
+        "tournament custom": {
+          "label": "tournament custom",
+          "tooltip": "Made for the big stage nya!!"
+        },
+        "tag": {
+          "label": "tag",
+          "tooltip": "Playing with friends is the best!!"
+        },
+        "port": {
+          "label": "port",
+          "tooltip": "It came from somewhere else nya~"
+        }
+      }
+    },
+    "user_tags": {
+      "groups": {
+        "additions": "Additions~",
+        "context": "Context!!",
+        "expression": "Expression >w<",
+        "gimmick": "Gimmick :3",
+        "jumps": "Jumps!!",
+        "meta": "Meta...",
+        "reading": "Reading??",
+        "skillset": "Skillset~",
+        "sliders": "Sliders :3",
+        "streams": "Streams!!",
+        "style": "Style~",
+        "tech": "Tech >w<"
+      },
+      "items": {
+        "tag_1": {
+          "label": "messy",
+          "tooltip": "Everything is just a huge mess and I hate it but I love it?? Patterns overlapping everywhere like my thoughts~"
+        },
+        "tag_2": {
+          "label": "simple",
+          "tooltip": "Easy peasy map for when my brain is empty :3"
+        },
+        "tag_3": {
+          "label": "chaotic",
+          "tooltip": "Super unpredictable!! Just like my mood swings~ testing weird skills >w<"
+        },
+        "tag_4": {
+          "label": "geometric",
+          "tooltip": "Pretty shapes!! Circles and triangles everywhere~"
+        },
+        "tag_5": {
+          "label": "freeform",
+          "tooltip": "No rules!! Just doing whatever I feel like right now~"
+        },
+        "tag_6": {
+          "label": "grid snap",
+          "tooltip": "Everything is perfectly in its place on the grid... so comfy~"
+        },
+        "tag_7": {
+          "label": "hexgrid",
+          "tooltip": "Hexagons are the bestagons!! Everything on a hex grid~"
+        },
+        "tag_8": {
+          "label": "symmetrical",
+          "tooltip": "Perfectly balanced!! Mirroring everything so I don’t lose it~"
+        },
+        "tag_9": {
+          "label": "playfield constraint",
+          "tooltip": "Stuck in a tiny box!! Only using part of the screen~"
+        },
+        "tag_10": {
+          "label": "old-style revival",
+          "tooltip": "Omg nostalgia!! Mapping like it’s 2010 again~"
+        },
+        "tag_11": {
+          "label": "repetition",
+          "tooltip": "Doing the same thing over and over and over... wait, I’ve seen this before!!"
+        },
+        "tag_12": {
+          "label": "progression",
+          "tooltip": "Getting harder and harder!! Can you keep up??"
+        },
+        "tag_13": {
+          "label": "high contrast",
+          "tooltip": "Flashy ideas!! One second it’s quiet, the next it’s EXPLODING!! Just like me~"
+        },
+        "tag_14": {
+          "label": "improvisation",
+          "tooltip": "Making it up as I go!! Adding sounds that aren’t even there~"
+        },
+        "tag_15": {
+          "label": "tech",
+          "tooltip": "Weird skills for weird people :3"
+        },
+        "tag_16": {
+          "label": "slider tech",
+          "tooltip": "Sliders are so confusing!! Kicksliders and wiggly shapes everywhere~"
+        },
+        "tag_17": {
+          "label": "finger control",
+          "tooltip": "Can your fingers even do that?? Tapping is so hard!!"
+        },
+        "tag_18": {
+          "label": "complex sv",
+          "tooltip": "The sliders are zooming!! My eyes can’t keep up >w<"
+        },
+        "tag_19": {
+          "label": "jumps",
+          "tooltip": "Jumping all over the place!! Zoom zoom!!"
+        },
+        "tag_20": {
+          "label": "sharp",
+          "tooltip": "Ouch!! Sharp angles everywhere~"
+        },
+        "tag_21": {
+          "label": "wide",
+          "tooltip": "Wide turns!! So much movement~"
+        },
+        "tag_22": {
+          "label": "linear",
+          "tooltip": "Straight lines!! Just keep going~"
+        },
+        "tag_23": {
+          "label": "aim control",
+          "tooltip": "Stop!! Go!! Why is the cursor moving like that??"
+        },
+        "tag_24": {
+          "label": "flow aim",
+          "tooltip": "So smooth~ just gliding across the screen!!"
+        },
+        "tag_25": {
+          "label": "bursts",
+          "tooltip": "Quick little taps!! 1-2-3-4-5!!"
+        },
+        "tag_26": {
+          "label": "streams",
+          "tooltip": "Don’t stop tapping!! Keep going forever!!"
+        },
+        "tag_27": {
+          "label": "spaced streams",
+          "tooltip": "Streams but they’re so far apart!! Help!!"
+        },
+        "tag_28": {
+          "label": "stamina",
+          "tooltip": "My fingers are dying!! Too much tapping~"
+        },
+        "tag_29": {
+          "label": "cutstreams",
+          "tooltip": "The stream just broke!! Why is that note so far away??"
+        },
+        "tag_30": {
+          "label": "reading",
+          "tooltip": "I can’t see anything!! Where do I click next??"
+        },
+        "tag_31": {
+          "label": "visually dense",
+          "tooltip": "Too many notes!! My brain is melting~"
+        },
+        "tag_32": {
+          "label": "overlaps",
+          "tooltip": "Everything is on top of each other!! I’m so confused~"
+        },
+        "tag_33": {
+          "label": "precision",
+          "tooltip": "Tiny tiny circles!! You have to be so careful~"
+        },
+        "tag_34": {
+          "label": "alt",
+          "tooltip": "Left-right-left-right!! Keep the rhythm~"
+        },
+        "tag_35": {
+          "label": "collab",
+          "tooltip": "Mapping with friends!! Or people I think are my friends??"
+        },
+        "tag_38": {
+          "label": "multi-song",
+          "tooltip": "So many songs in one!! It never ends~"
+        },
+        "tag_39": {
+          "label": "variable timing",
+          "tooltip": "The rhythm is all over the place!! I can’t find the beat~"
+        },
+        "tag_40": {
+          "label": "time signatures",
+          "tooltip": "Wait, what count are we on?? 1-2-3-4-5-6-7??"
+        },
+        "tag_41": {
+          "label": "clean",
+          "tooltip": "Everything is so neat and tidy!! I love it~"
+        },
+        "tag_42": {
+          "label": "complex slidershapes",
+          "tooltip": "Look at all these pretty sliders!! So many designs~"
+        },
+        "tag_43": {
+          "label": "aspire",
+          "tooltip": "Breaking the game!! It’s magic~"
+        },
+        "tag_44": {
+          "label": "distance snap",
+          "tooltip": "Everything is perfectly spaced~ so consistent!!"
+        },
+        "tag_45": {
+          "label": "mapping contest",
+          "tooltip": "I hope I win!! Or at least don’t come last... >w<"
+        },
+        "tag_46": {
+          "label": "tournament custom",
+          "tooltip": "Made for the pros!! So scary~"
+        },
+        "tag_48": {
+          "label": "complex snap",
+          "tooltip": "The timing is so weird!! 1/7?? 1/9?? Help!!"
+        },
+        "tag_49": {
+          "label": "iNiS-style",
+          "tooltip": "Old school DS vibes!! Just follow the vocals~"
+        },
+        "tag_50": {
+          "label": "2B",
+          "tooltip": "Two things at once?? My brain can’t handle this!!"
+        },
+        "tag_51": {
+          "label": "playfield usage",
+          "tooltip": "Using every single corner of the screen!!"
+        },
+        "tag_52": {
+          "label": "tag",
+          "tooltip": "Playing together!! Don’t mess up your turn~"
+        },
+        "tag_53": {
+          "label": "difficulty spike",
+          "tooltip": "It was so easy and now I’m DYING!! Why??"
+        },
+        "tag_54": {
+          "label": "avant-garde",
+          "tooltip": "It’s art!! You just don’t get it~"
+        },
+        "tag_55": {
+          "label": "keysounds",
+          "tooltip": "The hitsounds are making music!! So pretty~"
+        },
+        "tag_56": {
+          "label": "storyboard",
+          "tooltip": "It’s like a movie!! But I have to play it too??"
+        },
+        "tag_57": {
+          "label": "low sv",
+          "tooltip": "So... slow... I’m gonna fall asleep~"
+        },
+        "tag_58": {
+          "label": "high sv",
+          "tooltip": "SO FAST!! I can’t see anything!!"
+        },
+        "tag_59": {
+          "label": "mega collab",
+          "tooltip": "So many mappers!! It’s a party!!"
+        },
+        "tag_60": {
+          "label": "slider only",
+          "tooltip": "Only sliders!! No circles allowed~"
+        },
+        "tag_61": {
+          "label": "circle only",
+          "tooltip": "Only circles!! Click click click!!"
+        },
+        "tag_63": {
+          "label": "custom skin",
+          "tooltip": "Everything looks different!! So cute~"
+        },
+        "tag_64": {
+          "label": "video",
+          "tooltip": "Watch the video!! The patterns match it~"
+        },
+        "tag_66": {
+          "label": "perfect stacks",
+          "tooltip": "Notes on top of notes!! So satisfying~"
+        },
+        "tag_67": {
+          "label": "ninja spinners",
+          "tooltip": "Blink and you’ll miss it!! Spin fast!!"
+        },
+        "tag_70": {
+          "label": "accelerating bpm",
+          "tooltip": "Faster!! FASTER!! AAAAAAA!!"
+        },
+        "tag_71": {
+          "label": "custom song",
+          "tooltip": "A special song just for this map!!"
+        },
+        "tag_72": {
+          "label": "mirrored",
+          "tooltip": "Left, right, left, right!! Like a mirror~"
+        },
+        "tag_73": {
+          "label": "vocal",
+          "tooltip": "Just follow the singing~"
+        },
+        "tag_74": {
+          "label": "tnt",
+          "tooltip": "Like Taiko!! Don-don-katsu!!"
+        },
+        "tag_75": {
+          "label": "speed",
+          "tooltip": "Gotta go fast!! Tapping like crazy~"
+        },
+        "tag_76": {
+          "label": "double bpm",
+          "tooltip": "It’s twice as fast as it looks!! Surprise!!"
+        },
+        "tag_77": {
+          "label": "finisher-heavy",
+          "tooltip": "Big notes everywhere!! SMASH THEM!!"
+        },
+        "tag_78": {
+          "label": "mono-heavy",
+          "tooltip": "All the same color!! So boring but so hard~"
+        },
+        "tag_79": {
+          "label": "reversed",
+          "tooltip": "Everything is backwards!! I’m so confused~"
+        },
+        "tag_80": {
+          "label": "yellow notes",
+          "tooltip": "Ghost notes!! They’re barely there~"
+        },
+        "tag_82": {
+          "label": "barlines",
+          "tooltip": "Look at the lines!! They’re part of the game now~"
+        },
+        "tag_83": {
+          "label": "memory",
+          "tooltip": "Don’t forget!! You have to remember the patterns~"
+        },
+        "tag_84": {
+          "label": "taikosu",
+          "tooltip": "Is it osu?? Is it taiko?? It’s both!!"
+        },
+        "tag_85": {
+          "label": "swing",
+          "tooltip": "Feel the swing~ 1-and-2-and-3!!"
+        },
+        "tag_86": {
+          "label": "improvisation",
+          "tooltip": "Just vibing with the music~"
+        },
+        "tag_87": {
+          "label": "tech",
+          "tooltip": "Complex snaps!! My brain hurts~"
+        },
+        "tag_88": {
+          "label": "convert",
+          "tooltip": "It’s like the auto-generated maps!!"
+        },
+        "tag_89": {
+          "label": "hitsounds",
+          "tooltip": "New sounds!! Listen closely~"
+        },
+        "tag_90": {
+          "label": "tech",
+          "tooltip": "Sliders and stacks everywhere!! So technical~"
+        },
+        "tag_91": {
+          "label": "flow",
+          "tooltip": "It just feels right~ so natural!!"
+        },
+        "tag_92": {
+          "label": "antiflow",
+          "tooltip": "Why is it going that way?? It feels so wrong!!"
+        },
+        "tag_93": {
+          "label": "jump",
+          "tooltip": "Hyperdashes!! Zooming across the screen~"
+        },
+        "tag_94": {
+          "label": "no hyperdashes",
+          "tooltip": "No jumping!! Just walking~"
+        },
+        "tag_95": {
+          "label": "long sliders",
+          "tooltip": "Catch all the droplets!! Don’t miss any~"
+        },
+        "tag_96": {
+          "label": "spinner-heavy",
+          "tooltip": "Spin spin spin!! I’m getting dizzy~"
+        },
+        "tag_97": {
+          "label": "convert",
+          "tooltip": "Messy and weird!! Just like a convert~"
+        },
+        "tag_98": {
+          "label": "precision",
+          "tooltip": "Tiny fruits!! Be so careful~"
+        },
+        "tag_99": {
+          "label": "wiggles",
+          "tooltip": "Wiggle wiggle!! Quick turns~"
+        },
+        "tag_100": {
+          "label": "hyperwalks",
+          "tooltip": "Don’t run!! You’ll overshoot it!!"
+        },
+        "tag_101": {
+          "label": "dodge the beat",
+          "tooltip": "Don’t touch anything!! It’s a trap!!"
+        },
+        "tag_102": {
+          "label": "jumpstream",
+          "tooltip": "Streams with little jumps!! So fun~"
+        },
+        "tag_103": {
+          "label": "handstream",
+          "tooltip": "Three notes at once!! My hands!!"
+        },
+        "tag_104": {
+          "label": "quadstream",
+          "tooltip": "Four notes!! How am I supposed to hit that??"
+        },
+        "tag_105": {
+          "label": "chordjack",
+          "tooltip": "Tapping the same columns over and over!!"
+        },
+        "tag_106": {
+          "label": "longjack",
+          "tooltip": "One column forever!! My finger is tired~"
+        },
+        "tag_107": {
+          "label": "speedjack",
+          "tooltip": "Fast fast jacks!! Tap tap tap!!"
+        },
+        "tag_108": {
+          "label": "wristjack",
+          "tooltip": "Use your wrists!! Shake it~"
+        },
+        "tag_109": {
+          "label": "chordstream",
+          "tooltip": "Streams with chords mixed in!! So dense~"
+        },
+        "tag_110": {
+          "label": "delay",
+          "tooltip": "The notes are lagging!! Oh wait, it’s the song~"
+        },
+        "tag_111": {
+          "label": "tech",
+          "tooltip": "More weird snaps!! I’m losing it~"
+        },
+        "tag_112": {
+          "label": "mixed rice",
+          "tooltip": "All kinds of rice!! Yummy~"
+        },
+        "tag_113": {
+          "label": "LN coordination",
+          "tooltip": "Hold this, tap that!! I can’t multitask!!"
+        },
+        "tag_114": {
+          "label": "LN release",
+          "tooltip": "Don’t forget to let go!!"
+        },
+        "tag_115": {
+          "label": "LN inverse",
+          "tooltip": "Everything is backwards!! The gaps are the notes??"
+        },
+        "tag_116": {
+          "label": "LN density",
+          "tooltip": "So many long notes!! No breaks for me~"
+        },
+        "tag_117": {
+          "label": "LN mixed ",
+          "tooltip": "All the long notes at once!!"
+        },
+        "tag_118": {
+          "label": "generic hybrid",
+          "tooltip": "Rice and long notes together~"
+        },
+        "tag_119": {
+          "label": "technical hybrid",
+          "tooltip": "Hard rice and hard long notes!! Help!!"
+        },
+        "tag_120": {
+          "label": "tiebreaker",
+          "tooltip": "The final boss!! It’s so long~"
+        },
+        "tag_121": {
+          "label": "o2jam",
+          "tooltip": "Like the old days!! Classic mapping~"
+        },
+        "tag_122": {
+          "label": "N+1",
+          "tooltip": "One finger does its own thing!! So weird~"
+        },
+        "tag_123": {
+          "label": "dump",
+          "tooltip": "Just dump all the notes!! Feel the intensity~"
+        },
+        "tag_124": {
+          "label": "complex sv",
+          "tooltip": "The speed is lying to you!!"
+        },
+        "tag_125": {
+          "label": "complex sv",
+          "tooltip": "More speed tricks!! My eyes!!"
+        },
+        "tag_128": {
+          "label": "stamina",
+          "tooltip": "Keep tapping!! Don’t give up!!"
+        },
+        "tag_129": {
+          "label": "stamina",
+          "tooltip": "Still tapping... still dying..."
+        },
+        "tag_130": {
+          "label": "squares",
+          "tooltip": "Squares everywhere!!"
+        },
+        "tag_131": {
+          "label": "triangles",
+          "tooltip": "Triangles everywhere!!"
+        },
+        "tag_132": {
+          "label": "cross-screen",
+          "tooltip": "From one side to the other!! Zoom!!"
+        },
+        "tag_133": {
+          "label": "stamina",
+          "tooltip": "Jumping forever!! I’m exhausted~"
+        },
+        "tag_135": {
+          "label": "complex snap",
+          "tooltip": "What even is this rhythm??"
+        },
+        "tag_136": {
+          "label": "complex snap",
+          "tooltip": "I give up on the timing..."
+        },
+        "tag_137": {
+          "label": "gimmick",
+          "tooltip": "It’s just weird!! I don’t know what to call it~"
+        },
+        "tag_138": {
+          "label": "stars",
+          "tooltip": "Twinkle twinkle little star patterns~"
+        },
+        "tag_139": {
+          "label": "back and forth",
+          "tooltip": "Here, there, here, there!!"
+        },
+        "tag_140": {
+          "label": "freeform",
+          "tooltip": "Just random jumps!! No patterns here~"
+        },
+        "tag_141": {
+          "label": "doubles",
+          "tooltip": "Two at a time!! Tap-tap!!"
+        },
+        "tag_142": {
+          "label": "quads",
+          "tooltip": "Four at a time!! Tap-tap-tap-tap!!"
+        },
+        "tag_143": {
+          "label": "inspo",
+          "tooltip": "I want to be just like them~"
+        },
+        "tag_144": {
+          "label": "conceptual",
+          "tooltip": "It’s deep!! It means something!!"
+        },
+        "tag_145": {
+          "label": "combo colours",
+          "tooltip": "Pretty colors!! Look at the rainbow~"
+        }
+      }
+    }
+  }
+}

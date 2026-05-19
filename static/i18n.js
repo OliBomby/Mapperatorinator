@@ -20,7 +20,12 @@ const I18n = (function() {
     let fallbackTranslations = {};
     const STORAGE_KEY = 'mapperatorinator_language';
     const DEFAULT_LANGUAGE = 'en';
-    const SUPPORTED_LANGUAGES = ['en', 'zh-CN'];
+    const SUPPORTED_LANGUAGES = [
+        { code: 'en', name: 'English' },
+        { code: 'zh-CN', name: '简体中文' },
+        { code: 'bpd_catgirl', name: 'BPD Catgirl' }
+    ];
+    const SUPPORTED_LANGUAGE_CODES = SUPPORTED_LANGUAGES.map(lang => lang.code);
 
     /**
      * Initialize the i18n module
@@ -34,7 +39,7 @@ const I18n = (function() {
         currentLanguage = lang || savedLang || browserLang || DEFAULT_LANGUAGE;
 
         // Ensure the language is supported
-        if (!SUPPORTED_LANGUAGES.includes(currentLanguage)) {
+        if (!SUPPORTED_LANGUAGE_CODES.includes(currentLanguage)) {
             currentLanguage = DEFAULT_LANGUAGE;
         }
 
@@ -191,7 +196,7 @@ const I18n = (function() {
      * @returns {Promise<boolean>} - Resolves to true if successful
      */
     async function setLanguage(lang) {
-        if (!SUPPORTED_LANGUAGES.includes(lang)) {
+        if (!SUPPORTED_LANGUAGE_CODES.includes(lang)) {
             console.error(`[i18n] Unsupported language: ${lang}`);
             return false;
         }
@@ -235,10 +240,7 @@ const I18n = (function() {
      * @returns {Array<Object>} - Array of language objects with code and name
      */
     function getSupportedLanguages() {
-        return [
-            { code: 'en', name: 'English' },
-            { code: 'zh-CN', name: '简体中文' }
-        ];
+        return SUPPORTED_LANGUAGES.map(lang => ({ ...lang }));
     }
 
     /**
