@@ -187,304 +187,860 @@
         "beatmap_created": "Click Here to go to the created beatmap..."
     },
     "descriptors": {
-        "groups": {
-            "general": "General",
-            "meta_information": "Meta Information",
-            "style": "Style",
-            "song_representation": "Song Representation",
-            "skillsets": "Skillsets",
-            "aim": "Aim",
-            "tap": "Tap",
-            "scene": "Scene"
+        "omdb": {
+            "groups": {
+                "general": "General",
+                "meta_information": "Meta Information",
+                "style": "Style",
+                "song_representation": "Song Representation",
+                "skillsets": "Skillsets",
+                "aim": "Aim",
+                "tap": "Tap",
+                "scene": "Scene"
+            },
+            "items": {
+                "gimmick": {
+                    "label": "gimmick",
+                    "tooltip": "Focused on a single unique design or gameplay idea."
+                },
+                "2B": {
+                    "label": "2B",
+                    "tooltip": "Includes gameplay elements with two or more objects placed simultaneously."
+                },
+                "slider only": {
+                    "label": "slider only",
+                    "tooltip": "Restricts object choice to sliders only."
+                },
+                "circle only": {
+                    "label": "circle only",
+                    "tooltip": "Restricts object choice to circles only."
+                },
+                "swing": {
+                    "label": "swing",
+                    "tooltip": "Uses 1/3, 1/6, and 1/12 snap divisors for most/all objects."
+                },
+                "collab": {
+                    "label": "collab",
+                    "tooltip": "A map with two or more associated mappers."
+                },
+                "megacollab": {
+                    "label": "megacollab",
+                    "tooltip": "A map with 8 or more associated mappers."
+                },
+                "marathon": {
+                    "label": "marathon",
+                    "tooltip": "A map with a drain time of over 5 minutes."
+                },
+                "gungathon": {
+                    "label": "gungathon",
+                    "tooltip": "A map with a drain time of over 10 minutes."
+                },
+                "multi-song": {
+                    "label": "multi-song",
+                    "tooltip": "Contains multiple songs within the audio."
+                },
+                "variable timing": {
+                    "label": "variable timing",
+                    "tooltip": "Contains multiple timing points, usually for non-metronome songs."
+                },
+                "accelerating bpm": {
+                    "label": "accelerating bpm",
+                    "tooltip": "Features progressively increasing tempo."
+                },
+                "time signatures": {
+                    "label": "time signatures",
+                    "tooltip": "Many changes or uncommon time signatures."
+                },
+                "storyboard": {
+                    "label": "storyboard",
+                    "tooltip": "Contains a storyboard that enhances gameplay experience."
+                },
+                "storyboard gimmick": {
+                    "label": "storyboard gimmick",
+                    "tooltip": "Uses storyboard elements that change how the map is played."
+                },
+                "keysounds": {
+                    "label": "keysounds",
+                    "tooltip": "Uses various pitched hitsounds to create a melody."
+                },
+                "download unavailable": {
+                    "label": "download unavailable",
+                    "tooltip": "Cannot be downloaded from the osu! website."
+                },
+                "custom skin": {
+                    "label": "custom skin",
+                    "tooltip": "Utilizes custom skin elements and graphics."
+                },
+                "featured artist": {
+                    "label": "featured artist",
+                    "tooltip": "Features song(s) from osu!'s Featured Artist listing."
+                },
+                "custom song": {
+                    "label": "custom song",
+                    "tooltip": "Maps a song made specifically for the map."
+                },
+                "messy": {
+                    "label": "messy",
+                    "tooltip": "Visually chaotic and disorganised patterns."
+                },
+                "geometric": {
+                    "label": "geometric",
+                    "tooltip": "Incorporates geometric shapes within the design."
+                },
+                "grid snap": {
+                    "label": "grid snap",
+                    "tooltip": "Objects are placed along a square grid."
+                },
+                "hexgrid": {
+                    "label": "hexgrid",
+                    "tooltip": "Objects are placed along a hexagonal grid."
+                },
+                "freeform": {
+                    "label": "freeform",
+                    "tooltip": "A loose approach to visual structure."
+                },
+                "symmetrical": {
+                    "label": "symmetrical",
+                    "tooltip": "Employs symmetry within the design."
+                },
+                "old-style revival": {
+                    "label": "old-style revival",
+                    "tooltip": "Emulates a style from early mapping."
+                },
+                "clean": {
+                    "label": "clean",
+                    "tooltip": "Visually uncluttered and organised patterns."
+                },
+                "slidershapes": {
+                    "label": "slidershapes",
+                    "tooltip": "Uses a variety of slider designs."
+                },
+                "distance snapped": {
+                    "label": "distance snapped",
+                    "tooltip": "Uses osu's built-in distance snap feature."
+                },
+                "iNiS-style": {
+                    "label": "iNiS-style",
+                    "tooltip": "Originates from the original DS games."
+                },
+                "avant-garde": {
+                    "label": "avant-garde",
+                    "tooltip": "Experimental design philosophies."
+                },
+                "perfect stacks": {
+                    "label": "perfect stacks",
+                    "tooltip": "Features perfectly overlapped stacked notes."
+                },
+                "ninja spinners": {
+                    "label": "ninja spinners",
+                    "tooltip": "Features very short spinners."
+                },
+                "simple": {
+                    "label": "simple",
+                    "tooltip": "Accessible and straightforward design."
+                },
+                "chaotic": {
+                    "label": "chaotic",
+                    "tooltip": "Unpredictable map design."
+                },
+                "repetition": {
+                    "label": "repetition",
+                    "tooltip": "Features recognizable identical patterns."
+                },
+                "progression": {
+                    "label": "progression",
+                    "tooltip": "Gradual advancement in difficulty."
+                },
+                "high contrast": {
+                    "label": "high contrast",
+                    "tooltip": "Uses flashy ideas to follow music changes."
+                },
+                "improvisation": {
+                    "label": "improvisation",
+                    "tooltip": "Uses patterns that do not directly match the music."
+                },
+                "playfield usage": {
+                    "label": "playfield usage",
+                    "tooltip": "Deliberate use of the playfield."
+                },
+                "playfield constraint": {
+                    "label": "playfield constraint",
+                    "tooltip": "Restricts object placement to a part of the playfield."
+                },
+                "video gimmick": {
+                    "label": "video gimmick",
+                    "tooltip": "References the background video in its patterning."
+                },
+                "difficulty spike": {
+                    "label": "difficulty spike",
+                    "tooltip": "A sudden, significant challenge increase."
+                },
+                "low sv": {
+                    "label": "low sv",
+                    "tooltip": "Prominent low slider velocity usage."
+                },
+                "high sv": {
+                    "label": "high sv",
+                    "tooltip": "Prominent high slider velocity usage."
+                },
+                "colorhax": {
+                    "label": "colorhax",
+                    "tooltip": "Intentional use of combo colors for immersion."
+                },
+                "tech": {
+                    "label": "tech",
+                    "tooltip": "Tests uncommon skills."
+                },
+                "slider tech": {
+                    "label": "slider tech",
+                    "tooltip": "Tests skills involving complex sliders."
+                },
+                "complex sv": {
+                    "label": "complex sv",
+                    "tooltip": "Large changes in slider velocity to test reading."
+                },
+                "reading": {
+                    "label": "reading",
+                    "tooltip": "Tests a player's reading skill."
+                },
+                "visually dense": {
+                    "label": "visually dense",
+                    "tooltip": "Patterns with many visible notes that make reading hard."
+                },
+                "overlap reading": {
+                    "label": "overlap reading",
+                    "tooltip": "Overlapped objects obscure note order."
+                },
+                "jump aim": {
+                    "label": "jump aim",
+                    "tooltip": "Focuses heavily on jumps."
+                },
+                "sharp aim": {
+                    "label": "sharp aim",
+                    "tooltip": "Heavy use of sharp angle movement."
+                },
+                "wide aim": {
+                    "label": "wide aim",
+                    "tooltip": "Uses wide angle movement patterns."
+                },
+                "linear aim": {
+                    "label": "linear aim",
+                    "tooltip": "Requires continuous straight movement."
+                },
+                "aim control": {
+                    "label": "aim control",
+                    "tooltip": "Features abrupt velocity or direction changes."
+                },
+                "flow aim": {
+                    "label": "flow aim",
+                    "tooltip": "Encourages fully continuous cursor movement."
+                },
+                "precision": {
+                    "label": "precision",
+                    "tooltip": "Requires fine, precise cursor movement."
+                },
+                "finger control": {
+                    "label": "finger control",
+                    "tooltip": "Tests complex tapping ability."
+                },
+                "complex snap divisors": {
+                    "label": "complex snap divisors",
+                    "tooltip": "Uses unusual snap divisors."
+                },
+                "bursts": {
+                    "label": "bursts",
+                    "tooltip": "Continuous alternating patterns, typically 9 notes or less."
+                },
+                "streams": {
+                    "label": "streams",
+                    "tooltip": "Continuous alternating patterns, typically more than 9 notes."
+                },
+                "spaced streams": {
+                    "label": "spaced streams",
+                    "tooltip": "Streams with large spacing between notes."
+                },
+                "cutstreams": {
+                    "label": "cutstreams",
+                    "tooltip": "Streams with very uneven spacing."
+                },
+                "stamina": {
+                    "label": "stamina",
+                    "tooltip": "Tests endurance over long periods."
+                },
+                "aspire": {
+                    "label": "aspire",
+                    "tooltip": "Uses glitches for unique effects."
+                },
+                "mapping contest": {
+                    "label": "mapping contest",
+                    "tooltip": "An entry for a mapping contest."
+                },
+                "tournament custom": {
+                    "label": "tournament custom",
+                    "tooltip": "A custom map for a tournament."
+                },
+                "tag": {
+                    "label": "tag",
+                    "tooltip": "Designed for multiplayer tag mode."
+                },
+                "port": {
+                    "label": "port",
+                    "tooltip": "Originally created for other media then imported."
+                }
+            }
         },
-        "items": {
-            "gimmick": {
-                "label": "gimmick",
-                "tooltip": "Focused on a single unique design or gameplay idea."
-            },
-            "2B": {
-                "label": "2B",
-                "tooltip": "Includes gameplay elements with two or more objects placed simultaneously."
-            },
-            "slider only": {
-                "label": "slider only",
-                "tooltip": "Restricts object choice to sliders only."
-            },
-            "circle only": {
-                "label": "circle only",
-                "tooltip": "Restricts object choice to circles only."
-            },
-            "swing": {
-                "label": "swing",
-                "tooltip": "Uses 1/3, 1/6, and 1/12 snap divisors for most/all objects."
-            },
-            "collab": {
-                "label": "collab",
-                "tooltip": "A map with two or more associated mappers."
-            },
-            "megacollab": {
-                "label": "megacollab",
-                "tooltip": "A map with 8 or more associated mappers."
-            },
-            "marathon": {
-                "label": "marathon",
-                "tooltip": "A map with a drain time of over 5 minutes."
-            },
-            "gungathon": {
-                "label": "gungathon",
-                "tooltip": "A map with a drain time of over 10 minutes."
-            },
-            "multi-song": {
-                "label": "multi-song",
-                "tooltip": "Contains multiple songs within the audio."
-            },
-            "variable timing": {
-                "label": "variable timing",
-                "tooltip": "Contains multiple timing points, usually for non-metronome songs."
-            },
-            "accelerating bpm": {
-                "label": "accelerating bpm",
-                "tooltip": "Features progressively increasing tempo."
-            },
-            "time signatures": {
-                "label": "time signatures",
-                "tooltip": "Many changes or uncommon time signatures."
-            },
-            "storyboard": {
-                "label": "storyboard",
-                "tooltip": "Contains a storyboard that enhances gameplay experience."
-            },
-            "storyboard gimmick": {
-                "label": "storyboard gimmick",
-                "tooltip": "Uses storyboard elements that change how the map is played."
-            },
-            "keysounds": {
-                "label": "keysounds",
-                "tooltip": "Uses various pitched hitsounds to create a melody."
-            },
-            "download unavailable": {
-                "label": "download unavailable",
-                "tooltip": "Cannot be downloaded from the osu! website."
-            },
-            "custom skin": {
-                "label": "custom skin",
-                "tooltip": "Utilizes custom skin elements and graphics."
-            },
-            "featured artist": {
-                "label": "featured artist",
-                "tooltip": "Features song(s) from osu!'s Featured Artist listing."
-            },
-            "custom song": {
-                "label": "custom song",
-                "tooltip": "Maps a song made specifically for the map."
-            },
-            "messy": {
-                "label": "messy",
-                "tooltip": "Visually chaotic and disorganised patterns."
-            },
-            "geometric": {
-                "label": "geometric",
-                "tooltip": "Incorporates geometric shapes within the design."
-            },
-            "grid snap": {
-                "label": "grid snap",
-                "tooltip": "Objects are placed along a square grid."
-            },
-            "hexgrid": {
-                "label": "hexgrid",
-                "tooltip": "Objects are placed along a hexagonal grid."
-            },
-            "freeform": {
-                "label": "freeform",
-                "tooltip": "A loose approach to visual structure."
-            },
-            "symmetrical": {
-                "label": "symmetrical",
-                "tooltip": "Employs symmetry within the design."
-            },
-            "old-style revival": {
-                "label": "old-style revival",
-                "tooltip": "Emulates a style from early mapping."
-            },
-            "clean": {
-                "label": "clean",
-                "tooltip": "Visually uncluttered and organised patterns."
-            },
-            "slidershapes": {
-                "label": "slidershapes",
-                "tooltip": "Uses a variety of slider designs."
-            },
-            "distance snapped": {
-                "label": "distance snapped",
-                "tooltip": "Uses osu's built-in distance snap feature."
-            },
-            "iNiS-style": {
-                "label": "iNiS-style",
-                "tooltip": "Originates from the original DS games."
-            },
-            "avant-garde": {
-                "label": "avant-garde",
-                "tooltip": "Experimental design philosophies."
-            },
-            "perfect stacks": {
-                "label": "perfect stacks",
-                "tooltip": "Features perfectly overlapped stacked notes."
-            },
-            "ninja spinners": {
-                "label": "ninja spinners",
-                "tooltip": "Features very short spinners."
-            },
-            "simple": {
-                "label": "simple",
-                "tooltip": "Accessible and straightforward design."
-            },
-            "chaotic": {
-                "label": "chaotic",
-                "tooltip": "Unpredictable map design."
-            },
-            "repetition": {
-                "label": "repetition",
-                "tooltip": "Features recognizable identical patterns."
-            },
-            "progression": {
-                "label": "progression",
-                "tooltip": "Gradual advancement in difficulty."
-            },
-            "high contrast": {
-                "label": "high contrast",
-                "tooltip": "Uses flashy ideas to follow music changes."
-            },
-            "improvisation": {
-                "label": "improvisation",
-                "tooltip": "Uses patterns that do not directly match the music."
-            },
-            "playfield usage": {
-                "label": "playfield usage",
-                "tooltip": "Deliberate use of the playfield."
-            },
-            "playfield constraint": {
-                "label": "playfield constraint",
-                "tooltip": "Restricts object placement to a part of the playfield."
-            },
-            "video gimmick": {
-                "label": "video gimmick",
-                "tooltip": "References the background video in its patterning."
-            },
-            "difficulty spike": {
-                "label": "difficulty spike",
-                "tooltip": "A sudden, significant challenge increase."
-            },
-            "low sv": {
-                "label": "low sv",
-                "tooltip": "Prominent low slider velocity usage."
-            },
-            "high sv": {
-                "label": "high sv",
-                "tooltip": "Prominent high slider velocity usage."
-            },
-            "colorhax": {
-                "label": "colorhax",
-                "tooltip": "Intentional use of combo colors for immersion."
-            },
-            "tech": {
-                "label": "tech",
-                "tooltip": "Tests uncommon skills."
-            },
-            "slider tech": {
-                "label": "slider tech",
-                "tooltip": "Tests skills involving complex sliders."
-            },
-            "complex sv": {
-                "label": "complex sv",
-                "tooltip": "Large changes in slider velocity to test reading."
-            },
-            "reading": {
-                "label": "reading",
-                "tooltip": "Tests a player's reading skill."
-            },
-            "visually dense": {
-                "label": "visually dense",
-                "tooltip": "Patterns with many visible notes that make reading hard."
-            },
-            "overlap reading": {
-                "label": "overlap reading",
-                "tooltip": "Overlapped objects obscure note order."
-            },
-            "jump aim": {
-                "label": "jump aim",
-                "tooltip": "Focuses heavily on jumps."
-            },
-            "sharp aim": {
-                "label": "sharp aim",
-                "tooltip": "Heavy use of sharp angle movement."
-            },
-            "wide aim": {
-                "label": "wide aim",
-                "tooltip": "Uses wide angle movement patterns."
-            },
-            "linear aim": {
-                "label": "linear aim",
-                "tooltip": "Requires continuous straight movement."
-            },
-            "aim control": {
-                "label": "aim control",
-                "tooltip": "Features abrupt velocity or direction changes."
-            },
-            "flow aim": {
-                "label": "flow aim",
-                "tooltip": "Encourages fully continuous cursor movement."
-            },
-            "precision": {
-                "label": "precision",
-                "tooltip": "Requires fine, precise cursor movement."
-            },
-            "finger control": {
-                "label": "finger control",
-                "tooltip": "Tests complex tapping ability."
-            },
-            "complex snap divisors": {
-                "label": "complex snap divisors",
-                "tooltip": "Uses unusual snap divisors."
-            },
-            "bursts": {
-                "label": "bursts",
-                "tooltip": "Continuous alternating patterns, typically 9 notes or less."
-            },
-            "streams": {
-                "label": "streams",
-                "tooltip": "Continuous alternating patterns, typically more than 9 notes."
-            },
-            "spaced streams": {
-                "label": "spaced streams",
-                "tooltip": "Streams with large spacing between notes."
-            },
-            "cutstreams": {
-                "label": "cutstreams",
-                "tooltip": "Streams with very uneven spacing."
-            },
-            "stamina": {
-                "label": "stamina",
-                "tooltip": "Tests endurance over long periods."
-            },
-            "aspire": {
-                "label": "aspire",
-                "tooltip": "Uses glitches for unique effects."
-            },
-            "mapping contest": {
-                "label": "mapping contest",
-                "tooltip": "An entry for a mapping contest."
-            },
-            "tournament custom": {
-                "label": "tournament custom",
-                "tooltip": "A custom map for a tournament."
-            },
-            "tag": {
-                "label": "tag",
-                "tooltip": "Designed for multiplayer tag mode."
-            },
-            "port": {
-                "label": "port",
-                "tooltip": "Originally created for other media then imported."
+        "user_tags": {
+            "groups": {
+                "additions": "Additions",
+                "context": "Context",
+                "expression": "Expression",
+                "gimmick": "Gimmick",
+                "jumps": "Jumps",
+                "meta": "Meta",
+                "reading": "Reading",
+                "skillset": "Skillset",
+                "sliders": "Sliders",
+                "streams": "Streams",
+                "style": "Style",
+                "tech": "Tech"
+            },
+            "items": {
+                "tag_1": {
+                    "label": "messy",
+                    "tooltip": "Visually chaotic and intentionally disorganised patterns, often involving many overlaps and unequal visual spacing between objects."
+                },
+                "tag_2": {
+                    "label": "simple",
+                    "tooltip": "Accessible and straightforward map design."
+                },
+                "tag_3": {
+                    "label": "chaotic",
+                    "tooltip": "Unpredictable map design, often testing unusual skillsets."
+                },
+                "tag_4": {
+                    "label": "geometric",
+                    "tooltip": "Incorporates geometric shapes within the map's visual design."
+                },
+                "tag_5": {
+                    "label": "freeform",
+                    "tooltip": "An unrestrained and loose approach towards visual structure."
+                },
+                "tag_6": {
+                    "label": "grid snap",
+                    "tooltip": "Objects are placed along a square grid, typically using osu!'s in-built grid snap feature."
+                },
+                "tag_7": {
+                    "label": "hexgrid",
+                    "tooltip": "Objects are placed along a hexagonal grid."
+                },
+                "tag_8": {
+                    "label": "symmetrical",
+                    "tooltip": "Employs symmetry within the map design, often mirroring elements along the horizontal centreline."
+                },
+                "tag_9": {
+                    "label": "playfield constraint",
+                    "tooltip": "Restricts object placement to a certain part of the playfield."
+                },
+                "tag_10": {
+                    "label": "old-style revival",
+                    "tooltip": "Emulates a style closely associated with early mapping, typically to pay homage or invoke nostalgia."
+                },
+                "tag_11": {
+                    "label": "repetition",
+                    "tooltip": "Features the use of recognizable identical patterns or gameplay elements."
+                },
+                "tag_12": {
+                    "label": "progression",
+                    "tooltip": "Contains a gradual advancement in difficulty or concept across the map."
+                },
+                "tag_13": {
+                    "label": "high contrast",
+                    "tooltip": "Uses flashy ideas to follow changes in the music, creating stark differences between different sections of the song."
+                },
+                "tag_14": {
+                    "label": "improvisation",
+                    "tooltip": "Uses patterns that do not correspond to sounds in the music, often using hitsounds to add sounds in."
+                },
+                "tag_15": {
+                    "label": "tech",
+                    "tooltip": "Tests uncommon skills."
+                },
+                "tag_16": {
+                    "label": "slider tech",
+                    "tooltip": "Tests uncommon skills involving sliders, such as heavy use of kicksliders or aim on complex slidershapes."
+                },
+                "tag_17": {
+                    "label": "finger control",
+                    "tooltip": "Uses complex applications of rhythms in order to test the player's tapping ability."
+                },
+                "tag_18": {
+                    "label": "complex sv",
+                    "tooltip": "Changes slider velocity by large amounts in order to test the player's reading and aim ability."
+                },
+                "tag_19": {
+                    "label": "jumps",
+                    "tooltip": "Focuses heavily on jumps, i.e. circles spaced far apart that require the player to move towards, slow down to hit, then speed up to move towards the next object."
+                },
+                "tag_20": {
+                    "label": "sharp",
+                    "tooltip": "Patterns with heavy use of sharp angle movement."
+                },
+                "tag_21": {
+                    "label": "wide",
+                    "tooltip": "Patterns with heavy use of wide angle movement."
+                },
+                "tag_22": {
+                    "label": "linear",
+                    "tooltip": "Patterns that require the player to move continuously in a straight or nearly straight line."
+                },
+                "tag_23": {
+                    "label": "aim control",
+                    "tooltip": "Patterns with velocity or direction changes which strongly go against a player's natural movement pattern."
+                },
+                "tag_24": {
+                    "label": "flow aim",
+                    "tooltip": "Patterns with fully continuous cursor movement, usually due to a combination of wide angles and little time between objects."
+                },
+                "tag_25": {
+                    "label": "bursts",
+                    "tooltip": "Patterns requiring consecutively tapping 5-9 note groups."
+                },
+                "tag_26": {
+                    "label": "streams",
+                    "tooltip": "Patterns requiring continuous note hits, typically more than 9 notes."
+                },
+                "tag_27": {
+                    "label": "spaced streams",
+                    "tooltip": "Streams with large spacing, typically ones where the notes don't overlap."
+                },
+                "tag_28": {
+                    "label": "stamina",
+                    "tooltip": "Tests a player's ability to tap dense rhythms over long periods of time."
+                },
+                "tag_29": {
+                    "label": "cutstreams",
+                    "tooltip": "Streams in which the spacing of certain notes is much larger than the rest of the stream."
+                },
+                "tag_30": {
+                    "label": "reading",
+                    "tooltip": "Tests a player's reading skill, i.e. patterns that obfuscate note order and/or timing."
+                },
+                "tag_31": {
+                    "label": "visually dense",
+                    "tooltip": "Contains patterns where the amount of visible notes makes determining note order and/or timing difficult."
+                },
+                "tag_32": {
+                    "label": "overlaps",
+                    "tooltip": "Contains patterns where overlapped objects make determining note order and/or timing difficult."
+                },
+                "tag_33": {
+                    "label": "precision",
+                    "tooltip": "Colloquial term for maps which require fine, precise movement to aim correctly. Typically refers to maps with circle sizes above and including 6."
+                },
+                "tag_34": {
+                    "label": "alt",
+                    "tooltip": "Colloquial term for maps which use rhythms that encourage the player to alternate notes. Typically distinct from burst or stream maps."
+                },
+                "tag_35": {
+                    "label": "collab",
+                    "tooltip": "A map with two or more associated mappers."
+                },
+                "tag_38": {
+                    "label": "multi-song",
+                    "tooltip": "A map containing multiple songs."
+                },
+                "tag_39": {
+                    "label": "variable timing",
+                    "tooltip": "Contains multiple timing points, usually required for songs not recorded to a metronome."
+                },
+                "tag_40": {
+                    "label": "time signatures",
+                    "tooltip": "A song featuring many changes in time signature or uses an uncommon time signature."
+                },
+                "tag_41": {
+                    "label": "clean",
+                    "tooltip": "Visually uncluttered and organised patterns, often involving few overlaps and equal visual spacing between objects."
+                },
+                "tag_42": {
+                    "label": "complex slidershapes",
+                    "tooltip": "Uses a large variety of slider designs."
+                },
+                "tag_43": {
+                    "label": "aspire",
+                    "tooltip": "Uses glitches to provide gameplay or visual effects that are otherwise impossible to achieve, originating from the annual Aspire mapping contest."
+                },
+                "tag_44": {
+                    "label": "distance snap",
+                    "tooltip": "Uses osu's in-built distance snap feature for most/all of the map."
+                },
+                "tag_45": {
+                    "label": "mapping contest",
+                    "tooltip": "An entry for a mapping contest."
+                },
+                "tag_46": {
+                    "label": "tournament custom",
+                    "tooltip": "A map created for a playing tournament."
+                },
+                "tag_48": {
+                    "label": "complex snap",
+                    "tooltip": "Maps that feature prominent usage of mixed or unusual snap divisors."
+                },
+                "tag_49": {
+                    "label": "iNiS-style",
+                    "tooltip": "A style originating from the original DS games, recognizable by its emphasis on vocal rhythm, constant slider velocity, and easily understandable grid-snapped patterns."
+                },
+                "tag_50": {
+                    "label": "2B",
+                    "tooltip": "Includes gameplay elements with two or more objects placed simultaneously. The term originates from a Chinese transliteration of 'idiot'."
+                },
+                "tag_51": {
+                    "label": "playfield usage",
+                    "tooltip": "Includes deliberate use of the playfield within the map design."
+                },
+                "tag_52": {
+                    "label": "tag",
+                    "tooltip": "Includes gameplay designed for the multiplayer tag mode, where multiple players complete a map co-operatively."
+                },
+                "tag_53": {
+                    "label": "difficulty spike",
+                    "tooltip": "Contains a sudden and significant increase in challenge within the map's gameplay."
+                },
+                "tag_54": {
+                    "label": "avant-garde",
+                    "tooltip": "Employs boundary-pushing and experimental philosophies to map design, often foregoing gameplay and aesthetic conventions to extreme measures."
+                },
+                "tag_55": {
+                    "label": "keysounds",
+                    "tooltip": "Contains hitsounds that use various pitched samples to create a melody, typically following one within the song."
+                },
+                "tag_56": {
+                    "label": "storyboard",
+                    "tooltip": "Includes a storyboard that changes how the map is played, usually by changing a map's visuals by using storyboard elements in place of showing the map's hitobjects."
+                },
+                "tag_57": {
+                    "label": "low sv",
+                    "tooltip": "Features prominent low slider velocity usage as a key part of map design."
+                },
+                "tag_58": {
+                    "label": "high sv",
+                    "tooltip": "Features prominent high slider velocity usage as a key part of map design."
+                },
+                "tag_59": {
+                    "label": "mega collab",
+                    "tooltip": "A map with 8 or more associated mappers."
+                },
+                "tag_60": {
+                    "label": "slider only",
+                    "tooltip": "Restricts object choice to sliders only."
+                },
+                "tag_61": {
+                    "label": "circle only",
+                    "tooltip": "Restricts object choice to circles only."
+                },
+                "tag_63": {
+                    "label": "custom skin",
+                    "tooltip": "Utilizes custom skin elements and graphics."
+                },
+                "tag_64": {
+                    "label": "video",
+                    "tooltip": "Employs patterning that closely references the included background video."
+                },
+                "tag_66": {
+                    "label": "perfect stacks",
+                    "tooltip": "Features perfectly overlapped stacked notes using low stack leniency."
+                },
+                "tag_67": {
+                    "label": "ninja spinners",
+                    "tooltip": "Features spinners that are very short in duration."
+                },
+                "tag_70": {
+                    "label": "accelerating bpm",
+                    "tooltip": "A song featuring progressively increasing tempo."
+                },
+                "tag_71": {
+                    "label": "custom song",
+                    "tooltip": "Maps a song made specifically for the map. This includes songs created for a mapping contest which the map participated in."
+                },
+                "tag_72": {
+                    "label": "mirrored",
+                    "tooltip": "A map that features patterns that are mirrored on an axes in quick successions."
+                },
+                "tag_73": {
+                    "label": "vocal",
+                    "tooltip": "Patterning that focuses mainly on vocals."
+                },
+                "tag_74": {
+                    "label": "tnt",
+                    "tooltip": "A map that imitates the mapping style in Taiko No Tatsujin."
+                },
+                "tag_75": {
+                    "label": "speed",
+                    "tooltip": "A map that requires constant tapping at high BPMs."
+                },
+                "tag_76": {
+                    "label": "double bpm",
+                    "tooltip": "A map that plays at double the speed than what the BPM indicates."
+                },
+                "tag_77": {
+                    "label": "finisher-heavy",
+                    "tooltip": "Features finishers used in an unconventional manner or in large amounts."
+                },
+                "tag_78": {
+                    "label": "mono-heavy",
+                    "tooltip": "Features monos used in large amounts."
+                },
+                "tag_79": {
+                    "label": "reversed",
+                    "tooltip": "A map using reversed patterns in a regularly consecutive manner."
+                },
+                "tag_80": {
+                    "label": "yellow notes",
+                    "tooltip": "A map featuring frequent use of extremely short sliders to simulate ghost notes."
+                },
+                "tag_82": {
+                    "label": "barlines",
+                    "tooltip": "A map that makes use of barlines to enhance visuals or replace notes."
+                },
+                "tag_83": {
+                    "label": "memory",
+                    "tooltip": "A map designed around a memorization concept."
+                },
+                "tag_84": {
+                    "label": "taikosu",
+                    "tooltip": "A map designed with both osu! and osu!taiko in mind."
+                },
+                "tag_85": {
+                    "label": "swing",
+                    "tooltip": "A song with prominent use of swing rhythms."
+                },
+                "tag_86": {
+                    "label": "improvisation",
+                    "tooltip": "A map that's based on full improvisation that works as additional layer to the song."
+                },
+                "tag_87": {
+                    "label": "tech",
+                    "tooltip": "A map that frequently makes use of complex snaps."
+                },
+                "tag_88": {
+                    "label": "convert",
+                    "tooltip": "A map that imitates the converted maps from osu!."
+                },
+                "tag_89": {
+                    "label": "hitsounds",
+                    "tooltip": "A map that makes use of non-default hitsound samplesets."
+                },
+                "tag_90": {
+                    "label": "tech",
+                    "tooltip": "A map with the focus on lots of 1/4 sliders, hypersliders and stacks."
+                },
+                "tag_91": {
+                    "label": "flow",
+                    "tooltip": "A map focused on natural and intuitive movement patterns."
+                },
+                "tag_92": {
+                    "label": "antiflow",
+                    "tooltip": "A map focused on strong direction or velocity changes that go against a player's natural movement pattern."
+                },
+                "tag_93": {
+                    "label": "jump",
+                    "tooltip": "A map that focuses on 1/2 constant dashes or hyperdashes."
+                },
+                "tag_94": {
+                    "label": "no hyperdashes",
+                    "tooltip": "A map that doesn’t use hyperdashes even if allowed for its respective difficulty."
+                },
+                "tag_95": {
+                    "label": "long sliders",
+                    "tooltip": "A map that uses sliders for an extended period of time, having regular gameplay around catching juice drops and droplets instead of fruits."
+                },
+                "tag_96": {
+                    "label": "spinner-heavy",
+                    "tooltip": "A map that features heavy usage of spinners."
+                },
+                "tag_97": {
+                    "label": "convert",
+                    "tooltip": "A map that imitates the converted maps from osu!, where the structure and distances are irregular."
+                },
+                "tag_98": {
+                    "label": "precision",
+                    "tooltip": "Colloquial term for maps which require fine, precise movement to catch fruits. Typically refers to maps with circle sizes above and including 6."
+                },
+                "tag_99": {
+                    "label": "wiggles",
+                    "tooltip": "A map with a focus on quick directional changes."
+                },
+                "tag_100": {
+                    "label": "hyperwalks",
+                    "tooltip": "A map which makes use of hyperdashes that require the player to walk, as otherwise, you will overshoot them."
+                },
+                "tag_101": {
+                    "label": "dodge the beat",
+                    "tooltip": "A map where the player needs to avoid every object."
+                },
+                "tag_102": {
+                    "label": "jumpstream",
+                    "tooltip": "Stream with a mix of 2-note sized chords"
+                },
+                "tag_103": {
+                    "label": "handstream",
+                    "tooltip": "Stream with a mix of 3-note sized chords"
+                },
+                "tag_104": {
+                    "label": "quadstream",
+                    "tooltip": "Stream with a mix of 4-note sized chords"
+                },
+                "tag_105": {
+                    "label": "chordjack",
+                    "tooltip": "Maps that feature evenly spaced chords, with several consecutive notes stacked on the same columns."
+                },
+                "tag_106": {
+                    "label": "longjack",
+                    "tooltip": "Maps that feature long chains of consecutive notes on the same column."
+                },
+                "tag_107": {
+                    "label": "speedjack",
+                    "tooltip": "Maps that feature shorter jack sequences, characterized by the faster timeframe between consecutive stacked notes."
+                },
+                "tag_108": {
+                    "label": "wristjack",
+                    "tooltip": "Fast and/or fairly dense chordjack maps, whose optimal playing technique involves the use of the player’s wrist movements."
+                },
+                "tag_109": {
+                    "label": "chordstream",
+                    "tooltip": "Maps that make use of streams with a mix of differently-sized chords"
+                },
+                "tag_110": {
+                    "label": "delay",
+                    "tooltip": "Maps that feature high snap streams based on the song’s delayed sound effect. "
+                },
+                "tag_111": {
+                    "label": "tech",
+                    "tooltip": "A map that frequently makes use of complex snaps."
+                },
+                "tag_112": {
+                    "label": "mixed rice",
+                    "tooltip": "Maps that make use of multiple rice patterning styles."
+                },
+                "tag_113": {
+                    "label": "LN coordination",
+                    "tooltip": "Maps which require holding multiple long notes simultaneously while hitting other patterns."
+                },
+                "tag_114": {
+                    "label": "LN release",
+                    "tooltip": "Maps that make use of different long note holds ending."
+                },
+                "tag_115": {
+                    "label": "LN inverse",
+                    "tooltip": "Maps that feature long note holds that emphasize constant holds and releases in quick succession. Most distinct feature of Inverse is the “negative spaces” in the patterning."
+                },
+                "tag_116": {
+                    "label": "LN density",
+                    "tooltip": "Maps that feature dense long note streams without breaks."
+                },
+                "tag_117": {
+                    "label": "LN mixed ",
+                    "tooltip": "Maps that make use of multiple long note patterning styles."
+                },
+                "tag_118": {
+                    "label": "generic hybrid",
+                    "tooltip": "Maps that feature the combination of both straightforward rice and Long Notes patterning."
+                },
+                "tag_119": {
+                    "label": "technical hybrid",
+                    "tooltip": "Maps that feature the combination of both technical rice and Long Notes patterning."
+                },
+                "tag_120": {
+                    "label": "tiebreaker",
+                    "tooltip": "Maps that contain most of the skill sets from different categories, and are usually longer than 5 minutes."
+                },
+                "tag_121": {
+                    "label": "o2jam",
+                    "tooltip": "Map that mimics traditional mapping techniques usually found in O2jam charts."
+                },
+                "tag_122": {
+                    "label": "N+1",
+                    "tooltip": "A specific type of playstyle where the leftmost column is mapped independently from the rest of the columns, which otherwise form a standard playstyle."
+                },
+                "tag_123": {
+                    "label": "dump",
+                    "tooltip": "Maps that use groups of objects focusing more on the extension and intensity of the sounds, in contrast with using individual notes to follow each's sound timing accurately."
+                },
+                "tag_124": {
+                    "label": "complex sv",
+                    "tooltip": "Changes slider velocity by large amounts in order to test the player's reading ability."
+                },
+                "tag_125": {
+                    "label": "complex sv",
+                    "tooltip": "Changes slider velocity by large amounts in order to test the player's reading ability."
+                },
+                "tag_128": {
+                    "label": "stamina",
+                    "tooltip": "Tests a player's ability to tap dense rhythms over long periods of time."
+                },
+                "tag_129": {
+                    "label": "stamina",
+                    "tooltip": "Tests a player's ability to tap dense rhythms over long periods of time."
+                },
+                "tag_130": {
+                    "label": "squares",
+                    "tooltip": "Frequent use of square patterns."
+                },
+                "tag_131": {
+                    "label": "triangles",
+                    "tooltip": "Frequent use of triangular patterns."
+                },
+                "tag_132": {
+                    "label": "cross-screen",
+                    "tooltip": "Frequent use of jumps with a lot of spacing, usually placed on opposite sides of the playfield."
+                },
+                "tag_133": {
+                    "label": "stamina",
+                    "tooltip": "Tests a player's ability to aim spaced jumps over long periods of time."
+                },
+                "tag_135": {
+                    "label": "complex snap",
+                    "tooltip": "Maps that feature prominent usage of mixed or unusual snap divisors."
+                },
+                "tag_136": {
+                    "label": "complex snap",
+                    "tooltip": "Maps that feature prominent usage of mixed or unusual snap divisors."
+                },
+                "tag_137": {
+                    "label": "gimmick",
+                    "tooltip": "Distinct or obscure gameplay elements that cannot be categorised with common skillsets."
+                },
+                "tag_138": {
+                    "label": "stars",
+                    "tooltip": "Frequent use of star/pentagon patterns."
+                },
+                "tag_139": {
+                    "label": "back and forth",
+                    "tooltip": "Frequent use of back and forth patterns."
+                },
+                "tag_140": {
+                    "label": "freeform",
+                    "tooltip": "Frequent use of jumps without distinct patterning."
+                },
+                "tag_141": {
+                    "label": "doubles",
+                    "tooltip": "Patterns requiring consecutively tapping 2 note groups."
+                },
+                "tag_142": {
+                    "label": "quads",
+                    "tooltip": "Patterns requiring consecutively tapping 4 note groups."
+                },
+                "tag_143": {
+                    "label": "inspo",
+                    "tooltip": "Maps that draw inspiration directly from other maps/mappers."
+                },
+                "tag_144": {
+                    "label": "conceptual",
+                    "tooltip": "Distinct map design choices that do not follow ordinary mapping conventions, typically to creatively express part of a song."
+                },
+                "tag_145": {
+                    "label": "combo colours",
+                    "tooltip": "Maps that adjust combo colours in conjunction with variations in the song, also referred to as colourhax."
+                }
             }
         }
     }

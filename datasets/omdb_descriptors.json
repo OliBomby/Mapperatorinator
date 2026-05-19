@@ -1,0 +1,509 @@
+{
+    "tags": [
+        {
+            "id": 1,
+            "name": "general/gimmick",
+            "value": "gimmick",
+            "ruleset_id": null,
+            "description": "Focused on a single unique design or gameplay idea."
+        },
+        {
+            "id": 2,
+            "name": "general/2B",
+            "value": "2B",
+            "ruleset_id": null,
+            "description": "Includes gameplay elements with two or more objects placed simultaneously."
+        },
+        {
+            "id": 3,
+            "name": "general/slider only",
+            "value": "slider only",
+            "ruleset_id": null,
+            "description": "Restricts object choice to sliders only."
+        },
+        {
+            "id": 4,
+            "name": "general/circle only",
+            "value": "circle only",
+            "ruleset_id": null,
+            "description": "Restricts object choice to circles only."
+        },
+        {
+            "id": 5,
+            "name": "general/swing",
+            "value": "swing",
+            "ruleset_id": null,
+            "description": "Uses 1/3, 1/6, and 1/12 snap divisors for most/all objects."
+        },
+        {
+            "id": 6,
+            "name": "meta_information/collab",
+            "value": "collab",
+            "ruleset_id": null,
+            "description": "A map with two or more associated mappers."
+        },
+        {
+            "id": 7,
+            "name": "meta_information/megacollab",
+            "value": "megacollab",
+            "ruleset_id": null,
+            "description": "A map with 8 or more associated mappers."
+        },
+        {
+            "id": 8,
+            "name": "meta_information/marathon",
+            "value": "marathon",
+            "ruleset_id": null,
+            "description": "A map with a drain time of over 5 minutes."
+        },
+        {
+            "id": 9,
+            "name": "meta_information/gungathon",
+            "value": "gungathon",
+            "ruleset_id": null,
+            "description": "A map with a drain time of over 10 minutes."
+        },
+        {
+            "id": 10,
+            "name": "meta_information/multi-song",
+            "value": "multi-song",
+            "ruleset_id": null,
+            "description": "Contains multiple songs within the audio."
+        },
+        {
+            "id": 11,
+            "name": "meta_information/variable timing",
+            "value": "variable timing",
+            "ruleset_id": null,
+            "description": "Contains multiple timing points, usually for non-metronome songs."
+        },
+        {
+            "id": 12,
+            "name": "meta_information/accelerating bpm",
+            "value": "accelerating bpm",
+            "ruleset_id": null,
+            "description": "Features progressively increasing tempo."
+        },
+        {
+            "id": 13,
+            "name": "meta_information/time signatures",
+            "value": "time signatures",
+            "ruleset_id": null,
+            "description": "Many changes or uncommon time signatures."
+        },
+        {
+            "id": 14,
+            "name": "meta_information/storyboard",
+            "value": "storyboard",
+            "ruleset_id": null,
+            "description": "Contains a storyboard that enhances gameplay experience."
+        },
+        {
+            "id": 15,
+            "name": "meta_information/storyboard gimmick",
+            "value": "storyboard gimmick",
+            "ruleset_id": null,
+            "description": "Uses storyboard elements that change how the map is played."
+        },
+        {
+            "id": 16,
+            "name": "meta_information/keysounds",
+            "value": "keysounds",
+            "ruleset_id": null,
+            "description": "Uses various pitched hitsounds to create a melody."
+        },
+        {
+            "id": 17,
+            "name": "meta_information/download unavailable",
+            "value": "download unavailable",
+            "ruleset_id": null,
+            "description": "Cannot be downloaded from the osu! website."
+        },
+        {
+            "id": 18,
+            "name": "meta_information/custom skin",
+            "value": "custom skin",
+            "ruleset_id": null,
+            "description": "Utilizes custom skin elements and graphics."
+        },
+        {
+            "id": 19,
+            "name": "meta_information/featured artist",
+            "value": "featured artist",
+            "ruleset_id": null,
+            "description": "Features song(s) from osu!'s Featured Artist listing."
+        },
+        {
+            "id": 20,
+            "name": "meta_information/custom song",
+            "value": "custom song",
+            "ruleset_id": null,
+            "description": "Maps a song made specifically for the map."
+        },
+        {
+            "id": 21,
+            "name": "style/messy",
+            "value": "messy",
+            "ruleset_id": null,
+            "description": "Visually chaotic and disorganised patterns."
+        },
+        {
+            "id": 22,
+            "name": "style/geometric",
+            "value": "geometric",
+            "ruleset_id": null,
+            "description": "Incorporates geometric shapes within the design."
+        },
+        {
+            "id": 23,
+            "name": "style/grid snap",
+            "value": "grid snap",
+            "ruleset_id": null,
+            "description": "Objects are placed along a square grid."
+        },
+        {
+            "id": 24,
+            "name": "style/hexgrid",
+            "value": "hexgrid",
+            "ruleset_id": null,
+            "description": "Objects are placed along a hexagonal grid."
+        },
+        {
+            "id": 25,
+            "name": "style/freeform",
+            "value": "freeform",
+            "ruleset_id": null,
+            "description": "A loose approach to visual structure."
+        },
+        {
+            "id": 26,
+            "name": "style/symmetrical",
+            "value": "symmetrical",
+            "ruleset_id": null,
+            "description": "Employs symmetry within the design."
+        },
+        {
+            "id": 27,
+            "name": "style/old-style revival",
+            "value": "old-style revival",
+            "ruleset_id": null,
+            "description": "Emulates a style from early mapping."
+        },
+        {
+            "id": 28,
+            "name": "style/clean",
+            "value": "clean",
+            "ruleset_id": null,
+            "description": "Visually uncluttered and organised patterns."
+        },
+        {
+            "id": 29,
+            "name": "style/slidershapes",
+            "value": "slidershapes",
+            "ruleset_id": null,
+            "description": "Uses a variety of slider designs."
+        },
+        {
+            "id": 30,
+            "name": "style/distance snapped",
+            "value": "distance snapped",
+            "ruleset_id": null,
+            "description": "Uses osu's built-in distance snap feature."
+        },
+        {
+            "id": 31,
+            "name": "style/iNiS-style",
+            "value": "iNiS-style",
+            "ruleset_id": null,
+            "description": "Originates from the original DS games."
+        },
+        {
+            "id": 32,
+            "name": "style/avant-garde",
+            "value": "avant-garde",
+            "ruleset_id": null,
+            "description": "Experimental design philosophies."
+        },
+        {
+            "id": 33,
+            "name": "style/perfect stacks",
+            "value": "perfect stacks",
+            "ruleset_id": null,
+            "description": "Features perfectly overlapped stacked notes."
+        },
+        {
+            "id": 34,
+            "name": "style/ninja spinners",
+            "value": "ninja spinners",
+            "ruleset_id": null,
+            "description": "Features very short spinners."
+        },
+        {
+            "id": 35,
+            "name": "song_representation/simple",
+            "value": "simple",
+            "ruleset_id": null,
+            "description": "Accessible and straightforward design."
+        },
+        {
+            "id": 36,
+            "name": "song_representation/chaotic",
+            "value": "chaotic",
+            "ruleset_id": null,
+            "description": "Unpredictable map design."
+        },
+        {
+            "id": 37,
+            "name": "song_representation/repetition",
+            "value": "repetition",
+            "ruleset_id": null,
+            "description": "Features recognizable identical patterns."
+        },
+        {
+            "id": 38,
+            "name": "song_representation/progression",
+            "value": "progression",
+            "ruleset_id": null,
+            "description": "Gradual advancement in difficulty."
+        },
+        {
+            "id": 39,
+            "name": "song_representation/high contrast",
+            "value": "high contrast",
+            "ruleset_id": null,
+            "description": "Uses flashy ideas to follow music changes."
+        },
+        {
+            "id": 40,
+            "name": "song_representation/improvisation",
+            "value": "improvisation",
+            "ruleset_id": null,
+            "description": "Uses patterns that do not directly match the music."
+        },
+        {
+            "id": 41,
+            "name": "song_representation/playfield usage",
+            "value": "playfield usage",
+            "ruleset_id": null,
+            "description": "Deliberate use of the playfield."
+        },
+        {
+            "id": 42,
+            "name": "song_representation/playfield constraint",
+            "value": "playfield constraint",
+            "ruleset_id": null,
+            "description": "Restricts object placement to a part of the playfield."
+        },
+        {
+            "id": 43,
+            "name": "song_representation/video gimmick",
+            "value": "video gimmick",
+            "ruleset_id": null,
+            "description": "References the background video in its patterning."
+        },
+        {
+            "id": 44,
+            "name": "song_representation/difficulty spike",
+            "value": "difficulty spike",
+            "ruleset_id": null,
+            "description": "A sudden, significant challenge increase."
+        },
+        {
+            "id": 45,
+            "name": "song_representation/low sv",
+            "value": "low sv",
+            "ruleset_id": null,
+            "description": "Prominent low slider velocity usage."
+        },
+        {
+            "id": 46,
+            "name": "song_representation/high sv",
+            "value": "high sv",
+            "ruleset_id": null,
+            "description": "Prominent high slider velocity usage."
+        },
+        {
+            "id": 47,
+            "name": "song_representation/colorhax",
+            "value": "colorhax",
+            "ruleset_id": null,
+            "description": "Intentional use of combo colors for immersion."
+        },
+        {
+            "id": 48,
+            "name": "skillsets/tech",
+            "value": "tech",
+            "ruleset_id": null,
+            "description": "Tests uncommon skills."
+        },
+        {
+            "id": 49,
+            "name": "skillsets/slider tech",
+            "value": "slider tech",
+            "ruleset_id": null,
+            "description": "Tests skills involving complex sliders."
+        },
+        {
+            "id": 50,
+            "name": "skillsets/complex sv",
+            "value": "complex sv",
+            "ruleset_id": null,
+            "description": "Large changes in slider velocity to test reading."
+        },
+        {
+            "id": 51,
+            "name": "skillsets/reading",
+            "value": "reading",
+            "ruleset_id": null,
+            "description": "Tests a player's reading skill."
+        },
+        {
+            "id": 52,
+            "name": "skillsets/visually dense",
+            "value": "visually dense",
+            "ruleset_id": null,
+            "description": "Patterns with many visible notes that make reading hard."
+        },
+        {
+            "id": 53,
+            "name": "skillsets/overlap reading",
+            "value": "overlap reading",
+            "ruleset_id": null,
+            "description": "Overlapped objects obscure note order."
+        },
+        {
+            "id": 54,
+            "name": "aim/jump aim",
+            "value": "jump aim",
+            "ruleset_id": null,
+            "description": "Focuses heavily on jumps."
+        },
+        {
+            "id": 55,
+            "name": "aim/sharp aim",
+            "value": "sharp aim",
+            "ruleset_id": null,
+            "description": "Heavy use of sharp angle movement."
+        },
+        {
+            "id": 56,
+            "name": "aim/wide aim",
+            "value": "wide aim",
+            "ruleset_id": null,
+            "description": "Uses wide angle movement patterns."
+        },
+        {
+            "id": 57,
+            "name": "aim/linear aim",
+            "value": "linear aim",
+            "ruleset_id": null,
+            "description": "Requires continuous straight movement."
+        },
+        {
+            "id": 58,
+            "name": "aim/aim control",
+            "value": "aim control",
+            "ruleset_id": null,
+            "description": "Features abrupt velocity or direction changes."
+        },
+        {
+            "id": 59,
+            "name": "aim/flow aim",
+            "value": "flow aim",
+            "ruleset_id": null,
+            "description": "Encourages fully continuous cursor movement."
+        },
+        {
+            "id": 60,
+            "name": "aim/precision",
+            "value": "precision",
+            "ruleset_id": null,
+            "description": "Requires fine, precise cursor movement."
+        },
+        {
+            "id": 61,
+            "name": "tap/finger control",
+            "value": "finger control",
+            "ruleset_id": null,
+            "description": "Tests complex tapping ability."
+        },
+        {
+            "id": 62,
+            "name": "tap/complex snap divisors",
+            "value": "complex snap divisors",
+            "ruleset_id": null,
+            "description": "Uses unusual snap divisors."
+        },
+        {
+            "id": 63,
+            "name": "tap/bursts",
+            "value": "bursts",
+            "ruleset_id": null,
+            "description": "Continuous alternating patterns, typically 9 notes or less."
+        },
+        {
+            "id": 64,
+            "name": "tap/streams",
+            "value": "streams",
+            "ruleset_id": null,
+            "description": "Continuous alternating patterns, typically more than 9 notes."
+        },
+        {
+            "id": 65,
+            "name": "tap/spaced streams",
+            "value": "spaced streams",
+            "ruleset_id": null,
+            "description": "Streams with large spacing between notes."
+        },
+        {
+            "id": 66,
+            "name": "tap/cutstreams",
+            "value": "cutstreams",
+            "ruleset_id": null,
+            "description": "Streams with very uneven spacing."
+        },
+        {
+            "id": 67,
+            "name": "tap/stamina",
+            "value": "stamina",
+            "ruleset_id": null,
+            "description": "Tests endurance over long periods."
+        },
+        {
+            "id": 68,
+            "name": "scene/aspire",
+            "value": "aspire",
+            "ruleset_id": null,
+            "description": "Uses glitches for unique effects."
+        },
+        {
+            "id": 69,
+            "name": "scene/mapping contest",
+            "value": "mapping contest",
+            "ruleset_id": null,
+            "description": "An entry for a mapping contest."
+        },
+        {
+            "id": 70,
+            "name": "scene/tournament custom",
+            "value": "tournament custom",
+            "ruleset_id": null,
+            "description": "A custom map for a tournament."
+        },
+        {
+            "id": 71,
+            "name": "scene/tag",
+            "value": "tag",
+            "ruleset_id": null,
+            "description": "Designed for multiplayer tag mode."
+        },
+        {
+            "id": 72,
+            "name": "scene/port",
+            "value": "port",
+            "ruleset_id": null,
+            "description": "Originally created for other media then imported."
+        }
+    ]
+}
+

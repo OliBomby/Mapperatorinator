@@ -187,304 +187,860 @@
         "beatmap_created": "点击此处前往已创建的谱面..."
     },
     "descriptors": {
-        "groups": {
-            "general": "通用",
-            "meta_information": "元信息",
-            "style": "风格",
-            "song_representation": "歌曲表现",
-            "skillsets": "技能组",
-            "aim": "瞄准",
-            "tap": "点击",
-            "scene": "场景"
+        "omdb": {
+            "groups": {
+                "general": "通用",
+                "meta_information": "元信息",
+                "style": "风格",
+                "song_representation": "歌曲表现",
+                "skillsets": "技能组",
+                "aim": "瞄准",
+                "tap": "点击",
+                "scene": "场景"
+            },
+            "items": {
+                "gimmick": {
+                    "label": "gimmick（机制图）",
+                    "tooltip": "专注于单一独特的设计或玩法理念。"
+                },
+                "2B": {
+                    "label": "2B",
+                    "tooltip": "包含两个或更多物件同时放置的玩法元素。"
+                },
+                "slider only": {
+                    "label": "slider only（纯滑条）",
+                    "tooltip": "物件选择仅限于滑条。"
+                },
+                "circle only": {
+                    "label": "circle only（纯圆圈）",
+                    "tooltip": "物件选择仅限于圆圈。"
+                },
+                "swing": {
+                    "label": "swing（摇摆）",
+                    "tooltip": "大部分/所有物件使用 1/3、1/6 和 1/12 节拍细分。"
+                },
+                "collab": {
+                    "label": "collab（合作图）",
+                    "tooltip": "由两个或更多谱师共同制作的谱面。"
+                },
+                "megacollab": {
+                    "label": "megacollab（大型合作图）",
+                    "tooltip": "由 8 个或更多谱师共同制作的谱面。"
+                },
+                "marathon": {
+                    "label": "marathon（马拉松）",
+                    "tooltip": "游玩时间超过 5 分钟的谱面。"
+                },
+                "gungathon": {
+                    "label": "gungathon（超长马拉松）",
+                    "tooltip": "游玩时间超过 10 分钟的谱面。"
+                },
+                "multi-song": {
+                    "label": "multi-song（多歌曲）",
+                    "tooltip": "音频中包含多首歌曲。"
+                },
+                "variable timing": {
+                    "label": "variable timing（变速）",
+                    "tooltip": "包含多个时间点，通常用于非节拍器歌曲。"
+                },
+                "accelerating bpm": {
+                    "label": "accelerating bpm（加速 BPM）",
+                    "tooltip": "节奏逐渐加快的特点。"
+                },
+                "time signatures": {
+                    "label": "time signatures（拍号）",
+                    "tooltip": "频繁变换或使用不常见的拍号。"
+                },
+                "storyboard": {
+                    "label": "storyboard（故事板）",
+                    "tooltip": "包含增强游戏体验的故事板。"
+                },
+                "storyboard gimmick": {
+                    "label": "storyboard gimmick（故事板机制）",
+                    "tooltip": "使用故事板元素改变谱面的游玩方式。"
+                },
+                "keysounds": {
+                    "label": "keysounds（按键音）",
+                    "tooltip": "使用各种音高的打击音效创建旋律。"
+                },
+                "download unavailable": {
+                    "label": "download unavailable（无法下载）",
+                    "tooltip": "无法从 osu! 网站下载。"
+                },
+                "custom skin": {
+                    "label": "custom skin（自定义皮肤）",
+                    "tooltip": "使用自定义皮肤元素和图形。"
+                },
+                "featured artist": {
+                    "label": "featured artist（精选艺术家）",
+                    "tooltip": "使用 osu! 精选艺术家列表中的歌曲。"
+                },
+                "custom song": {
+                    "label": "custom song（定制歌曲）",
+                    "tooltip": "使用专门为该谱面制作的歌曲。"
+                },
+                "messy": {
+                    "label": "messy（凌乱）",
+                    "tooltip": "视觉上混乱且无序的图案。"
+                },
+                "geometric": {
+                    "label": "geometric（几何）",
+                    "tooltip": "在设计中融入几何形状。"
+                },
+                "grid snap": {
+                    "label": "grid snap（网格对齐）",
+                    "tooltip": "物件沿方形网格放置。"
+                },
+                "hexgrid": {
+                    "label": "hexgrid（六边形网格）",
+                    "tooltip": "物件沿六边形网格放置。"
+                },
+                "freeform": {
+                    "label": "freeform（自由式）",
+                    "tooltip": "视觉结构较为宽松的方式。"
+                },
+                "symmetrical": {
+                    "label": "symmetrical（对称）",
+                    "tooltip": "在设计中运用对称性。"
+                },
+                "old-style revival": {
+                    "label": "old-style revival（复古风格）",
+                    "tooltip": "模仿早期作图风格。"
+                },
+                "clean": {
+                    "label": "clean（整洁）",
+                    "tooltip": "视觉上简洁有序的图案。"
+                },
+                "slidershapes": {
+                    "label": "slidershapes（滑条造型）",
+                    "tooltip": "使用多种滑条设计。"
+                },
+                "distance snapped": {
+                    "label": "distance snapped（距离对齐）",
+                    "tooltip": "使用 osu! 内置的距离对齐功能。"
+                },
+                "iNiS-style": {
+                    "label": "iNiS-style（iNiS 风格）",
+                    "tooltip": "源自原版 DS 游戏。"
+                },
+                "avant-garde": {
+                    "label": "avant-garde（前卫）",
+                    "tooltip": "实验性的设计理念。"
+                },
+                "perfect stacks": {
+                    "label": "perfect stacks（完美堆叠）",
+                    "tooltip": "具有完美重叠的堆叠音符。"
+                },
+                "ninja spinners": {
+                    "label": "ninja spinners（忍者转盘）",
+                    "tooltip": "具有非常短的转盘。"
+                },
+                "simple": {
+                    "label": "simple（简单）",
+                    "tooltip": "易于理解和上手的设计。"
+                },
+                "chaotic": {
+                    "label": "chaotic（混乱）",
+                    "tooltip": "不可预测的谱面设计。"
+                },
+                "repetition": {
+                    "label": "repetition（重复）",
+                    "tooltip": "具有可识别的相同图案。"
+                },
+                "progression": {
+                    "label": "progression（渐进）",
+                    "tooltip": "难度逐渐提升。"
+                },
+                "high contrast": {
+                    "label": "high contrast（高对比）",
+                    "tooltip": "使用醒目的设计来跟随音乐变化。"
+                },
+                "improvisation": {
+                    "label": "improvisation（即兴）",
+                    "tooltip": "使用与音乐不直接匹配的图案。"
+                },
+                "playfield usage": {
+                    "label": "playfield usage（游戏区域使用）",
+                    "tooltip": "有意识地使用游戏区域。"
+                },
+                "playfield constraint": {
+                    "label": "playfield constraint（游戏区域限制）",
+                    "tooltip": "将物件放置限制在游戏区域的一部分。"
+                },
+                "video gimmick": {
+                    "label": "video gimmick（视频联动）",
+                    "tooltip": "在图案设计中参考背景视频。"
+                },
+                "difficulty spike": {
+                    "label": "difficulty spike（难度峰值）",
+                    "tooltip": "突然显著增加的挑战。"
+                },
+                "low sv": {
+                    "label": "low sv（低滑条速度）",
+                    "tooltip": "显著使用低滑条速度。"
+                },
+                "high sv": {
+                    "label": "high sv（高滑条速度）",
+                    "tooltip": "显著使用高滑条速度。"
+                },
+                "colorhax": {
+                    "label": "colorhax（颜色技巧）",
+                    "tooltip": "有意使用连击颜色来增强沉浸感。"
+                },
+                "tech": {
+                    "label": "tech（技术）",
+                    "tooltip": "测试不常见的技能。"
+                },
+                "slider tech": {
+                    "label": "slider tech（滑条技术）",
+                    "tooltip": "测试涉及复杂滑条的技能。"
+                },
+                "complex sv": {
+                    "label": "complex sv（复杂滑条速度）",
+                    "tooltip": "大幅变化的滑条速度以测试读图能力。"
+                },
+                "reading": {
+                    "label": "reading（读图）",
+                    "tooltip": "测试玩家的读图技能。"
+                },
+                "visually dense": {
+                    "label": "visually dense（视觉密集）",
+                    "tooltip": "具有许多可见音符的图案，使读图变难。"
+                },
+                "overlap reading": {
+                    "label": "overlap reading（重叠读图）",
+                    "tooltip": "重叠的物件遮挡音符顺序。"
+                },
+                "jump aim": {
+                    "label": "jump aim（跳跃瞄准）",
+                    "tooltip": "重点关注跳跃。"
+                },
+                "sharp aim": {
+                    "label": "sharp aim（锐角瞄准）",
+                    "tooltip": "大量使用锐角移动。"
+                },
+                "wide aim": {
+                    "label": "wide aim（广角瞄准）",
+                    "tooltip": "使用广角移动图案。"
+                },
+                "linear aim": {
+                    "label": "linear aim（线性瞄准）",
+                    "tooltip": "需要持续的直线移动。"
+                },
+                "aim control": {
+                    "label": "aim control（瞄准控制）",
+                    "tooltip": "具有突然的速度或方向变化。"
+                },
+                "flow aim": {
+                    "label": "flow aim（流畅瞄准）",
+                    "tooltip": "鼓励完全连续的光标移动。"
+                },
+                "precision": {
+                    "label": "precision（精确）",
+                    "tooltip": "需要精细、精确的光标移动。"
+                },
+                "finger control": {
+                    "label": "finger control（手指控制）",
+                    "tooltip": "测试复杂的点击能力。"
+                },
+                "complex snap divisors": {
+                    "label": "complex snap divisors（复杂节拍细分）",
+                    "tooltip": "使用不常见的节拍细分。"
+                },
+                "bursts": {
+                    "label": "bursts（短连打）",
+                    "tooltip": "连续的交替图案，通常 9 个音符或更少。"
+                },
+                "streams": {
+                    "label": "streams（连打）",
+                    "tooltip": "连续的交替图案，通常超过 9 个音符。"
+                },
+                "spaced streams": {
+                    "label": "spaced streams（间隔连打）",
+                    "tooltip": "音符之间有大间距的连打。"
+                },
+                "cutstreams": {
+                    "label": "cutstreams（切割连打）",
+                    "tooltip": "间距非常不均匀的连打。"
+                },
+                "stamina": {
+                    "label": "stamina（耐力）",
+                    "tooltip": "测试长时间的耐力。"
+                },
+                "aspire": {
+                    "label": "aspire",
+                    "tooltip": "使用 bug 实现独特效果。"
+                },
+                "mapping contest": {
+                    "label": "mapping contest（作图比赛）",
+                    "tooltip": "作图比赛的参赛作品。"
+                },
+                "tournament custom": {
+                    "label": "tournament custom（锦标赛定制）",
+                    "tooltip": "为锦标赛定制的谱面。"
+                },
+                "tag": {
+                    "label": "tag（接力）",
+                    "tooltip": "为多人接力模式设计。"
+                },
+                "port": {
+                    "label": "port（移植）",
+                    "tooltip": "最初为其他媒体创建，然后导入。"
+                }
+            }
         },
-        "items": {
-            "gimmick": {
-                "label": "gimmick（机制图）",
-                "tooltip": "专注于单一独特的设计或玩法理念。"
-            },
-            "2B": {
-                "label": "2B",
-                "tooltip": "包含两个或更多物件同时放置的玩法元素。"
-            },
-            "slider only": {
-                "label": "slider only（纯滑条）",
-                "tooltip": "物件选择仅限于滑条。"
-            },
-            "circle only": {
-                "label": "circle only（纯圆圈）",
-                "tooltip": "物件选择仅限于圆圈。"
-            },
-            "swing": {
-                "label": "swing（摇摆）",
-                "tooltip": "大部分/所有物件使用 1/3、1/6 和 1/12 节拍细分。"
-            },
-            "collab": {
-                "label": "collab（合作图）",
-                "tooltip": "由两个或更多谱师共同制作的谱面。"
-            },
-            "megacollab": {
-                "label": "megacollab（大型合作图）",
-                "tooltip": "由 8 个或更多谱师共同制作的谱面。"
-            },
-            "marathon": {
-                "label": "marathon（马拉松）",
-                "tooltip": "游玩时间超过 5 分钟的谱面。"
-            },
-            "gungathon": {
-                "label": "gungathon（超长马拉松）",
-                "tooltip": "游玩时间超过 10 分钟的谱面。"
-            },
-            "multi-song": {
-                "label": "multi-song（多歌曲）",
-                "tooltip": "音频中包含多首歌曲。"
-            },
-            "variable timing": {
-                "label": "variable timing（变速）",
-                "tooltip": "包含多个时间点，通常用于非节拍器歌曲。"
-            },
-            "accelerating bpm": {
-                "label": "accelerating bpm（加速 BPM）",
-                "tooltip": "节奏逐渐加快的特点。"
-            },
-            "time signatures": {
-                "label": "time signatures（拍号）",
-                "tooltip": "频繁变换或使用不常见的拍号。"
-            },
-            "storyboard": {
-                "label": "storyboard（故事板）",
-                "tooltip": "包含增强游戏体验的故事板。"
-            },
-            "storyboard gimmick": {
-                "label": "storyboard gimmick（故事板机制）",
-                "tooltip": "使用故事板元素改变谱面的游玩方式。"
-            },
-            "keysounds": {
-                "label": "keysounds（按键音）",
-                "tooltip": "使用各种音高的打击音效创建旋律。"
-            },
-            "download unavailable": {
-                "label": "download unavailable（无法下载）",
-                "tooltip": "无法从 osu! 网站下载。"
-            },
-            "custom skin": {
-                "label": "custom skin（自定义皮肤）",
-                "tooltip": "使用自定义皮肤元素和图形。"
-            },
-            "featured artist": {
-                "label": "featured artist（精选艺术家）",
-                "tooltip": "使用 osu! 精选艺术家列表中的歌曲。"
-            },
-            "custom song": {
-                "label": "custom song（定制歌曲）",
-                "tooltip": "使用专门为该谱面制作的歌曲。"
-            },
-            "messy": {
-                "label": "messy（凌乱）",
-                "tooltip": "视觉上混乱且无序的图案。"
-            },
-            "geometric": {
-                "label": "geometric（几何）",
-                "tooltip": "在设计中融入几何形状。"
-            },
-            "grid snap": {
-                "label": "grid snap（网格对齐）",
-                "tooltip": "物件沿方形网格放置。"
-            },
-            "hexgrid": {
-                "label": "hexgrid（六边形网格）",
-                "tooltip": "物件沿六边形网格放置。"
-            },
-            "freeform": {
-                "label": "freeform（自由式）",
-                "tooltip": "视觉结构较为宽松的方式。"
-            },
-            "symmetrical": {
-                "label": "symmetrical（对称）",
-                "tooltip": "在设计中运用对称性。"
-            },
-            "old-style revival": {
-                "label": "old-style revival（复古风格）",
-                "tooltip": "模仿早期作图风格。"
-            },
-            "clean": {
-                "label": "clean（整洁）",
-                "tooltip": "视觉上简洁有序的图案。"
-            },
-            "slidershapes": {
-                "label": "slidershapes（滑条造型）",
-                "tooltip": "使用多种滑条设计。"
-            },
-            "distance snapped": {
-                "label": "distance snapped（距离对齐）",
-                "tooltip": "使用 osu! 内置的距离对齐功能。"
-            },
-            "iNiS-style": {
-                "label": "iNiS-style（iNiS 风格）",
-                "tooltip": "源自原版 DS 游戏。"
-            },
-            "avant-garde": {
-                "label": "avant-garde（前卫）",
-                "tooltip": "实验性的设计理念。"
-            },
-            "perfect stacks": {
-                "label": "perfect stacks（完美堆叠）",
-                "tooltip": "具有完美重叠的堆叠音符。"
-            },
-            "ninja spinners": {
-                "label": "ninja spinners（忍者转盘）",
-                "tooltip": "具有非常短的转盘。"
-            },
-            "simple": {
-                "label": "simple（简单）",
-                "tooltip": "易于理解和上手的设计。"
-            },
-            "chaotic": {
-                "label": "chaotic（混乱）",
-                "tooltip": "不可预测的谱面设计。"
-            },
-            "repetition": {
-                "label": "repetition（重复）",
-                "tooltip": "具有可识别的相同图案。"
-            },
-            "progression": {
-                "label": "progression（渐进）",
-                "tooltip": "难度逐渐提升。"
-            },
-            "high contrast": {
-                "label": "high contrast（高对比）",
-                "tooltip": "使用醒目的设计来跟随音乐变化。"
-            },
-            "improvisation": {
-                "label": "improvisation（即兴）",
-                "tooltip": "使用与音乐不直接匹配的图案。"
-            },
-            "playfield usage": {
-                "label": "playfield usage（游戏区域使用）",
-                "tooltip": "有意识地使用游戏区域。"
-            },
-            "playfield constraint": {
-                "label": "playfield constraint（游戏区域限制）",
-                "tooltip": "将物件放置限制在游戏区域的一部分。"
-            },
-            "video gimmick": {
-                "label": "video gimmick（视频联动）",
-                "tooltip": "在图案设计中参考背景视频。"
-            },
-            "difficulty spike": {
-                "label": "difficulty spike（难度峰值）",
-                "tooltip": "突然显著增加的挑战。"
-            },
-            "low sv": {
-                "label": "low sv（低滑条速度）",
-                "tooltip": "显著使用低滑条速度。"
-            },
-            "high sv": {
-                "label": "high sv（高滑条速度）",
-                "tooltip": "显著使用高滑条速度。"
-            },
-            "colorhax": {
-                "label": "colorhax（颜色技巧）",
-                "tooltip": "有意使用连击颜色来增强沉浸感。"
-            },
-            "tech": {
-                "label": "tech（技术）",
-                "tooltip": "测试不常见的技能。"
-            },
-            "slider tech": {
-                "label": "slider tech（滑条技术）",
-                "tooltip": "测试涉及复杂滑条的技能。"
-            },
-            "complex sv": {
-                "label": "complex sv（复杂滑条速度）",
-                "tooltip": "大幅变化的滑条速度以测试读图能力。"
-            },
-            "reading": {
-                "label": "reading（读图）",
-                "tooltip": "测试玩家的读图技能。"
-            },
-            "visually dense": {
-                "label": "visually dense（视觉密集）",
-                "tooltip": "具有许多可见音符的图案，使读图变难。"
-            },
-            "overlap reading": {
-                "label": "overlap reading（重叠读图）",
-                "tooltip": "重叠的物件遮挡音符顺序。"
-            },
-            "jump aim": {
-                "label": "jump aim（跳跃瞄准）",
-                "tooltip": "重点关注跳跃。"
-            },
-            "sharp aim": {
-                "label": "sharp aim（锐角瞄准）",
-                "tooltip": "大量使用锐角移动。"
-            },
-            "wide aim": {
-                "label": "wide aim（广角瞄准）",
-                "tooltip": "使用广角移动图案。"
-            },
-            "linear aim": {
-                "label": "linear aim（线性瞄准）",
-                "tooltip": "需要持续的直线移动。"
-            },
-            "aim control": {
-                "label": "aim control（瞄准控制）",
-                "tooltip": "具有突然的速度或方向变化。"
-            },
-            "flow aim": {
-                "label": "flow aim（流畅瞄准）",
-                "tooltip": "鼓励完全连续的光标移动。"
-            },
-            "precision": {
-                "label": "precision（精确）",
-                "tooltip": "需要精细、精确的光标移动。"
-            },
-            "finger control": {
-                "label": "finger control（手指控制）",
-                "tooltip": "测试复杂的点击能力。"
-            },
-            "complex snap divisors": {
-                "label": "complex snap divisors（复杂节拍细分）",
-                "tooltip": "使用不常见的节拍细分。"
-            },
-            "bursts": {
-                "label": "bursts（短连打）",
-                "tooltip": "连续的交替图案，通常 9 个音符或更少。"
-            },
-            "streams": {
-                "label": "streams（连打）",
-                "tooltip": "连续的交替图案，通常超过 9 个音符。"
-            },
-            "spaced streams": {
-                "label": "spaced streams（间隔连打）",
-                "tooltip": "音符之间有大间距的连打。"
-            },
-            "cutstreams": {
-                "label": "cutstreams（切割连打）",
-                "tooltip": "间距非常不均匀的连打。"
-            },
-            "stamina": {
-                "label": "stamina（耐力）",
-                "tooltip": "测试长时间的耐力。"
-            },
-            "aspire": {
-                "label": "aspire",
-                "tooltip": "使用 bug 实现独特效果。"
-            },
-            "mapping contest": {
-                "label": "mapping contest（作图比赛）",
-                "tooltip": "作图比赛的参赛作品。"
-            },
-            "tournament custom": {
-                "label": "tournament custom（锦标赛定制）",
-                "tooltip": "为锦标赛定制的谱面。"
-            },
-            "tag": {
-                "label": "tag（接力）",
-                "tooltip": "为多人接力模式设计。"
-            },
-            "port": {
-                "label": "port（移植）",
-                "tooltip": "最初为其他媒体创建，然后导入。"
+        "user_tags": {
+            "groups": {
+                "additions": "补充",
+                "context": "语境",
+                "expression": "表现",
+                "gimmick": "机制",
+                "jumps": "跳跃",
+                "meta": "元信息",
+                "reading": "读图",
+                "skillset": "技能组",
+                "sliders": "滑条",
+                "streams": "连打",
+                "style": "风格",
+                "tech": "技巧"
+            },
+            "items": {
+                "tag_1": {
+                    "label": "messy（凌乱）",
+                    "tooltip": "视觉上混乱且刻意不规整的图形，通常包含大量重叠与不均匀的视觉间距。"
+                },
+                "tag_2": {
+                    "label": "simple（简单）",
+                    "tooltip": "易于理解且直观的谱面设计。"
+                },
+                "tag_3": {
+                    "label": "chaotic（混乱）",
+                    "tooltip": "不可预测的谱面设计，常用于考验非常规技能组。"
+                },
+                "tag_4": {
+                    "label": "geometric（几何）",
+                    "tooltip": "在谱面视觉设计中融入几何形状。"
+                },
+                "tag_5": {
+                    "label": "freeform（自由式）",
+                    "tooltip": "一种不受拘束、较为松散的视觉结构处理方式。"
+                },
+                "tag_6": {
+                    "label": "grid snap（网格对齐）",
+                    "tooltip": "物件沿方形网格放置，通常使用 osu! 内置的网格对齐功能。"
+                },
+                "tag_7": {
+                    "label": "hexgrid（六边形网格）",
+                    "tooltip": "物件沿六边形网格放置。"
+                },
+                "tag_8": {
+                    "label": "symmetrical（对称）",
+                    "tooltip": "在谱面设计中运用对称性，常沿水平中线镜像元素。"
+                },
+                "tag_9": {
+                    "label": "playfield constraint（游戏区域限制）",
+                    "tooltip": "将物件摆放限制在游戏区域的某一部分。"
+                },
+                "tag_10": {
+                    "label": "old-style revival（复古风格复兴）",
+                    "tooltip": "模仿与早期作图密切相关的风格，通常用于致敬或营造怀旧感。"
+                },
+                "tag_11": {
+                    "label": "repetition（重复）",
+                    "tooltip": "使用可辨识的重复图形或玩法元素。"
+                },
+                "tag_12": {
+                    "label": "progression（渐进）",
+                    "tooltip": "在整张谱面中逐步推进难度或概念。"
+                },
+                "tag_13": {
+                    "label": "high contrast（高对比）",
+                    "tooltip": "用张扬的设计跟随音乐变化，在歌曲不同段落间形成强烈反差。"
+                },
+                "tag_14": {
+                    "label": "improvisation（即兴）",
+                    "tooltip": "使用与音乐声音本身不对应的图形，常借助打击音效补充声音表现。"
+                },
+                "tag_15": {
+                    "label": "tech（技术）",
+                    "tooltip": "考验较为少见的技巧。"
+                },
+                "tag_16": {
+                    "label": "slider tech（滑条技术）",
+                    "tooltip": "考验与滑条相关的非常规技巧，例如大量 kickslider 或复杂滑条形上的瞄准。"
+                },
+                "tag_17": {
+                    "label": "finger control（手指控制）",
+                    "tooltip": "通过复杂的节奏运用来考验玩家的敲击控制能力。"
+                },
+                "tag_18": {
+                    "label": "complex sv（复杂滑条速度）",
+                    "tooltip": "通过大幅变化的滑条速度来考验玩家的读图与瞄准能力。"
+                },
+                "tag_19": {
+                    "label": "jumps（跳跃）",
+                    "tooltip": "高度侧重 jump，即间距很大的圆圈，要求玩家先移动过去、减速击中，再加速移动到下一个物件。"
+                },
+                "tag_20": {
+                    "label": "sharp（锐角）",
+                    "tooltip": "大量使用锐角移动的图形。"
+                },
+                "tag_21": {
+                    "label": "wide（广角）",
+                    "tooltip": "大量使用大角度移动的图形。"
+                },
+                "tag_22": {
+                    "label": "linear（线性）",
+                    "tooltip": "要求玩家持续沿直线或近似直线移动的图形。"
+                },
+                "tag_23": {
+                    "label": "aim control（瞄准控制）",
+                    "tooltip": "带有速度或方向变化、并强烈违背玩家自然移动轨迹的图形。"
+                },
+                "tag_24": {
+                    "label": "flow aim（流畅瞄准）",
+                    "tooltip": "具有完全连续的光标移动，通常由大角度与物件间较短时间共同形成。"
+                },
+                "tag_25": {
+                    "label": "bursts（短连打）",
+                    "tooltip": "需要连续敲击 5 到 9 个音符一组的图形。"
+                },
+                "tag_26": {
+                    "label": "streams（连打）",
+                    "tooltip": "需要连续击打音符的图形，通常超过 9 个音符。"
+                },
+                "tag_27": {
+                    "label": "spaced streams（间隔连打）",
+                    "tooltip": "间距很大的连打，通常音符彼此不重叠。"
+                },
+                "tag_28": {
+                    "label": "stamina（耐力）",
+                    "tooltip": "考验玩家长时间敲击高密度节奏的能力。"
+                },
+                "tag_29": {
+                    "label": "cutstreams（切割连打）",
+                    "tooltip": "连打中某些音符间距明显大于其余部分的图形。"
+                },
+                "tag_30": {
+                    "label": "reading（读图）",
+                    "tooltip": "考验玩家读图能力的图形，即会混淆音符顺序和或时值。"
+                },
+                "tag_31": {
+                    "label": "visually dense（视觉密集）",
+                    "tooltip": "包含因可见音符数量过多而难以判断顺序和或时值的图形。"
+                },
+                "tag_32": {
+                    "label": "overlaps（重叠）",
+                    "tooltip": "包含因物件重叠而难以判断顺序和或时值的图形。"
+                },
+                "tag_33": {
+                    "label": "precision（精确）",
+                    "tooltip": "俗称需要精细、精准移动才能正确瞄准的谱面。通常指 CS 6 及以上的谱面。"
+                },
+                "tag_34": {
+                    "label": "alt（交替）",
+                    "tooltip": "俗称使用鼓励玩家交替敲击节奏的谱面，通常与 burst 或 stream 图区分开。"
+                },
+                "tag_35": {
+                    "label": "collab（合作图）",
+                    "tooltip": "由两位或以上谱师共同制作的谱面。"
+                },
+                "tag_38": {
+                    "label": "multi-song（多歌曲）",
+                    "tooltip": "包含多首歌曲的谱面。"
+                },
+                "tag_39": {
+                    "label": "variable timing（变速）",
+                    "tooltip": "包含多个 timing point，通常用于未按节拍器录制的歌曲。"
+                },
+                "tag_40": {
+                    "label": "time signatures（拍号）",
+                    "tooltip": "歌曲中拍号变化频繁，或使用了不常见的拍号。"
+                },
+                "tag_41": {
+                    "label": "clean（整洁）",
+                    "tooltip": "视觉上干净、有序的图形，通常重叠较少且视觉间距均匀。"
+                },
+                "tag_42": {
+                    "label": "complex slidershapes（复杂滑条形）",
+                    "tooltip": "使用种类丰富的滑条造型。"
+                },
+                "tag_43": {
+                    "label": "aspire",
+                    "tooltip": "利用 bug 制造本来无法实现的玩法或视觉效果，源自年度 Aspire 作图比赛。"
+                },
+                "tag_44": {
+                    "label": "distance snap（距离对齐）",
+                    "tooltip": "在谱面大部分或全部部分使用 osu! 内置的距离对齐功能。"
+                },
+                "tag_45": {
+                    "label": "mapping contest（作图比赛）",
+                    "tooltip": "作图比赛的参赛作品。"
+                },
+                "tag_46": {
+                    "label": "tournament custom（锦标赛定制）",
+                    "tooltip": "为比赛用途创作的谱面。"
+                },
+                "tag_48": {
+                    "label": "complex snap（复杂节拍细分）",
+                    "tooltip": "谱面显著使用混合或不常见的节拍细分。"
+                },
+                "tag_49": {
+                    "label": "iNiS-style（iNiS 风格）",
+                    "tooltip": "源自原版 DS 游戏的风格，以强调人声节奏、恒定滑条速度和易于理解的网格对齐图形为特征。"
+                },
+                "tag_50": {
+                    "label": "2B",
+                    "tooltip": "包含两个或更多物件同时出现的玩法元素。该术语源自对 idiot 的中文音译。"
+                },
+                "tag_51": {
+                    "label": "playfield usage（游戏区域运用）",
+                    "tooltip": "在谱面设计中有意识地利用游戏区域。"
+                },
+                "tag_52": {
+                    "label": "tag（接力）",
+                    "tooltip": "包含为多人 Tag 模式设计的玩法，由多名玩家协作完成谱面。"
+                },
+                "tag_53": {
+                    "label": "difficulty spike（难度峰值）",
+                    "tooltip": "谱面玩法中出现突然且显著的难度上升。"
+                },
+                "tag_54": {
+                    "label": "avant-garde（前卫）",
+                    "tooltip": "在谱面设计中采用突破边界的实验性理念，常把玩法与审美常规推向极端。"
+                },
+                "tag_55": {
+                    "label": "keysounds（按键音）",
+                    "tooltip": "包含使用不同音高采样来构成旋律的打击音效，通常跟随歌曲中的某段旋律。"
+                },
+                "tag_56": {
+                    "label": "storyboard（故事板机制）",
+                    "tooltip": "包含会改变谱面游玩方式的故事板，通常通过用故事板元素替代谱面物件可视化来实现。"
+                },
+                "tag_57": {
+                    "label": "low sv（低滑条速度）",
+                    "tooltip": "以显著使用低滑条速度作为谱面设计的重要部分。"
+                },
+                "tag_58": {
+                    "label": "high sv（高滑条速度）",
+                    "tooltip": "以显著使用高滑条速度作为谱面设计的重要部分。"
+                },
+                "tag_59": {
+                    "label": "mega collab（大型合作图）",
+                    "tooltip": "由 8 位或更多谱师共同参与的谱面。"
+                },
+                "tag_60": {
+                    "label": "slider only（纯滑条）",
+                    "tooltip": "将物件类型限制为仅使用滑条。"
+                },
+                "tag_61": {
+                    "label": "circle only（纯圆圈）",
+                    "tooltip": "将物件类型限制为仅使用圆圈。"
+                },
+                "tag_63": {
+                    "label": "custom skin（自定义皮肤）",
+                    "tooltip": "使用自定义皮肤元素和图形。"
+                },
+                "tag_64": {
+                    "label": "video（视频联动）",
+                    "tooltip": "使用与所附背景视频紧密呼应的图形设计。"
+                },
+                "tag_66": {
+                    "label": "perfect stacks（完美堆叠）",
+                    "tooltip": "在较低 stack leniency 下使用完全重叠的堆叠音符。"
+                },
+                "tag_67": {
+                    "label": "ninja spinners（忍者转盘）",
+                    "tooltip": "包含持续时间极短的转盘。"
+                },
+                "tag_70": {
+                    "label": "accelerating bpm（加速 BPM）",
+                    "tooltip": "歌曲节奏逐渐加快。"
+                },
+                "tag_71": {
+                    "label": "custom song（定制歌曲）",
+                    "tooltip": "为该谱面专门创作或使用的歌曲，也包括为其参加的作图比赛所创作的歌曲。"
+                },
+                "tag_72": {
+                    "label": "mirrored（镜像）",
+                    "tooltip": "谱面在短时间内连续出现沿某条轴线镜像的图形。"
+                },
+                "tag_73": {
+                    "label": "vocal（人声向）",
+                    "tooltip": "图形主要聚焦于人声。"
+                },
+                "tag_74": {
+                    "label": "tnt（太鼓达人风）",
+                    "tooltip": "模仿太鼓达人中的作图风格。"
+                },
+                "tag_75": {
+                    "label": "speed（高速）",
+                    "tooltip": "要求持续在高 BPM 下敲击的谱面。"
+                },
+                "tag_76": {
+                    "label": "double bpm（双倍 BPM）",
+                    "tooltip": "谱面实际演奏速度看起来像是 BPM 标示值的两倍。"
+                },
+                "tag_77": {
+                    "label": "finisher-heavy（大音符密集）",
+                    "tooltip": "大量使用或以非常规方式使用 finisher 大音符。"
+                },
+                "tag_78": {
+                    "label": "mono-heavy（单音密集）",
+                    "tooltip": "大量使用 mono 单音。"
+                },
+                "tag_79": {
+                    "label": "reversed（反转）",
+                    "tooltip": "以规律且连续的方式使用反向图形的谱面。"
+                },
+                "tag_80": {
+                    "label": "yellow notes（黄色音符）",
+                    "tooltip": "频繁使用极短滑条来模拟幽灵音符的谱面。"
+                },
+                "tag_82": {
+                    "label": "barlines（小节线）",
+                    "tooltip": "利用小节线来增强视觉效果或替代音符的谱面。"
+                },
+                "tag_83": {
+                    "label": "memory（记忆）",
+                    "tooltip": "围绕记忆玩法概念设计的谱面。"
+                },
+                "tag_84": {
+                    "label": "taikosu",
+                    "tooltip": "在设计时同时考虑 osu! standard 与 osu!taiko 的谱面。"
+                },
+                "tag_85": {
+                    "label": "swing（摇摆）",
+                    "tooltip": "歌曲中显著使用 swing 节奏。"
+                },
+                "tag_86": {
+                    "label": "improvisation（即兴）",
+                    "tooltip": "以完全即兴的方式构建图形，作为歌曲的附加表达层。"
+                },
+                "tag_87": {
+                    "label": "tech（技术）",
+                    "tooltip": "频繁使用复杂节拍细分的谱面。"
+                },
+                "tag_88": {
+                    "label": "convert（转铺风）",
+                    "tooltip": "模仿 osu! 转铺谱面的作图风格。"
+                },
+                "tag_89": {
+                    "label": "hitsounds（打击音效）",
+                    "tooltip": "使用非默认 hitsound sampleset 的谱面。"
+                },
+                "tag_90": {
+                    "label": "tech（技术）",
+                    "tooltip": "以大量 1/4 滑条、hyperslider 和堆叠为重点的谱面。"
+                },
+                "tag_91": {
+                    "label": "flow（顺流）",
+                    "tooltip": "侧重自然、直觉式移动路线的谱面。"
+                },
+                "tag_92": {
+                    "label": "antiflow（逆流）",
+                    "tooltip": "侧重强烈方向或速度变化、违背玩家自然移动轨迹的谱面。"
+                },
+                "tag_93": {
+                    "label": "jump（跳接）",
+                    "tooltip": "侧重 1/2 持续 dash 或 hyperdash 的谱面。"
+                },
+                "tag_94": {
+                    "label": "no hyperdashes（无超冲）",
+                    "tooltip": "即使难度允许也不使用 hyperdash 的谱面。"
+                },
+                "tag_95": {
+                    "label": "long sliders（长滑条）",
+                    "tooltip": "长时间使用滑条作为主要玩法，围绕接住 juice drops 和 droplets 而非常规 fruits 展开。"
+                },
+                "tag_96": {
+                    "label": "spinner-heavy（转盘密集）",
+                    "tooltip": "大量使用转盘的谱面。"
+                },
+                "tag_97": {
+                    "label": "convert（转铺风）",
+                    "tooltip": "模仿 osu! 转铺谱面的风格，其结构与距离通常更不规则。"
+                },
+                "tag_98": {
+                    "label": "precision（精确）",
+                    "tooltip": "俗称需要精确移动才能顺利接到 fruits 的谱面。通常指 CS 6 及以上。"
+                },
+                "tag_99": {
+                    "label": "wiggles（摆动）",
+                    "tooltip": "侧重快速变向的谱面。"
+                },
+                "tag_100": {
+                    "label": "hyperwalks（超冲走位）",
+                    "tooltip": "使用需要玩家步行接住的 hyperdash；若一直全速冲会直接冲过。"
+                },
+                "tag_101": {
+                    "label": "dodge the beat（躲拍）",
+                    "tooltip": "玩家需要避开所有物件的谱面。"
+                },
+                "tag_102": {
+                    "label": "jumpstream（跳跃连打）",
+                    "tooltip": "由 2-note 和弦混入 stream 的图形。"
+                },
+                "tag_103": {
+                    "label": "handstream（手流）",
+                    "tooltip": "由 3-note 和弦混入 stream 的图形。"
+                },
+                "tag_104": {
+                    "label": "quadstream（四和弦流）",
+                    "tooltip": "由 4-note 和弦混入 stream 的图形。"
+                },
+                "tag_105": {
+                    "label": "chordjack（和弦纵连）",
+                    "tooltip": "具有等间距和弦，且同列上连续堆叠多个音符的谱面。"
+                },
+                "tag_106": {
+                    "label": "longjack（长纵连）",
+                    "tooltip": "同一列上具有长链连续音符的谱面。"
+                },
+                "tag_107": {
+                    "label": "speedjack（高速纵连）",
+                    "tooltip": "具有较短 jack 段落的谱面，特点是连续堆叠音符之间的时间更快。"
+                },
+                "tag_108": {
+                    "label": "wristjack（手腕纵连）",
+                    "tooltip": "快速和或较高密度的 chordjack 谱面，其最佳演奏方式通常需要更多手腕动作。"
+                },
+                "tag_109": {
+                    "label": "chordstream（和弦流）",
+                    "tooltip": "使用混合不同大小和弦的 streams 的谱面。"
+                },
+                "tag_110": {
+                    "label": "delay（延迟音）",
+                    "tooltip": "围绕歌曲中延迟音效构建的高细分连打谱面。"
+                },
+                "tag_111": {
+                    "label": "tech（技术）",
+                    "tooltip": "频繁使用复杂节拍细分的谱面。"
+                },
+                "tag_112": {
+                    "label": "mixed rice（混合米）",
+                    "tooltip": "混合多种 rice 图形风格的谱面。"
+                },
+                "tag_113": {
+                    "label": "LN coordination（LN 协调）",
+                    "tooltip": "要求同时按住多个长条并击打其他图形的谱面。"
+                },
+                "tag_114": {
+                    "label": "LN release（LN 尾判）",
+                    "tooltip": "使用不同长条释放时机的谱面。"
+                },
+                "tag_115": {
+                    "label": "LN inverse（LN 反转）",
+                    "tooltip": "利用长条持续按住与快速释放的交替来强调图形，最鲜明的特征是图形中的负空间。"
+                },
+                "tag_116": {
+                    "label": "LN density（LN 密度）",
+                    "tooltip": "具有不中断的高密度长条流的谱面。"
+                },
+                "tag_117": {
+                    "label": "LN mixed（混合 LN）",
+                    "tooltip": "混合多种长条图形风格的谱面。"
+                },
+                "tag_118": {
+                    "label": "generic hybrid（通用混合）",
+                    "tooltip": "同时结合直观 rice 与 Long Notes 图形的谱面。"
+                },
+                "tag_119": {
+                    "label": "technical hybrid（技术混合）",
+                    "tooltip": "同时结合技术型 rice 与 Long Notes 图形的谱面。"
+                },
+                "tag_120": {
+                    "label": "tiebreaker（决胜图）",
+                    "tooltip": "包含多个不同类别的技能组，且通常长度超过 5 分钟的谱面。"
+                },
+                "tag_121": {
+                    "label": "o2jam（O2Jam 风）",
+                    "tooltip": "模仿 O2Jam 谱面中常见传统作图技法的谱面。"
+                },
+                "tag_122": {
+                    "label": "N+1",
+                    "tooltip": "一种特殊玩法风格，最左侧列独立于其余列进行编排，而其余列本身构成标准玩法。"
+                },
+                "tag_123": {
+                    "label": "dump（爆发堆料）",
+                    "tooltip": "使用成组物件，更强调声音的延展与强度，而非用单个音符精确跟随每个声音的时值。"
+                },
+                "tag_124": {
+                    "label": "complex sv（复杂滑条速度）",
+                    "tooltip": "通过大幅改变滑条速度来考验玩家的读图能力。"
+                },
+                "tag_125": {
+                    "label": "complex sv（复杂滑条速度）",
+                    "tooltip": "通过大幅改变滑条速度来考验玩家的读图能力。"
+                },
+                "tag_128": {
+                    "label": "stamina（耐力）",
+                    "tooltip": "考验玩家长时间敲击高密度节奏的能力。"
+                },
+                "tag_129": {
+                    "label": "stamina（耐力）",
+                    "tooltip": "考验玩家长时间敲击高密度节奏的能力。"
+                },
+                "tag_130": {
+                    "label": "squares（方形跳）",
+                    "tooltip": "频繁使用方形图案。"
+                },
+                "tag_131": {
+                    "label": "triangles（三角跳）",
+                    "tooltip": "频繁使用三角形图案。"
+                },
+                "tag_132": {
+                    "label": "cross-screen（跨屏跳）",
+                    "tooltip": "频繁使用间距很大且通常位于游戏区域两端的跳跃。"
+                },
+                "tag_133": {
+                    "label": "stamina（耐力）",
+                    "tooltip": "考验玩家长时间瞄准大间距 jumps 的能力。"
+                },
+                "tag_135": {
+                    "label": "complex snap（复杂节拍细分）",
+                    "tooltip": "谱面显著使用混合或不常见的节拍细分。"
+                },
+                "tag_136": {
+                    "label": "complex snap（复杂节拍细分）",
+                    "tooltip": "谱面显著使用混合或不常见的节拍细分。"
+                },
+                "tag_137": {
+                    "label": "gimmick（机制）",
+                    "tooltip": "无法用常见技能组归类的独特或冷门玩法元素。"
+                },
+                "tag_138": {
+                    "label": "stars（星形跳）",
+                    "tooltip": "频繁使用星形或五边形图案。"
+                },
+                "tag_139": {
+                    "label": "back and forth（来回跳）",
+                    "tooltip": "频繁使用来回摆动的图案。"
+                },
+                "tag_140": {
+                    "label": "freeform（自由跳）",
+                    "tooltip": "频繁使用没有明显固定形状的 jumps。"
+                },
+                "tag_141": {
+                    "label": "doubles（双连）",
+                    "tooltip": "需要连续敲击 2 音一组的图形。"
+                },
+                "tag_142": {
+                    "label": "quads（四连）",
+                    "tooltip": "需要连续敲击 4 音一组的图形。"
+                },
+                "tag_143": {
+                    "label": "inspo（灵感来源）",
+                    "tooltip": "直接从其他谱面或谱师获得灵感的谱面。"
+                },
+                "tag_144": {
+                    "label": "conceptual（概念化）",
+                    "tooltip": "采用不遵循常规作图惯例的鲜明设计选择，通常用于创造性地表达歌曲的一部分。"
+                },
+                "tag_145": {
+                    "label": "combo colours（连击颜色）",
+                    "tooltip": "谱面会配合歌曲变化调整连击颜色，也常被称为 colourhax。"
+                }
             }
         }
     }

@@ -7,18 +7,26 @@ $(document).ready(function() {
         animationSpeed: 300,
 
         modelCapabilities: {
-            "v28": {},
-            "v29": {},
+            "v28": {
+                descriptorSet: 'omdb',
+            },
+            "v29": {
+                descriptorSet: 'omdb',
+            },
             "v30": {
                 supportedGamemodes: ['0'],
                 supportsYear: false,
                 supportedInContextOptions: ['TIMING'],
                 hideHitsoundsOption: true,
+                descriptorSet: null,
                 supportsDescriptors: false,
             },
-            "v31": {},
+            "v31": {
+                descriptorSet: 'omdb',
+            },
             "v32": {
                 supportedInContextOptions: ['TIMING'],
+                descriptorSet: 'user_tags',
             },
         }
     };
@@ -204,6 +212,7 @@ $(document).ready(function() {
             }
 
             this.updateConditionalFields();
+            DescriptorManager.renderCurrentDescriptors();
         }
     };
 
@@ -409,9 +418,154 @@ $(document).ready(function() {
 
     // Descriptor Manager
     const DescriptorManager = {
+        descriptorSets: {},
+        selectionStates: new Map(),
+
         init() {
+            this.descriptorSets = window.APP_BOOTSTRAP?.descriptorSets || {};
+
             this.attachDropdownHandler();
             this.attachDescriptorClickHandlers();
+
+            window.addEventListener('languageChanged', () => this.renderCurrentDescriptors());
+        },
+
+        buildDescriptorInputId(setName, value) {
+            const slug = value
+                .toString()
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-');
+            return `desc-${setName}-${slug}`;
+        },
+
+        formatGroupTitle(title = '') {
+            return title
+                .toString()
+                .split(/[_\s]+/)
+                .filter(Boolean)
+                .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+        },
+
+        getActiveDescriptorSetName() {
+            const selectedModel = $('#model').val();
+            const capabilities = AppState.modelCapabilities[selectedModel] || {};
+            return Object.prototype.hasOwnProperty.call(capabilities, 'descriptorSet')
+                ? capabilities.descriptorSet
+                : 'omdb';
+        },
+
+        getActiveDescriptorGroups() {
+            const descriptorSetName = this.getActiveDescriptorSetName();
+            if (!descriptorSetName) {
+                return [];
+            }
+
+            const selectedGamemode = $('#gamemode').val();
+            const descriptorSet = this.descriptorSets[descriptorSetName];
+            const groups = descriptorSet?.groups || [];
+
+            return groups
+                .map((group) => ({
+                    ...group,
+                    items: (group.items || []).filter((item) => item.rulesetId === null || item.rulesetId === undefined || String(item.rulesetId) === String(selectedGamemode))
+                }))
+                .filter((group) => group.items.length > 0);
+        },
+
+        renderCurrentDescriptors() {
+            const $dropdown = $('.custom-dropdown-descriptors');
+            const $container = $dropdown.find('.descriptors-container');
+            const descriptorSetName = this.getActiveDescriptorSetName();
+
+            if (!descriptorSetName) {
+                $container.empty();
+                $dropdown.removeClass('open');
+                $dropdown.find('.dropdown-content').attr('inert', '');
+                if ($dropdown.is(':visible')) {
+                    $dropdown.stop(true, true).slideUp(AppState.animationSpeed);
+                }
+                return;
+            }
+
+            const groups = this.getActiveDescriptorGroups();
+            $container.empty();
+
+            groups.forEach((group) => {
+                const $group = $('<div>').addClass('descriptor-group');
+                const $heading = $('<h3>').text(group.title || this.formatGroupTitle(group.key || ''));
+                const groupTitleKey = group.titleKey || `descriptors.${descriptorSetName}.groups.${group.key}`;
+
+                if (groupTitleKey) {
+                    $heading.attr('data-i18n', groupTitleKey);
+                }
+
+                $group.append($heading);
+
+                (group.items || []).forEach((item) => {
+                    const inputId = this.buildDescriptorInputId(descriptorSetName, item.value);
+                    const translationBase = item.translationKey
+                        ? `descriptors.${descriptorSetName}.items.${item.translationKey}`
+                        : null;
+                    const $item = $('<div>').addClass('descriptor-item');
+                    const $checkbox = $('<input>')
+                        .attr({
+                            type: 'checkbox',
+                            id: inputId,
+                            name: 'descriptors',
+                            value: item.value,
+                        });
+                    const $label = $('<label>')
+                        .attr('for', inputId)
+                        .text(item.label || item.value);
+
+                    if (item.labelKey || translationBase) {
+                        $label.attr('data-i18n', item.labelKey || `${translationBase}.label`);
+                    }
+                    if (item.titleKey || translationBase) {
+                        $label.attr('data-i18n-title', item.titleKey || `${translationBase}.tooltip`);
+                    }
+                    if (item.title) {
+                        $label.attr('title', item.title);
+                    }
+
+                    $item.append($checkbox, $label);
+                    $group.append($item);
+                });
+
+                $container.append($group);
+            });
+
+            if (!$dropdown.is(':visible')) {
+                $dropdown.stop(true, true).slideDown(AppState.animationSpeed);
+            }
+
+            if (typeof I18n !== 'undefined' && typeof I18n.applyTranslations === 'function') {
+                I18n.applyTranslations();
+            }
+
+            this.syncRenderedSelections();
+        },
+
+        syncRenderedSelections() {
+            $('.descriptors-container input[name="descriptors"]').each((_, element) => {
+                const $checkbox = $(element);
+                const state = this.selectionStates.get($checkbox.val()) || 'neutral';
+                this.applyCheckboxState($checkbox, state);
+            });
+        },
+
+        applyCheckboxState($checkbox, state) {
+            $checkbox.removeClass('positive-check negative-check');
+
+            if (state === 'positive') {
+                $checkbox.addClass('positive-check').prop('checked', true);
+            } else if (state === 'negative') {
+                $checkbox.addClass('negative-check').prop('checked', true);
+            } else {
+                $checkbox.prop('checked', false);
+            }
         },
 
         attachDropdownHandler() {
@@ -433,21 +587,20 @@ $(document).ready(function() {
         },
 
         setDescriptorState($checkbox, state) {
-            $checkbox.removeClass('positive-check negative-check');
+            const value = $checkbox.val();
 
-            if (state === 'positive') {
-                $checkbox.addClass('positive-check').prop('checked', true);
-            } else if (state === 'negative') {
-                $checkbox.addClass('negative-check').prop('checked', true);
+            if (state === 'positive' || state === 'negative') {
+                this.selectionStates.set(value, state);
             } else {
-                $checkbox.prop('checked', false);
+                this.selectionStates.delete(value);
             }
+
+            this.applyCheckboxState($checkbox, state);
         },
 
         clearSelections() {
-            $('input[name="descriptors"]').each((_, element) => {
-                this.setDescriptorState($(element), 'neutral');
-            });
+            this.selectionStates.clear();
+            this.syncRenderedSelections();
         },
 
         getSelections() {
@@ -466,21 +619,16 @@ $(document).ready(function() {
         },
 
         applySelections(descriptors = {}) {
-            this.clearSelections();
-
+            this.selectionStates.clear();
             (descriptors.positive || []).forEach((value) => {
-                const $checkbox = $(`input[name="descriptors"][value="${value}"]`);
-                if ($checkbox.length) {
-                    this.setDescriptorState($checkbox, 'positive');
-                }
+                this.selectionStates.set(value, 'positive');
             });
 
             (descriptors.negative || []).forEach((value) => {
-                const $checkbox = $(`input[name="descriptors"][value="${value}"]`);
-                if ($checkbox.length) {
-                    this.setDescriptorState($checkbox, 'negative');
-                }
+                this.selectionStates.set(value, 'negative');
             });
+
+            this.syncRenderedSelections();
         },
 
         attachDescriptorClickHandlers() {
@@ -1261,7 +1409,10 @@ $(document).ready(function() {
 
         // Attach event handlers
         $("#model").on('change', () => UIManager.updateModelSettings());
-        $("#gamemode").on('change', () => UIManager.updateConditionalFields());
+        $("#gamemode").on('change', () => {
+            UIManager.updateConditionalFields();
+            DescriptorManager.renderCurrentDescriptors();
+        });
 
         // Initial UI updates
         UIManager.updateModelSettings();

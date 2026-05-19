@@ -1,6 +1,7 @@
 import traceback
 from dataclasses import asdict
 from pathlib import Path
+import json
 
 from hydra import initialize_config_dir, compose
 from omegaconf import OmegaConf
@@ -38,9 +39,69 @@ from inference import compile_args, get_server_address, main
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
 static_folder = os.path.join(script_dir, 'static')
+descriptor_dataset_paths = {
+    'omdb': Path(script_dir) / 'datasets' / 'omdb_descriptors.json',
+    'user_tags': Path(script_dir) / 'datasets' / 'tags_2026.json',
+}
 
 if not os.path.isdir(static_folder):
     print(f"Warning: Static folder not found at {static_folder}. Ensure it exists and contains your CSS/images.")
+
+
+def format_descriptor_group_title(group_key: str) -> str:
+    return ' '.join(part.capitalize() for part in group_key.replace('_', ' ').split())
+
+
+def load_descriptor_set(dataset_path: Path, set_name: str) -> dict:
+    if not dataset_path.is_file():
+        print(f"Warning: Descriptor dataset not found at {dataset_path}.")
+        return {'groups': []}
+
+    with dataset_path.open('r', encoding='utf-8') as f:
+        tag_data = json.load(f)
+
+    groups = []
+    groups_by_key = {}
+
+    for tag in tag_data.get('tags', []):
+        full_name = (tag.get('name') or '').strip()
+        if not full_name:
+            continue
+
+        if '/' in full_name:
+            group_key, descriptor_name = full_name.split('/', 1)
+        else:
+            group_key, descriptor_name = 'other', full_name
+
+        group = groups_by_key.get(group_key)
+        if group is None:
+            group = {
+                'key': group_key,
+                'title': format_descriptor_group_title(group_key),
+                'items': [],
+            }
+            groups_by_key[group_key] = group
+            groups.append(group)
+
+        descriptor_value = (tag.get('value') or full_name).strip()
+        if not descriptor_value:
+            continue
+
+        group['items'].append({
+            'value': descriptor_value,
+            'label': descriptor_name,
+            'title': tag.get('description') or '',
+            'rulesetId': tag.get('ruleset_id'),
+            'translationKey': tag.get('translation_key') or (f"tag_{tag['id']}" if set_name == 'user_tags' else descriptor_value),
+        })
+
+    return {'groups': groups}
+
+
+DESCRIPTOR_SETS = {
+    set_name: load_descriptor_set(dataset_path, set_name)
+    for set_name, dataset_path in descriptor_dataset_paths.items()
+}
 
 
 # Set Flask environment to production before initializing Flask app to silence warning
@@ -318,7 +379,12 @@ def _inference_worker(cfg: InferenceConfig, out_q: mp.Queue):
 def index():
     """Renders the main HTML page."""
     # Jinja rendering is now handled by Flask's render_template
-    return render_template('index.html', csrf_token=LOCAL_UI_CSRF_TOKEN, csrf_header_name=CSRF_HEADER_NAME)
+    return render_template(
+        'index.html',
+        csrf_token=LOCAL_UI_CSRF_TOKEN,
+        csrf_header_name=CSRF_HEADER_NAME,
+        descriptor_sets=DESCRIPTOR_SETS,
+    )
 
 
 @app.route('/check_bf16_support', methods=['GET'])
