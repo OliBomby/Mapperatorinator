@@ -62,8 +62,8 @@ $(document).ready(function() {
             $('#inferenceForm')[0].reset();
 
             // Clear descriptors
-            $('input[name="descriptors"], input[name="in_context_options"]')
-                .removeClass('positive-check negative-check').prop('checked', false);
+            DescriptorManager.clearSelections();
+            $('input[name="in_context_options"]').prop('checked', false);
 
             ValidationManager.clearPlaceholders();
             return ValidationManager.validateAndAutofill(false);
@@ -417,13 +417,68 @@ $(document).ready(function() {
         attachDropdownHandler() {
             $('.custom-dropdown-descriptors .dropdown-header').on('click', function() {
                 const $dropdown = $(this).parent();
-                const dropdownContent = document.querySelector('.dropdown-content');
+                const dropdownContent = $dropdown.find('.dropdown-content').get(0);
                 $dropdown.toggleClass('open');
+                if (!dropdownContent) {
+                    return;
+                }
+
                 if ($dropdown.hasClass('open')) {
                     Utils.smoothScroll('.custom-dropdown-descriptors');
                     dropdownContent.removeAttribute('inert');
                 } else {
                     dropdownContent.setAttribute('inert', '');
+                }
+            });
+        },
+
+        setDescriptorState($checkbox, state) {
+            $checkbox.removeClass('positive-check negative-check');
+
+            if (state === 'positive') {
+                $checkbox.addClass('positive-check').prop('checked', true);
+            } else if (state === 'negative') {
+                $checkbox.addClass('negative-check').prop('checked', true);
+            } else {
+                $checkbox.prop('checked', false);
+            }
+        },
+
+        clearSelections() {
+            $('input[name="descriptors"]').each((_, element) => {
+                this.setDescriptorState($(element), 'neutral');
+            });
+        },
+
+        getSelections() {
+            const selections = { positive: [], negative: [] };
+
+            $('input[name="descriptors"]').each(function() {
+                const $checkbox = $(this);
+                if ($checkbox.hasClass('positive-check')) {
+                    selections.positive.push($checkbox.val());
+                } else if ($checkbox.hasClass('negative-check')) {
+                    selections.negative.push($checkbox.val());
+                }
+            });
+
+            return selections;
+        },
+
+        applySelections(descriptors = {}) {
+            this.clearSelections();
+
+            (descriptors.positive || []).forEach((value) => {
+                const $checkbox = $(`input[name="descriptors"][value="${value}"]`);
+                if ($checkbox.length) {
+                    this.setDescriptorState($checkbox, 'positive');
+                }
+            });
+
+            (descriptors.negative || []).forEach((value) => {
+                const $checkbox = $(`input[name="descriptors"][value="${value}"]`);
+                if ($checkbox.length) {
+                    this.setDescriptorState($checkbox, 'negative');
                 }
             });
         },
@@ -435,15 +490,13 @@ $(document).ready(function() {
 
                 if (!$checkbox.prop('disabled')) {
                     if ($checkbox.hasClass('positive-check')) {
-                        $checkbox.removeClass('positive-check').addClass('negative-check');
+                        DescriptorManager.setDescriptorState($checkbox, 'negative');
                     } else if ($checkbox.hasClass('negative-check')) {
-                        $checkbox.removeClass('negative-check');
-                        $checkbox.prop('checked', false);
+                        DescriptorManager.setDescriptorState($checkbox, 'neutral');
                         return;
                     } else {
-                        $checkbox.addClass('positive-check');
+                        DescriptorManager.setDescriptorState($checkbox, 'positive');
                     }
-                    $checkbox.prop('checked', true);
                 }
             });
         }
@@ -489,15 +542,7 @@ $(document).ready(function() {
             });
 
             // Export descriptors
-            $('input[name="descriptors"]').each(function() {
-                const $checkbox = $(this);
-                const value = $checkbox.val();
-                if ($checkbox.hasClass('positive-check')) {
-                    config.descriptors.positive.push(value);
-                } else if ($checkbox.hasClass('negative-check')) {
-                    config.descriptors.negative.push(value);
-                }
-            });
+            config.descriptors = DescriptorManager.getSelections();
 
             // Export in-context options
             $('input[name="in_context_options"]:checked').each(function() {
@@ -601,17 +646,7 @@ $(document).ready(function() {
                 }
 
                 // Import descriptors
-                $('input[name="descriptors"]').removeClass('positive-check negative-check').prop('checked', false);
-                if (config.descriptors) {
-                    config.descriptors.positive?.forEach(value => {
-                        $(`input[name="descriptors"][value="${value}"]`)
-                            .addClass('positive-check').prop('checked', true);
-                    });
-                    config.descriptors.negative?.forEach(value => {
-                        $(`input[name="descriptors"][value="${value}"]`)
-                            .addClass('negative-check').prop('checked', true);
-                    });
-                }
+                DescriptorManager.applySelections(config.descriptors);
 
                 // Import in-context options
                 $('input[name="in_context_options"]').prop('checked', false);
@@ -834,20 +869,11 @@ $(document).ready(function() {
 
             // Handle descriptors
             formData.delete('descriptors');
-            const positiveDescriptors = [];
-            const negativeDescriptors = [];
+            formData.delete('negative_descriptors');
+            const descriptorSelections = DescriptorManager.getSelections();
 
-            $('input[name="descriptors"]').each(function() {
-                const $cb = $(this);
-                if ($cb.hasClass('positive-check')) {
-                    positiveDescriptors.push($cb.val());
-                } else if ($cb.hasClass('negative-check')) {
-                    negativeDescriptors.push($cb.val());
-                }
-            });
-
-            positiveDescriptors.forEach(val => formData.append('descriptors', val));
-            negativeDescriptors.forEach(val => formData.append('negative_descriptors', val));
+            descriptorSelections.positive.forEach(val => formData.append('descriptors', val));
+            descriptorSelections.negative.forEach(val => formData.append('negative_descriptors', val));
 
             // Ensure hitsounded is true for V30
             if ($("#model").val() === "v30" && !$("#option-item-hitsounded").is(':visible')) {
