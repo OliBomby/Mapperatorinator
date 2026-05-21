@@ -97,6 +97,7 @@
         "run_inference": "Run Inference",
         "cancel": "Cancel",
         "cancelling": "Cancelling...",
+        "remove": "Remove",
         "export": "Export",
         "import": "Import",
         "clear": "Clear"
@@ -135,6 +136,7 @@
     },
     "progress": {
         "title": "Progress",
+        "starting": "Starting...",
         "initializing": "Initializing process... This may take a moment.",
         "generating_timing": "Generating Timing",
         "generating_kiai": "Generating Kiai",
@@ -142,6 +144,8 @@
         "refining_positions": "Refining Positions",
         "processing_complete": "Processing Complete",
         "processing_failed": "Processing Failed",
+        "cancelled": "Cancelled",
+        "warning_detected": "Warning on this job (Will continue to generate)",
         "error_detected": "Error Detected",
         "connection_error": "Connection Error"
     },
@@ -149,6 +153,7 @@
         "success": {
             "inference_started": "Inference started",
             "inference_cancelled": "Inference cancelled successfully.",
+            "cancel_request_sent": "Cancel request sent",
             "config_exported": "Configuration exported successfully",
             "config_imported": "Configuration imported successfully!",
             "settings_reset": "All settings reset to default values",
@@ -182,6 +187,7 @@
         }
     },
     "links": {
+        "view_warning_log": "View warning log",
         "open_folder": "Click here to open the folder containing your map.",
         "open_log": "See why... (opens error log)",
         "beatmap_created": "Click Here to go to the created beatmap..."

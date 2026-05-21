@@ -1,4 +1,33 @@
 $(document).ready(function() {
+    const I18nUtils = {
+        t(key, fallback = key, params) {
+            if (typeof I18n !== 'undefined' && typeof I18n.t === 'function') {
+                const translated = I18n.t(key, params);
+                if (translated !== key) {
+                    return translated;
+                }
+            }
+
+            return fallback;
+        },
+
+        button(key, fallback, params) {
+            return this.t(`buttons.${key}`, fallback, params);
+        },
+
+        progress(key, fallback, params) {
+            return this.t(`progress.${key}`, fallback, params);
+        },
+
+        message(type, key, fallback, params) {
+            return this.t(`messages.${type}.${key}`, fallback, params);
+        },
+
+        link(key, fallback, params) {
+            return this.t(`links.${key}`, fallback, params);
+        }
+    };
+
     // Application state and configuration
     const AppState = {
         jobs: new Map(),
@@ -58,6 +87,28 @@ $(document).ready(function() {
             const messageDiv = $(`<div class="${alertClass}">${message}</div>`);
             flashContainer.append(messageDiv);
             setTimeout(() => messageDiv.remove(), 5000);
+        },
+
+        showTranslatedFlashMessage(keyPath, fallback, type = 'success', params) {
+            this.showFlashMessage(I18nUtils.t(keyPath, fallback, params), type);
+        },
+
+        translateValidationMessage(message) {
+            if (!message) {
+                return message;
+            }
+
+            if (message.includes('Audio file not found')) {
+                return I18nUtils.message('error', 'audio_not_found', 'Audio file not found');
+            }
+            if (message.includes('Beatmap file not found')) {
+                return I18nUtils.message('error', 'beatmap_not_found', 'Beatmap file not found');
+            }
+            if (message.includes('Beatmap file must have .osu extension')) {
+                return I18nUtils.message('error', 'beatmap_invalid_ext', 'Beatmap file must have .osu extension');
+            }
+
+            return message;
         },
 
         smoothScroll(target, offset = 0) {
@@ -255,7 +306,7 @@ $(document).ready(function() {
 
                     if (path) {
                         if (targetId === 'beatmap_path' && !path.toLowerCase().endsWith('.osu')) {
-                            Utils.showFlashMessage('Please select a valid .osu file.', 'error');
+                            Utils.showTranslatedFlashMessage('messages.error.invalid_osu_file', 'Please select a valid .osu file.', 'error');
                             // Set the path and let validation handle inline error
                         }
 
@@ -269,7 +320,7 @@ $(document).ready(function() {
                     }
                 } catch (error) {
                     console.error(`Error browsing for ${browseType}:`, error);
-                    alert(`Could not browse for ${browseType}. Ensure the backend API is running.`);
+                    alert(I18nUtils.message('error', 'browse_failed', 'Could not browse. Ensure the backend API is running.'));
                 }
             });
         }
@@ -313,7 +364,7 @@ $(document).ready(function() {
                     error: (xhr, status, error) => {
                         console.error('Path validation failed:', error);
                         if (showFlashMessages) {
-                            Utils.showFlashMessage('Error validating paths. Check console for details.', 'error');
+                            Utils.showTranslatedFlashMessage('messages.error.validation_failed', 'Error validating paths. Check console for details.', 'error');
                         }
                         this.clearPlaceholders();
                         resolve(false);
@@ -366,7 +417,7 @@ $(document).ready(function() {
             if (showFlashMessages) {
                 // Show errors as flash messages and inline indicators
                 response.errors.forEach(error => {
-                    Utils.showFlashMessage(error, 'error');
+                    Utils.showFlashMessage(Utils.translateValidationMessage(error), 'error');
                 });
             }
 
@@ -384,11 +435,11 @@ $(document).ready(function() {
             const beatmapPathVal = $('#beatmap_path').val().trim();
 
             if (error.includes('Audio file not found') && (audioPathVal || beatmapPathVal)) {
-                this.showInlineError('#audio_path', 'Audio file not found');
+                this.showInlineError('#audio_path', I18nUtils.message('error', 'audio_not_found', 'Audio file not found'));
             } else if (error.includes('Beatmap file not found') && beatmapPathVal) {
-                this.showInlineError('#beatmap_path', 'Beatmap file not found');
+                this.showInlineError('#beatmap_path', I18nUtils.message('error', 'beatmap_not_found', 'Beatmap file not found'));
             } else if (error.includes('Beatmap file must have .osu extension') && beatmapPathVal) {
-                this.showInlineError('#beatmap_path', 'Must be .osu file');
+                this.showInlineError('#beatmap_path', I18nUtils.message('error', 'beatmap_invalid_ext', 'Beatmap file must have .osu extension'));
             }
         },
 
@@ -706,7 +757,7 @@ $(document).ready(function() {
 
                 const filePath = await window.pywebview.api.save_file(filename);
                 if (!filePath) {
-                    this.showConfigStatus("Export cancelled by user", "error");
+                    this.showConfigStatus(I18nUtils.message('error', 'export_cancelled', 'Export cancelled by user'), "error");
                     return;
                 }
 
@@ -719,13 +770,13 @@ $(document).ready(function() {
                     },
                     success: (response) => {
                         if (response.success) {
-                            this.showConfigStatus(`Configuration exported successfully to: ${response.file_path}`, "success");
+                            this.showConfigStatus(`${I18nUtils.message('success', 'config_exported', 'Configuration exported successfully')}: ${response.file_path}`, "success");
                         } else {
-                            this.showConfigStatus(`Error saving config: ${response.error}`, "error");
+                            this.showConfigStatus(`${I18nUtils.message('error', 'save_failed', 'Failed to save configuration')}: ${response.error}`, "error");
                         }
                     },
                     error: () => {
-                        this.showConfigStatus("Failed to save config to server. Using browser download instead.", "error");
+                        this.showConfigStatus(I18nUtils.message('error', 'save_failed', 'Failed to save configuration'), "error");
                         this.fallbackDownload(config);
                     }
                 });
@@ -745,15 +796,15 @@ $(document).ready(function() {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            this.showConfigStatus("Configuration exported successfully (browser download)", "success");
+            this.showConfigStatus(I18nUtils.message('success', 'config_exported', 'Configuration exported successfully'), "success");
         },
 
         resetToDefaults() {
-            if (confirm("Are you sure you want to reset all settings to default values? This cannot be undone.")) {
+            if (confirm(I18nUtils.message('confirm', 'reset_settings', 'Are you sure you want to reset all settings to default values? This cannot be undone.'))) {
                 Utils.resetFormToDefaults();
                 $("#model, #gamemode, #beatmap_path").trigger('change');
                 $(UIManager.clearable_inputs).trigger('blur');
-                this.showConfigStatus("All settings reset to default values", "success");
+                this.showConfigStatus(I18nUtils.message('success', 'settings_reset', 'All settings reset to default values'), "success");
             }
         },
 
@@ -762,7 +813,7 @@ $(document).ready(function() {
             if (!file) return;
 
             if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
-                this.showConfigStatus("Please select a valid JSON configuration file.", "error");
+                this.showConfigStatus(I18nUtils.message('error', 'config_invalid', 'Please select a valid JSON configuration file.'), "error");
                 return;
             }
 
@@ -776,7 +827,7 @@ $(document).ready(function() {
             try {
                 const config = JSON.parse(content);
                 if (!config.version) {
-                    throw new Error("Invalid configuration file format");
+                    throw new Error(I18nUtils.message('error', 'config_invalid', 'Please select a valid JSON configuration file.'));
                 }
 
                 // Import settings
@@ -807,11 +858,12 @@ $(document).ready(function() {
                 $(UIManager.clearable_inputs).trigger('blur');
                 $(UIManager.clearable_inputs).trigger('input');
 
-                this.showConfigStatus(`Configuration imported successfully! (${config.timestamp || 'Unknown date'})`, "success");
+                const timestampSuffix = config.timestamp ? ` (${config.timestamp})` : '';
+                this.showConfigStatus(`${I18nUtils.message('success', 'config_imported', 'Configuration imported successfully!')}${timestampSuffix}`, "success");
 
             } catch (error) {
                 console.error("Error importing configuration:", error);
-                this.showConfigStatus(`Error importing configuration: ${error.message}`, "error");
+                this.showConfigStatus(`${I18nUtils.message('error', 'config_import_failed', 'Error importing configuration')}: ${error.message}`, "error");
             }
         },
 
@@ -828,6 +880,42 @@ $(document).ready(function() {
     const InferenceManager = {
         init() {
             $('#inferenceForm').submit((e) => this.handleSubmit(e));
+            window.addEventListener('languageChanged', () => this.refreshAllJobTranslations());
+        },
+
+        setJobStatus(job, key, fallback, params) {
+            job.statusTranslationKey = key;
+            job.statusFallback = fallback;
+            job.statusParams = params;
+            job.elements.$status.text(I18nUtils.t(key, fallback, params));
+        },
+
+        refreshJobTranslations(job) {
+            if (!job?.elements) {
+                return;
+            }
+
+            job.elements.$card.find('.progress-card-close')
+                .attr('title', I18nUtils.button('remove', 'Remove'));
+            job.elements.$warningText.text(I18nUtils.progress('warning_detected', 'Warning on this job (Will continue to generate)'));
+            job.elements.$initMessage.text(I18nUtils.progress('initializing', 'Initializing process... This may take a moment.'));
+            job.elements.$warningLogLinkAnchor.text(I18nUtils.link('view_warning_log', 'View warning log'));
+            job.elements.$beatmapLinkAnchor.text(I18nUtils.link('open_folder', 'Click here to open the folder containing your map.'));
+            job.elements.$errorLogLinkAnchor.text(I18nUtils.link('open_log', 'See why... (opens error log)'));
+
+            if (job.cancelState === 'cancelling') {
+                job.elements.$cancelButton.text(I18nUtils.button('cancelling', 'Cancelling...'));
+            } else {
+                job.elements.$cancelButton.text(I18nUtils.button('cancel', 'Cancel'));
+            }
+
+            if (job.statusTranslationKey) {
+                this.setJobStatus(job, job.statusTranslationKey, job.statusFallback, job.statusParams);
+            }
+        },
+
+        refreshAllJobTranslations() {
+            AppState.jobs.forEach((job) => this.refreshJobTranslations(job));
         },
 
         async handleSubmit(e) {
@@ -856,21 +944,21 @@ $(document).ready(function() {
 
             if (!audioPath && !beatmapPath) {
                 Utils.smoothScroll(0);
-                Utils.showFlashMessage("Either 'Beatmap Path' or 'Audio Path' are required for running inference", 'error');
+                Utils.showTranslatedFlashMessage('messages.error.audio_or_beatmap_required', "Either 'Beatmap Path' or 'Audio Path' are required for running inference", 'error');
                 return false;
             }
 
             if (!outputPath && !beatmapPath) {
                 Utils.smoothScroll(0);
-                Utils.showFlashMessage("Either 'Output Path' or 'Beatmap Path' are required for running inference", 'error');
+                Utils.showTranslatedFlashMessage('messages.error.output_or_beatmap_required', "Either 'Output Path' or 'Beatmap Path' are required for running inference", 'error');
                 return false;
             }
 
             // Validate beatmap file type if beatmap path is provided
             if (beatmapPath && !beatmapPath.toLowerCase().endsWith('.osu')) {
                 Utils.smoothScroll('#beatmap_path');
-                Utils.showFlashMessage("Beatmap file must have .osu extension", 'error');
-                ValidationManager.showInlineError('#beatmap_path', 'Must be .osu file');
+                Utils.showTranslatedFlashMessage('messages.error.beatmap_invalid_ext', 'Beatmap file must have .osu extension', 'error');
+                ValidationManager.showInlineError('#beatmap_path', I18nUtils.message('error', 'beatmap_invalid_ext', 'Beatmap file must have .osu extension'));
                 return false;
             }
 
@@ -936,6 +1024,7 @@ $(document).ready(function() {
                 warningCaptureActive: false,
                 warningCaptureRemaining: 0,
                 warningSuppressed: false,
+                cancelState: 'idle',
                 evtSource: null,
                 isCancelled: false,
                 inferenceErrorOccurred: false,
@@ -961,6 +1050,9 @@ $(document).ready(function() {
 
             $card.find('.progress-card-close').on('click', () => this.requestClose(job, $card));
             job.elements.$cancelButton.on('click', () => this.requestCancel(job));
+
+            this.setJobStatus(job, 'progress.starting', 'Starting...');
+            this.refreshJobTranslations(job);
 
             AppState.jobs.set(tempKey, job);
             return job;
@@ -1069,12 +1161,13 @@ $(document).ready(function() {
                 success: (response) => {
                     const jobId = response.job_id;
                     if (!jobId) {
-                        Utils.showFlashMessage("Failed to start inference: missing job id.", 'error');
+                        Utils.showTranslatedFlashMessage('messages.error.start_failed', 'Failed to start inference process. Check backend console.', 'error');
                         this.removeJob(job.id || job.tempKey, job.elements.$card);
                         return;
                     }
                     job.id = jobId;
-                    job.elements.$cancelButton.show().prop('disabled', false).text('Cancel');
+                    job.cancelState = 'idle';
+                    job.elements.$cancelButton.show().prop('disabled', false).text(I18nUtils.button('cancel', 'Cancel'));
                     job.elements.$card.attr('data-job-id', jobId);
                     AppState.jobs.delete(job.tempKey);
                     AppState.jobs.set(jobId, job);
@@ -1177,15 +1270,15 @@ $(document).ready(function() {
             // Update progress title based on message content
             const lowerCaseMessage = messageData.toLowerCase();
             const progressTitles = {
-                "generating timing": "Generating Timing",
-                "generating kiai": "Generating Kiai",
-                "generating map": "Generating Map",
-                "seq len": "Refining Positions"
+                "generating timing": ['progress.generating_timing', 'Generating Timing'],
+                "generating kiai": ['progress.generating_kiai', 'Generating Kiai'],
+                "generating map": ['progress.generating_map', 'Generating Map'],
+                "seq len": ['progress.refining_positions', 'Refining Positions']
             };
 
-            Object.entries(progressTitles).forEach(([keyword, title]) => {
+            Object.entries(progressTitles).forEach(([keyword, [key, fallback]]) => {
                 if (lowerCaseMessage.includes(keyword)) {
-                    job.elements.$status.text(title);
+                    this.setJobStatus(job, key, fallback);
                     if (job.stage !== 'generating') {
                         job.stage = 'generating';
                     }
@@ -1210,7 +1303,7 @@ $(document).ready(function() {
 
                     job.elements.$beatmapLinkAnchor
                         .attr("href", "#")
-                        .text("Click here to open the folder containing your map.")
+                        .text(I18nUtils.link('open_folder', 'Click here to open the folder containing your map.'))
                         .off("click")
                         .on("click", (e) => {
                             e.preventDefault();
@@ -1220,7 +1313,7 @@ $(document).ready(function() {
                                 data: { folder: folderPath }
                             })
                                 .done(response => console.log("Open folder response:", response))
-                                .fail(() => alert("Failed to open folder via backend."));
+                                .fail(() => alert(I18nUtils.message('error', 'open_folder_failed', 'Failed to open folder via backend.')));
                         });
                     job.elements.$beatmapLink.show();
                 }
@@ -1238,11 +1331,12 @@ $(document).ready(function() {
 
             if (!job.isCancelled && !job.inferenceErrorOccurred) {
                 job.inferenceErrorOccurred = true;
-                job.accumulatedErrorMessages.push("Error: Connection to process stream lost.");
-                job.elements.$status.text("Connection Error").css('color', 'var(--accent-color)');
+                job.accumulatedErrorMessages.push(I18nUtils.message('error', 'connection_lost', 'Error: Connection to process stream lost.'));
+                this.setJobStatus(job, 'progress.connection_error', 'Connection Error');
+                job.elements.$status.css('color', 'var(--accent-color)');
                 job.elements.$progressBar.addClass('error');
                 job.elements.$card.data('status', 'error');
-                Utils.showFlashMessage("Error: Connection to process stream lost.", "error");
+                Utils.showTranslatedFlashMessage('messages.error.connection_lost', 'Error: Connection to process stream lost.', 'error');
             }
 
             job.elements.$cancelButton.hide();
@@ -1262,7 +1356,8 @@ $(document).ready(function() {
             }
 
             if (job.isCancelled) {
-                job.elements.$status.text("Cancelled").css('color', 'var(--accent-color)');
+                this.setJobStatus(job, 'progress.cancelled', 'Cancelled');
+                job.elements.$status.css('color', 'var(--accent-color)');
                 job.elements.$progressBar.addClass('error');
                 job.elements.$card.data('status', 'cancelled');
             } else if (job.inferenceErrorOccurred) {
@@ -1275,34 +1370,37 @@ $(document).ready(function() {
                 this.handleInferenceError(job);
                 job.elements.$card.data('status', 'error');
             } else {
-                job.elements.$status.text("Processing Complete").css('color', '');
+                this.setJobStatus(job, 'progress.processing_complete', 'Processing Complete');
+                job.elements.$status.css('color', '');
                 job.elements.$progressBar.css("width", "100%").removeClass('error');
                 job.elements.$card.data('status', 'completed');
             }
 
             job.elements.$cancelButton.hide();
             job.isCancelled = false;
+            job.cancelState = 'idle';
         },
 
         handleInferenceError(job) {
             const fullErrorText = job.accumulatedErrorMessages.join("\\n");
-            let specificError = "An error occurred during processing. Check console/logs.";
+            let specificError = I18nUtils.message('error', 'generation_error', 'There was an error while creating the beatmap. Check console/logs for details.');
 
             if (fullErrorText.includes("FileNotFoundError:")) {
                 const fileNotFoundMatch = fullErrorText.match(/FileNotFoundError:.*? file (.*?) not found/);
                 specificError = fileNotFoundMatch?.[1] ?
-                    `Error: File not found - ${fileNotFoundMatch[1].replace(/\\\\/g, '\\\\')}` :
-                    "Error: A required file was not found.";
+                    `${I18nUtils.message('error', 'file_not_found', 'Error: A required file was not found.')}: ${fileNotFoundMatch[1].replace(/\\\\/g, '\\\\')}` :
+                    I18nUtils.message('error', 'file_not_found', 'Error: A required file was not found.');
             } else if (fullErrorText.includes("HYDRA_FULL_ERROR=1")) {
-                specificError = "There was an error while creating the beatmap. Check console/logs for details.";
+                specificError = I18nUtils.message('error', 'generation_error', 'There was an error while creating the beatmap. Check console/logs for details.');
             } else if (fullErrorText.includes("Error executing job")) {
-                specificError = "There was an error starting or executing the generation task.";
+                specificError = I18nUtils.message('error', 'task_error', 'There was an error starting or executing the generation task.');
             } else if (fullErrorText.includes("Connection to process stream lost")) {
-                specificError = "Error: Connection to the generation process was lost.";
+                specificError = I18nUtils.message('error', 'connection_lost', 'Error: Connection to process stream lost.');
             }
 
             Utils.showFlashMessage(specificError, "error");
-            job.elements.$status.text("Processing Failed").css('color', 'var(--accent-color)').show();
+            this.setJobStatus(job, 'progress.processing_failed', 'Processing Failed');
+            job.elements.$status.css('color', 'var(--accent-color)').show();
             job.elements.$progressBar.css("width", "100%").addClass('error');
             job.elements.$beatmapLink.hide();
 
@@ -1315,7 +1413,7 @@ $(document).ready(function() {
                         data: { path: job.errorLogFilePath }
                     })
                         .done(response => console.log("Open log response:", response))
-                        .fail(() => alert("Failed to open log file via backend."));
+                        .fail(() => alert(I18nUtils.message('error', 'open_log_failed', 'Failed to open log file via backend.')));
                 });
                 job.elements.$errorLogLink.show();
             }
@@ -1327,7 +1425,8 @@ $(document).ready(function() {
 
         cancelInference(job) {
             const $cancelBtn = job.elements.$cancelButton;
-            $cancelBtn.prop('disabled', true).text('Cancelling...');
+            job.cancelState = 'cancelling';
+            $cancelBtn.prop('disabled', true).text(I18nUtils.button('cancelling', 'Cancelling...'));
 
             $.ajax({
                 url: "/cancel_inference",
@@ -1335,12 +1434,13 @@ $(document).ready(function() {
                 data: { job_id: job.id },
                 success: (response) => { // Expecting JSON response
                     job.isCancelled = true;
-                    Utils.showFlashMessage(response.message || "Inference cancelled successfully.", "cancel-success");
+                    Utils.showFlashMessage(I18nUtils.message('success', 'cancel_request_sent', 'Cancel request sent'), "cancel-success");
                 },
                 error: (jqXHR) => {
-                    const errorMsg = jqXHR.responseJSON?.message || "Failed to send cancel request. Unknown error.";
+                    const errorMsg = jqXHR.responseJSON?.message || I18nUtils.message('error', 'cancel_failed', 'Failed to send cancel request. Unknown error.');
                     Utils.showFlashMessage(errorMsg, "error");
-                    $cancelBtn.prop('disabled', false).text('Cancel');
+                    job.cancelState = 'idle';
+                    $cancelBtn.prop('disabled', false).text(I18nUtils.button('cancel', 'Cancel'));
                 }
             });
         },

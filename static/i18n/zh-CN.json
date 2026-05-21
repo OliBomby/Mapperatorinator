@@ -97,6 +97,7 @@
         "run_inference": "开始生成",
         "cancel": "取消",
         "cancelling": "取消中...",
+        "remove": "移除",
         "export": "导出",
         "import": "导入",
         "clear": "清空"
@@ -135,6 +136,7 @@
     },
     "progress": {
         "title": "进度",
+        "starting": "启动中...",
         "initializing": "正在初始化进程...请稍候。",
         "generating_timing": "正在生成 Timing",
         "generating_kiai": "正在生成 Kiai",
@@ -142,6 +144,8 @@
         "refining_positions": "正在优化位置",
         "processing_complete": "处理完成",
         "processing_failed": "处理失败",
+        "cancelled": "已取消",
+        "warning_detected": "此任务出现警告（将继续生成）",
         "error_detected": "检测到错误",
         "connection_error": "连接错误"
     },
@@ -149,6 +153,7 @@
         "success": {
             "inference_started": "推理已开始",
             "inference_cancelled": "推理已成功取消。",
+            "cancel_request_sent": "已发送取消请求",
             "config_exported": "配置导出成功",
             "config_imported": "配置导入成功！",
             "settings_reset": "所有设置已重置为默认值",
@@ -182,6 +187,7 @@
         }
     },
     "links": {
+        "view_warning_log": "查看警告日志",
         "open_folder": "点击此处打开包含谱面的文件夹。",
         "open_log": "查看原因...（打开错误日志）",
         "beatmap_created": "点击此处前往已创建的谱面..."

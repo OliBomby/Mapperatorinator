@@ -189,6 +189,19 @@ def _protect_local_ui_endpoints():
 # --- pywebview API Class ---
 class Api:
     # No __init__ needed as we get the window dynamically
+    def set_window_title(self, title):
+        """Updates the native pywebview window title."""
+        if not webview.windows:
+            print("Error: No pywebview window found.")
+            return False
+
+        try:
+            webview.windows[0].set_title(title)
+            return True
+        except Exception:
+            traceback.print_exc()
+            return False
+
     def save_file(self, filename):
         """Opens a save file dialog and returns the selected file path."""
         # Get the window dynamically from the global list

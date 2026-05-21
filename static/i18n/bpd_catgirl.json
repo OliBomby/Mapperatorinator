@@ -97,6 +97,7 @@
     "run_inference": "DO IT NOW",
     "cancel": "STOP IT",
     "cancelling": "Stopping... (don't hate me)",
+    "remove": "Make it go away",
     "export": "Export",
     "import": "Import",
     "clear": "GET RID OF IT"
@@ -135,6 +136,7 @@
   },
   "progress": {
     "title": "Progress (are we there yet?)",
+    "starting": "Starteratorinator...",
     "initializing": "Getting ready... wait for me!!",
     "generating_timing": "Making the timing...",
     "generating_kiai": "Making it flashy...",
@@ -142,6 +144,8 @@
     "refining_positions": "Fixing everything...",
     "processing_complete": "DONE!! I did it!!",
     "processing_failed": "I FAILED YOU I'M SORRY",
+    "cancelled": "Cancelled... okay fine...",
+    "warning_detected": "Something weird happened but I'm still going!!",
     "error_detected": "SOMETHING IS WRONG",
     "connection_error": "I can't hear you!! (Connection Error)"
   },
@@ -149,6 +153,7 @@
     "success": {
       "inference_started": "I started!!",
       "inference_cancelled": "I stopped... is that what you wanted?",
+      "cancel_request_sent": "Okay okay I'm stopping!!",
       "config_exported": "I saved the config for you",
       "config_imported": "I got the config!!",
       "settings_reset": "Everything is back to normal now",
@@ -182,6 +187,7 @@
     }
   },
   "links": {
+    "view_warning_log": "Show me the scary warning log...",
     "open_folder": "Click here to see the map I made for you.",
     "open_log": "See why I failed... (opens error log)",
     "beatmap_created": "CLICK HERE TO SEE IT!!"

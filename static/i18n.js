@@ -147,6 +147,20 @@ const I18n = (function() {
         return current;
     }
 
+    function syncPageTitle(title) {
+        if (!title) {
+            return;
+        }
+
+        document.title = title;
+
+        if (window.pywebview?.api?.set_window_title) {
+            Promise.resolve(window.pywebview.api.set_window_title(title)).catch((error) => {
+                console.debug('[i18n] Failed to sync native window title:', error);
+            });
+        }
+    }
+
     /**
      * Apply translations to all elements with data-i18n attributes
      */
@@ -154,7 +168,7 @@ const I18n = (function() {
         // Update page title
         const pageTitle = t('page.title');
         if (pageTitle && pageTitle !== 'page.title') {
-            document.title = pageTitle;
+            syncPageTitle(pageTitle);
         }
 
         // Update elements with data-i18n attribute
@@ -286,6 +300,18 @@ const I18n = (function() {
 
 // Auto-initialize when DOM is ready (if not using as module)
 if (typeof document !== 'undefined') {
+    window.addEventListener('pywebviewready', () => {
+        if (typeof I18n !== 'undefined' && typeof I18n.t === 'function') {
+            const pageTitle = I18n.t('page.title');
+            if (pageTitle && pageTitle !== 'page.title') {
+                document.title = pageTitle;
+                if (window.pywebview?.api?.set_window_title) {
+                    Promise.resolve(window.pywebview.api.set_window_title(pageTitle)).catch(() => {});
+                }
+            }
+        }
+    });
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => I18n.init());
     } else {
