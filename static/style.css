@@ -267,6 +267,11 @@ button[type="submit"]:hover {
     gap: 10px;
 }
 
+#inferenceForm label {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
 .path-input-group label {
     flex-shrink: 0;
     margin-bottom: 0;
@@ -293,8 +298,6 @@ button[type="submit"]:hover {
 
 .metadata-group label {
     display: block;
-    font-weight: 500;
-    color: var(--text-color);
 }
 
 .metadata-group input[type="text"],

@@ -51,6 +51,10 @@ $background_line//Break Periods
 $timing_points
 
 [Colours]
+Combo0 : 255,192,0
+Combo1 : 0,202,0
+Combo2 : 18,124,255
+‏Combo3 : 242,24,57
 
 [HitObjects]
 $hit_objects
