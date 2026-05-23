@@ -55,7 +55,7 @@ parallel: false         # Use parallel sampling
 do_sample: true         # Use sampling
 num_beams: 1            # Number of beams for beam search
 super_timing: false     # Use super timing generator (slow but accurate timing)
-timer_num_beams: 2            # Number of beams for beam search
+timer_num_beams: 1        # Number of beams for beam search
 timer_bpm_threshold: 0.1  # Threshold requirement for BPM change in timer, higher values will result in less BPM changes
 timer_cfg_scale: 1.0     # Scale of classifier-free guidance for timer
 timer_iterations: 20     # Number of iterations for timer
