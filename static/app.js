@@ -53,6 +53,10 @@ $(document).ready(function() {
             "v31": {
                 descriptorSet: 'omdb',
             },
+            "v32-mini": {
+                supportedInContextOptions: ['TIMING'],
+                descriptorSet: 'user_tags',
+            },
             "v32": {
                 supportedInContextOptions: ['TIMING'],
                 descriptorSet: 'user_tags',

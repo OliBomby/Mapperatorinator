@@ -107,6 +107,7 @@
         "v29": "Mapperatorinator V29（支持游戏模式和描述符）",
         "v30": "Mapperatorinator V30（先最佳模型）",
         "v31": "Mapperatorinator V31（比 V29 略准确）",
+        "v32-mini": "Mapperatorinator V32-mini",
         "v32": "Mapperatorinator V32（最佳模型）"
     },
     "gamemodes": {
