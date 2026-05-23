@@ -23,3 +23,4 @@ rosu-pp-py==3.1.0
 datasets==4.8.3
 torchcodec==0.10.0
 huggingface-hub==0.36.2
+hf-xet==1.4.2
