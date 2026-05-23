@@ -332,6 +332,19 @@ def _coerce_bool_checkbox(form, key: str) -> bool:
     return key in form
 
 
+def _validate_year_for_model(model_name: str | None, year: int | None) -> None:
+    if year is None:
+        return
+
+    min_year = 2007
+    max_year = 2024 if model_name == 'v32' else 2023
+
+    if year < min_year or year > max_year:
+        raise ValueError(
+            f"Year must be between {min_year} and {max_year} for model '{model_name or 'unknown'}'."
+        )
+
+
 class _QueueWriter(io.TextIOBase):
     def __init__(self, q: mp.Queue):
         self._q = q
@@ -449,6 +462,10 @@ def start_inference():
     cfg.gamemode = _coerce_optional_int(request.form.get('gamemode')) or 0
     cfg.difficulty = _coerce_optional_float(request.form.get('difficulty'))
     cfg.year = _coerce_optional_int(request.form.get('year'))
+    try:
+        _validate_year_for_model(config_name, cfg.year)
+    except ValueError as ve:
+        return jsonify({"status": "error", "message": str(ve)}), 400
 
     # Numeric settings
     cfg.hp_drain_rate = _coerce_optional_float(request.form.get('hp_drain_rate'))

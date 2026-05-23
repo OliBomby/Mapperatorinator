@@ -53,7 +53,7 @@
     "cfg_scale": "Control me...",
     "temperature": "Is it hot in here?",
     "top_p": "Only the best for me!",
-    "year": "When was it??",
+    "year": "When was it?? ({min}-{max})",
     "start_time": "It's starting!!",
     "end_time": "It's ending... nooo!!"
   },
@@ -85,7 +85,7 @@
     "seed": "A random number so everything is different",
     "mapper_id": "The mapper's ID so I can copy them",
     "cfg_scale": "How much I should listen to you",
-    "year": "What year was it? (2007-2023)",
+    "year": "What year was it? ({min}-{max})",
     "start_time": "When we start (ms)",
     "end_time": "When it all ends (ms)",
     "in_context_options": "Extra stuff for the model to think about",

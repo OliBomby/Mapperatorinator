@@ -53,7 +53,7 @@
         "cfg_scale": "CFG Scale",
         "temperature": "Temperature",
         "top_p": "Top-p",
-        "year": "Year (2007-2023)",
+        "year": "Year ({min}-{max})",
         "start_time": "Start Time (ms)",
         "end_time": "End Time (ms)"
     },
@@ -85,7 +85,7 @@
         "seed": "Random seed for generation",
         "mapper_id": "Mapper user ID for style",
         "cfg_scale": "Scale of the classifier-free guidance",
-        "year": "Year of the song (2007-2023)",
+        "year": "Year of the song ({min}-{max})",
         "start_time": "Generation start time in milliseconds",
         "end_time": "Generation end time in milliseconds",
         "in_context_options": "List of additional context to provide to the model",

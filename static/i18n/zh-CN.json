@@ -53,7 +53,7 @@
         "cfg_scale": "CFG 引导强度",
         "temperature": "温度",
         "top_p": "Top-p",
-        "year": "年份（2007-2023）",
+        "year": "年份（{min}-{max}）",
         "start_time": "开始时间（ms）",
         "end_time": "结束时间（ms）"
     },
@@ -85,7 +85,7 @@
         "seed": "生成时使用的随机种子",
         "mapper_id": "谱师用户 ID，用于风格参考",
         "cfg_scale": "无分类器引导的强度",
-        "year": "歌曲年份（2007-2023）",
+        "year": "歌曲年份（{min}-{max}）",
         "start_time": "生成开始时间（毫秒）",
         "end_time": "生成结束时间（毫秒）",
         "in_context_options": "提供给模型的额外上下文列表",

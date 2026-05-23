@@ -34,6 +34,10 @@ $(document).ready(function() {
         jobCounter: 0,
         lastStartedJobId: null,
         animationSpeed: 300,
+        yearRange: {
+            min: 2007,
+            defaultMax: 2023,
+        },
 
         modelCapabilities: {
             "v28": {
@@ -56,10 +60,12 @@ $(document).ready(function() {
             "v32-mini": {
                 supportedInContextOptions: ['TIMING'],
                 descriptorSet: 'user_tags',
+                maxYear: 2024,
             },
             "v32": {
                 supportedInContextOptions: ['TIMING'],
                 descriptorSet: 'user_tags',
+                maxYear: 2024,
             },
         }
     };
@@ -225,6 +231,44 @@ $(document).ready(function() {
             });
         },
 
+        getYearMaxForModel(model) {
+            const capabilities = AppState.modelCapabilities[model] || {};
+            return capabilities.maxYear || AppState.yearRange.defaultMax;
+        },
+
+        updateYearSettings() {
+            const selectedModel = $("#model").val();
+            const yearMin = AppState.yearRange.min;
+            const yearMax = this.getYearMaxForModel(selectedModel);
+            const $yearInput = $('#year');
+            const $yearLabel = $('label[for="year"]');
+            const translationParams = JSON.stringify({ min: yearMin, max: yearMax });
+
+            $yearInput.attr({
+                min: yearMin,
+                max: yearMax,
+            });
+            $yearLabel.attr('data-i18n-params', translationParams);
+            $yearLabel.attr('data-i18n-title-params', translationParams);
+
+            const currentValue = $yearInput.val().trim();
+            if (currentValue !== '') {
+                const numericValue = Number(currentValue);
+                if (!Number.isNaN(numericValue)) {
+                    if (numericValue > yearMax) {
+                        $yearInput.val(String(yearMax));
+                    } else if (numericValue < yearMin) {
+                        $yearInput.val(String(yearMin));
+                    }
+                }
+            }
+
+            const labelText = I18nUtils.t('labels.year', 'Year ({min}-{max})', { min: yearMin, max: yearMax });
+            const tooltipText = I18nUtils.t('tooltips.year', 'Year of the song ({min}-{max})', { min: yearMin, max: yearMax });
+            $yearLabel.text(`${labelText}:`);
+            $yearLabel.attr('title', tooltipText);
+        },
+
         updateModelSettings() {
             const selectedModel = $("#model").val();
             const capabilities = AppState.modelCapabilities[selectedModel] || {};
@@ -266,6 +310,7 @@ $(document).ready(function() {
                 $('#hitsounded').prop('checked', true);
             }
 
+            this.updateYearSettings();
             this.updateConditionalFields();
             DescriptorManager.renderCurrentDescriptors();
         }
@@ -1483,6 +1528,8 @@ $(document).ready(function() {
                 }
             });
         }
+
+        window.addEventListener('languageChanged', () => UIManager.updateYearSettings());
 
         // Check BF16 support on page load
         $.get("/check_bf16_support", function(data) {

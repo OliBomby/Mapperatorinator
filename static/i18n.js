@@ -147,6 +147,20 @@ const I18n = (function() {
         return current;
     }
 
+    function getElementTranslationParams(element, attributeName) {
+        const rawParams = element.getAttribute(attributeName);
+        if (!rawParams) {
+            return undefined;
+        }
+
+        try {
+            return JSON.parse(rawParams);
+        } catch (error) {
+            console.warn(`[i18n] Invalid translation params on ${attributeName}:`, rawParams, error);
+            return undefined;
+        }
+    }
+
     function syncPageTitle(title) {
         if (!title) {
             return;
@@ -174,7 +188,8 @@ const I18n = (function() {
         // Update elements with data-i18n attribute
         document.querySelectorAll('[data-i18n]').forEach(element => {
             const key = element.getAttribute('data-i18n');
-            const translation = t(key);
+            const params = getElementTranslationParams(element, 'data-i18n-params');
+            const translation = t(key, params);
             if (translation !== key) {
                 // Check for suffix attribute (used for negative descriptors)
                 const suffix = element.getAttribute('data-i18n-suffix');
@@ -185,7 +200,9 @@ const I18n = (function() {
         // Update elements with data-i18n-title attribute (for tooltips)
         document.querySelectorAll('[data-i18n-title]').forEach(element => {
             const key = element.getAttribute('data-i18n-title');
-            const translation = t(key);
+            const params = getElementTranslationParams(element, 'data-i18n-title-params') ||
+                getElementTranslationParams(element, 'data-i18n-params');
+            const translation = t(key, params);
             if (translation !== key) {
                 element.setAttribute('title', translation);
             }
