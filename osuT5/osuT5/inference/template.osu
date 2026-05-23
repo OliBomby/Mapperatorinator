@@ -52,9 +52,11 @@ $timing_points
 
 [Colours]
 Combo0 : 255,192,0
-Combo1 : 0,202,0
-Combo2 : 18,124,255
-‏Combo3 : 242,24,57
+Combo1 : 255,192,0
+Combo2 : 0,202,0
+Combo3󠀝 : 255,74,102
+Combo4 : 242,24,57
+Combo5 : 18,124,255
 
 [HitObjects]
 $hit_objects
