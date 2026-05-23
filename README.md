@@ -37,7 +37,7 @@ Try the generative model [here](https://colab.research.google.com/github/OliBomb
 Mapperatorinator is multi-model framework that uses spectrogram inputs to generate fully featured osu! beatmaps for all gamemodes and [assist modding beatmaps](#maimod-the-ai-driven-modding-tool).
 The goal of this project is to automatically generate rankable quality osu! beatmaps from any song with a high degree of customizability.
 
-This project is built upon [osuT5](https://github.com/gyataro/osuT5) and [osu-diffusion](https://github.com/OliBomby/osu-diffusion). In developing this, I spent about 2500 hours of GPU compute across 142 runs on my 4060 Ti and rented 4090 instances on vast.ai.
+This project is built upon [osuT5](https://github.com/gyataro/osuT5) and [osu-diffusion](https://github.com/OliBomby/osu-diffusion). In developing this, I spent about 5700 hours of GPU compute across 261 runs on my 4060 Ti and rented 4090 instances on vast.ai.
 
 #### Use this tool responsibly. Always disclose the use of AI in your beatmaps.
 
@@ -69,7 +69,7 @@ source .venv/bin/activate
 
 ### 3. Install dependencies
 
-- Python 3.10
+- Python 3.10+
 - [Git](https://git-scm.com/downloads)
 - [ffmpeg](http://www.ffmpeg.org/)
 - [CUDA 13.0](https://developer.nvidia.com/cuda-zone) (For NVIDIA GPUs) or [ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html) (For AMD GPUs on linux)
@@ -110,7 +110,7 @@ The Web UI acts as a convenient wrapper around the `inference.py` script. For ad
 
 For users who prefer the command line or need access to advanced configurations, follow the steps below. **Note:** For a simpler graphical interface, please see the [Web UI (Recommended)](#web-ui-recommended) section above.
 
-Run `inference.py` and pass in some arguments to generate beatmaps. For this use [Hydra override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/). See `configs/inference_v29.yaml` for all available parameters.
+Run `inference.py` and pass in some arguments to generate beatmaps. For this use [Hydra override syntax](https://hydra.cc/docs/advanced/override_grammar/basic/). See `configs/inference/default.yaml` for all available parameters.
 ```
 python inference.py \
   audio_path           [Path to input audio] \
@@ -142,7 +142,7 @@ python inference.py \
 
 Example:
 ```
-python inference.py beatmap_path="'C:\Users\USER\AppData\Local\osu!\Songs\1 Kenji Ninuma - DISCO PRINCE\Kenji Ninuma - DISCOPRINCE (peppy) [Normal].osu'" gamemode=0 difficulty=5.5 year=2023 descriptors="['jump aim','clean']" in_context=[TIMING,KIAI]
+python inference.py beatmap_path="'C:\Users\USER\AppData\Local\osu!\Songs\1 Kenji Ninuma - DISCO PRINCE\Kenji Ninuma - DISCOPRINCE (peppy) [Normal].osu'" gamemode=0 difficulty=5.5 year=2023 descriptors="['skillset/jumps','style/clean']" in_context=[TIMING]
 ```
 
 ## Interactive CLI
@@ -171,17 +171,17 @@ You can then confirm to execute it directly or cancel and copy the command for m
 
 ## Generation Tips
 
-- You can edit `configs/inference_v29.yaml` and add your arguments there instead of typing them in the terminal every time.
+- You can edit `configs/inference/v32.yaml` and add your arguments there instead of typing them in the terminal every time.
 - All available descriptors can be found [here](https://osu.ppy.sh/wiki/en/Beatmap/Beatmap_tags).
-- Always provide a year argument between 2007 and 2023. If you leave it unknown, the model might generate with an inconsistent style.
+- Always provide a year argument between 2007 and 2024. If you leave it unknown, the model might generate with an inconsistent style.
 - Always provide a difficulty argument. If you leave it unknown, the model might generate with an inconsistent difficulty.
 - Increase the `cfg_scale` parameter to increase the effectiveness of the `mapper_id` and `descriptors` arguments.
 - You can use the `negative_descriptors` argument to guide the model away from certain styles. This only works when `cfg_scale > 1`. Make sure the number of negative descriptors is equal to the number of descriptors.
 - If your song style and desired beatmap style don't match well, the model might not follow your directions. For example, its hard to generate a high SR, high SV beatmap for a calm song. 
-- If you already have timing and kiai times done for a song, then you can give this to the model to greatly increase inference speed and accuracy: Use the `beatmap_path` and `in_context=[TIMING,KIAI]` arguments.
+- If you already have timing done for a song, then you can give this to the model to greatly increase inference speed and accuracy: Use the `beatmap_path` and `in_context=[TIMING]` arguments.
 - To remap just a part of your beatmap, use the `beatmap_path`, `start_time`, `end_time`, and `add_to_beatmap=true` arguments.
-- To generate a guest difficulty for a beatmap, use the `beatmap_path` and `in_context=[GD,TIMING,KIAI]` arguments.
-- To generate hitsounds for a beatmap, use the `beatmap_path` and `in_context=[NO_HS,TIMING,KIAI]` arguments.
+- To generate a guest difficulty for a beatmap, use the `beatmap_path` and `in_context=[GD,TIMING,KIAI]` arguments. Only for V31 model.
+- To generate hitsounds for a beatmap, use the `beatmap_path` and `in_context=[NO_HS,TIMING,KIAI]` arguments. Only for V31 model.
 - To generate only timing for a song, use the `super_timing=true` and `output_type=[TIMING]` arguments.
 
 ## MaiMod: The AI-driven Modding Tool
@@ -221,18 +221,20 @@ python mai_mod_ui.py
 ### Tokenization
 
 Mapperatorinator converts osu! beatmaps into an intermediate event representation that can be directly converted to and from tokens.
-It includes hit objects, hitsounds, slider velocities, new combos, timing points, kiai times, and taiko/mania scroll speeds.
+It includes hit objects, hitsounds, slider velocities, new combos, timing points, and taiko/mania scroll speeds.
 
 Here is a small examle of the tokenization process:
 
 ![mapperatorinator_parser](https://github.com/user-attachments/assets/84efde76-4c27-48a1-b8ce-beceddd9e695)
 
 To save on vocabulary size, time events are quantized to 10ms intervals and position coordinates are quantized to 32 pixel grid points.
+V32 adds onto this a position refinement token which allows it to generate coordinates with a 2 pixel precision.
 
 ### Model architecture
-The model is basically a wrapper around the [HF Transformers Whisper](https://huggingface.co/docs/transformers/en/model_doc/whisper#transformers.WhisperForConditionalGeneration) model, with custom input embeddings and loss function.
+The model is a modified version of [HF Transformers Whisper](https://huggingface.co/docs/transformers/en/model_doc/whisper#transformers.WhisperForConditionalGeneration) model, with custom input embeddings and loss function.
+We've added RoPE positional embeddings and optimized it for training on variable length data using Flash Attention's variable length attention methods.
 Model size amounts to 219M parameters.
-This model was found to be faster and more accurate than T5 for this task.
+This model was found to be 2x faster and use 2x less memory than the original Whisper model.
 
 The high-level overview of the model's input-output is as follows:
 
@@ -244,13 +246,13 @@ The model uses Mel spectrogram frames as encoder input, with one frame per input
 
 ![Multitask training format](https://github.com/user-attachments/assets/62f490bc-a567-4671-a7ce-dbcc5f9cd6d9)
 
-Before the SOS token are additional tokens that facilitate conditional generation. These tokens include the gamemode, difficulty, mapper ID, year, and other metadata.
+Before the SOS token are additional tokens that facilitate conditional generation. These tokens include the gamemode, difficulty, mapper ID, year, circle size, SV, descriptors, and other metadata.
 During training, these tokens do not have accompanying labels, so they are never output by the model. 
 Also during training there is a random chance that a metadata token gets replaced by an 'unknown' token, so during inference we can use these 'unknown' tokens to reduce the amount of metadata we have to give to the model.
 
 ### Seamless long generation
 
-The context length of the model is 8.192 seconds long. This is obviously not enough to generate a full beatmap, so we have to split the song into multiple windows and generate the beatmap in small parts.
+The context length of the model is 16.4 seconds long. This is obviously not enough to generate a full beatmap, so we have to split the song into multiple windows and generate the beatmap in small parts.
 To make sure that the generated beatmap does not have noticeable seams in between windows, we use a 90% overlap and generate the windows sequentially.
 Each generation window except the first starts with the decoder pre-filled up to 50% of the generation window with tokens from the previous windows.
 We use a logit processor to make sure that the model can't generate time tokens that are in the first 50% of the generation window.
@@ -260,7 +262,7 @@ This ensures that each generated token is conditioned on at least 4 seconds of p
 To prevent offset drifting during long generation, random offsets have been added to time events in the decoder during training.
 This forces it to correct timing errors by listening to the onsets in the audio instead, and results in a consistently accurate offset.
 
-### Refined coordinates with diffusion
+### Refined coordinates with diffusion (V29)
 
 Position coordinates generated by the decoder are quantized to 32 pixel grid points, so afterward we use diffusion to denoise the coordinates to the final positions.
 For this we trained a modified version of [osu-diffusion](https://github.com/OliBomby/osu-diffusion) that is specialized to only the last 10% of the noise schedule, and accepts the more advanced metadata tokens that Mapperatorinator uses for conditional generation.
@@ -274,9 +276,7 @@ This means that the diffusion process does not have direct control over the slid
 
 Mapperatorinator does some extra post-processing to improve the quality of the generated beatmap:
 
-- Refine position coordinates with diffusion.
 - Resnap time events to the nearest tick using the snap divisors generated by the model.
-- Snap near-perfect positional overlaps.
 - Convert mania column events to X coordinates.
 - Generate slider paths for taiko drumrolls.
 - Fix big discrepancies in required slider length and control point path length.
@@ -297,62 +297,74 @@ git clone https://github.com/OliBomby/Mapperatorinator.git
 cd Mapperatorinator
 ```
 
-### 2. Create dataset
+### 2. (Optional) Create your own dataset
 
 Create your own dataset using the [Mapperator console app](https://github.com/mappingtools/Mapperator/blob/master/README.md#create-a-high-quality-dataset). It requires an [osu! OAuth client token](https://osu.ppy.sh/home/account/edit) to verify beatmaps and get additional metadata. Place the dataset in a `datasets` directory next to the `Mapperatorinator` directory.
+
+Note that this creates a dataset of type `mmrs`, so you'll have to set the `dataset_type` argument to `mmrs` in the training config.
+Also update the data start and end indices for train/test split according to the number of mapsets of your dataset.
+The dataset path should point to the root folder of your dataset. The path is local to the docker container, so if you placed your dataset called `cool_dataset` into the `datasets` directory, then it should be `/workspace/datasets/cool_dataset`.
 
 ```sh
 Mapperator.ConsoleApp.exe dataset2 -t "/Mapperatorinator/datasets/beatmap_descriptors.csv" -i "path/to/osz/files" -o "/datasets/cool_dataset"
 ```
 
+If you skip this step, the Mapperatorinator training script by default downloads [a dataset from Hugging Face](https://huggingface.co/datasets/project-riz/osu-beatmaps) which contains all ranked maps.
+Depending on your needs, it's enough to filter this dataset instead of creating your own. For example, if you only want to train on Taiko maps, you can filter the dataset with `gamemode=[1]`.
+
 ### 3. (Optional) Set-up Weight & Biases for logging
 Create an account on [Weight & Biases](https://wandb.ai/site) and get your API key from your account settings.
-Then set the `WANDB_API_KEY` environment variable, so the training process knows to log to this key.
+Then set the `WANDB_API_KEY` environment variable, so the training process knows to log to this key. Or use `wandb login` command to log in through the terminal.
 
 ```sh
 export WANDB_API_KEY=<your_api_key>
 ```
 
 ### 4. Create docker container
-Training in your venv is also possible, but we recommend using Docker on WSL for better performance.
+
+Training in your venv is also possible, but we recommend using Docker on WSL for better performance. This automatically builds the correct version of Flash Attention, and ensures that all dependencies are correctly installed.
+
 ```sh
 docker compose up -d --force-recreate
 docker attach mapperatorinator_space
 cd Mapperatorinator
 ```
 
+If building Flash Attention takes too long, you can also use [the pre-built image from Docker Hub](https://hub.docker.com/repository/docker/olibomby/mapperatorinator/general).
+
 ### 5. Configure parameters and begin training
 
-All configurations are located in `./configs/train/default.yaml`. 
-Make sure to set the correct `train_dataset_path` and `test_dataset_path` to your dataset, as well as the start and end mapset indices for train/test split.
-The path is local to the docker container, so if you placed your dataset called `cool_dataset` into the `datasets` directory, then it should be `/workspace/datasets/cool_dataset`.
+All training configurations are located in `./configs/train/default.yaml` and `./configs/train/v32.yaml`.
 
-I recommend making a custom config file that overrides the default config, so you have a record of your training config for reproducibility.
+I recommend making a copy of `v32.yaml` and override the configuration values there, so you have a record of your training config for reproducibility.
 
 ```yaml
 data:
+  dataset_type: "mmrs"
   train_dataset_path: "/workspace/datasets/cool_dataset"
   test_dataset_path: "/workspace/datasets/cool_dataset"
   train_dataset_start: 0
   train_dataset_end: 90
   test_dataset_start: 90
   test_dataset_end: 100
+  gamemodes: [0, 1, 2, 3]
+  ranked_statuses: [1, 2]
 ```
 
 Begin training by calling `python osuT5/train.py` or `torchrun --nproc_per_node=NUM_GPUS osuT5/train.py` for multi-GPU training.
-
+You can also use `multi_train.sh` to automatically train a base model and several fine-tunes for different gamemodes.
 
 ```sh
-python osuT5/train.py -cn train_v29 train_dataset_path="/workspace/datasets/cool_dataset" test_dataset_path="/workspace/datasets/cool_dataset" train_dataset_end=90 test_dataset_start=90 test_dataset_end=100
+python osuT5/train.py -cn your-new-training-config
 ```
 
 ### 6. LoRA fine-tuning
 
 You can also fine-tune a pre-trained model with [LoRA](https://arxiv.org/abs/2106.09685) to adapt it to a specific style or gamemode.
-To do this, adapt `configs/train/lora.yaml` to your needs and run the `lora` training config:
+To do this, adapt `configs/train/lora_v32.yaml` to your needs and run the `lora_v32` training config:
 
 ```sh
-python osuT5/train.py -cn lora train_dataset_path="/workspace/datasets/cool_dataset" test_dataset_path="/workspace/datasets/cool_dataset" train_dataset_end=90 test_dataset_start=90 test_dataset_end=100
+python osuT5/train.py -cn lora_v32 train_dataset_path="/workspace/datasets/cool_dataset" test_dataset_path="/workspace/datasets/cool_dataset" train_dataset_end=90 test_dataset_start=90 test_dataset_end=100
 ```
 
 Important LoRA parameters to consider:
