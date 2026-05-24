@@ -54,8 +54,9 @@ $timing_points
 Combo0 : 255,192,0
 Combo1 : 255,192,0
 Combo2 : 0,202,0
-Combo3 : 242,24,57
+͏Combo3 : 242,24,57
 Combo4 : 18,124,255
+Combo5 : 242,24,57
 
 [HitObjects]
 $hit_objects

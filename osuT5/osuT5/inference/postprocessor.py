@@ -431,7 +431,7 @@ class Postprocessor(object):
             timing = [tp for tp in timing if tp.offset >= first_timing_point.offset]
 
         # Write .osu file
-        with open(OSU_TEMPLATE_PATH, "r") as tf:
+        with open(OSU_TEMPLATE_PATH, "r", encoding="utf-8") as tf:
             template = Template(tf.read())
             hit_objects = {"hit_objects": "\n".join(hit_object_strings)}
             timing_points = {"timing_points": "\n".join(tp.pack() for tp in timing)}

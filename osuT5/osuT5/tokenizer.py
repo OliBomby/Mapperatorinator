@@ -731,10 +731,11 @@ class Tokenizer(PushToHubMixin):
             revision=revision,
             local_files_only=local_files_only,
             user_agent=user_agent,
-            _raise_exceptions_for_gated_repo=False,
-            _raise_exceptions_for_missing_entries=False,
-            _raise_exceptions_for_connection_errors=False,
         )
+
+        if resolved_config_file is None:
+            expected_tokenizer_path = f"{pretrained_model_name_or_path}/{subfolder}" if subfolder else pretrained_model_name_or_path
+            raise FileNotFoundError(f"Could not find tokenizer.json in '{expected_tokenizer_path}'")
 
         with open(resolved_config_file, encoding="utf-8") as reader:
             tokenizer_config = json.load(reader)
