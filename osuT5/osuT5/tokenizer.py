@@ -736,6 +736,13 @@ class Tokenizer(PushToHubMixin):
             _raise_exceptions_for_connection_errors=False,
         )
 
+        if resolved_config_file is None:
+            raise FileNotFoundError(
+                f"Could not find tokenizer.json in '{pretrained_model_name_or_path}'"
+                + (f" (subfolder: '{subfolder}')" if subfolder else "")
+                + ". Make sure the model path is correct and the tokenizer file exists."
+            )
+
         with open(resolved_config_file, encoding="utf-8") as reader:
             tokenizer_config = json.load(reader)
             tokenizer = cls()
