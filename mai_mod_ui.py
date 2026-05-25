@@ -1,4 +1,4 @@
-import excepthook  # noqa
+import utils.excepthook  # noqa
 import functools
 import hmac
 import os

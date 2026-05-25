@@ -1,7 +1,7 @@
 import logging
 import sys
 
-import excepthook  # noqa
+import utils.excepthook  # noqa
 import os.path
 import uuid
 from functools import reduce
@@ -18,7 +18,7 @@ from importlib import metadata
 from packaging.version import Version
 
 import osu_diffusion
-import routed_pickle
+from utils import routed_pickle
 from config import InferenceConfig
 from diffusion_pipeline import DiffisionPipeline
 from osuT5.osuT5.config import TrainConfig

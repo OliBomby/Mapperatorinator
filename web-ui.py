@@ -6,7 +6,7 @@ import json
 from hydra import initialize_config_dir, compose
 from omegaconf import OmegaConf
 
-import excepthook  # noqa
+import utils.excepthook  # noqa
 import functools
 import os
 import platform
@@ -29,7 +29,7 @@ import webview
 import werkzeug.serving
 from flask import Flask, render_template, request, Response, jsonify
 
-import routed_pickle
+from utils import routed_pickle
 from config import InferenceConfig
 from osuT5.osuT5.event import ContextType
 from osuT5.osuT5.inference.server import InferenceClient
