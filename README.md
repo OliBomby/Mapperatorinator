@@ -69,7 +69,7 @@ source .venv/bin/activate
 
 ### 3. Install dependencies
 
-- Python 3.10+
+- Python 3.10
 - [Git](https://git-scm.com/downloads)
 - [ffmpeg](http://www.ffmpeg.org/)
 - [CUDA 13.0](https://developer.nvidia.com/cuda-zone) (For NVIDIA GPUs) or [ROCm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html) (For AMD GPUs on linux)
