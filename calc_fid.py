@@ -9,6 +9,7 @@ from typing import Optional
 import hydra
 import numpy as np
 import torch
+import torch.nn.functional as F
 from omegaconf import OmegaConf
 from scipy import linalg
 from slider import Beatmap, Circle, Slider, Spinner, HoldNote
@@ -32,6 +33,8 @@ import multiprocessing
 from logging.handlers import QueueHandler, QueueListener
 
 logger = logging.getLogger(__name__)
+
+CM3P_SSM_SIMILARITY = "cosine"
 
 
 # --- Extra metrics helpers (Drain/BPM/SR) ---
@@ -151,6 +154,80 @@ def _sr_stars(beatmap_path: Path) -> Optional[float]:
     rosu_diff = rosu.Difficulty()
     attrs = rosu_diff.calculate(rosu_map)
     return attrs.stars
+
+
+def _compute_self_similarity(features: np.ndarray, similarity: str = CM3P_SSM_SIMILARITY) -> np.ndarray:
+    if features.ndim != 2:
+        raise ValueError(f"Expected 2D CM3P features, got shape {features.shape}")
+
+    if similarity == "dot":
+        return features @ features.T
+
+    norms = np.linalg.norm(features, axis=1, keepdims=True)
+    norms = np.clip(norms, a_min=1e-12, a_max=None)
+    normalized = features / norms
+    return normalized @ normalized.T
+
+
+def _normalize_similarity_matrix_for_display(
+        matrix: np.ndarray,
+        similarity: str = CM3P_SSM_SIMILARITY,
+        min_value: float | None = None,
+        max_value: float | None = None,
+) -> np.ndarray:
+    if similarity == "cosine":
+        return np.clip((matrix + 1.0) / 2.0, 0.0, 1.0).astype(np.float32, copy=False)
+
+    if min_value is None:
+        min_value = float(np.min(matrix))
+    if max_value is None:
+        max_value = float(np.max(matrix))
+
+    if max_value - min_value < 1e-12:
+        return np.zeros_like(matrix, dtype=np.float32)
+
+    return np.clip((matrix - min_value) / (max_value - min_value), 0.0, 1.0).astype(np.float32)
+
+
+def _resize_similarity_matrix(matrix: np.ndarray, target_size: int) -> np.ndarray:
+    if matrix.shape == (target_size, target_size):
+        return matrix.astype(np.float32, copy=False)
+
+    matrix_tensor = torch.from_numpy(matrix.astype(np.float32, copy=False)).unsqueeze(0).unsqueeze(0)
+    resized = F.interpolate(matrix_tensor, size=(target_size, target_size), mode="bilinear", align_corners=False)
+    return resized.squeeze(0).squeeze(0).numpy()
+
+
+def _ssm_rmse_for_pair(
+        real_features: Optional[np.ndarray],
+        generated_features: Optional[np.ndarray],
+        similarity: str = CM3P_SSM_SIMILARITY,
+) -> Optional[float]:
+    if real_features is None or generated_features is None:
+        return None
+
+    if real_features.size == 0 or generated_features.size == 0:
+        return None
+
+    matrix_real = _compute_self_similarity(real_features, similarity)
+    matrix_generated = _compute_self_similarity(generated_features, similarity)
+
+    if similarity == "dot":
+        shared_min = float(min(np.min(matrix_real), np.min(matrix_generated)))
+        shared_max = float(max(np.max(matrix_real), np.max(matrix_generated)))
+        display_real = _normalize_similarity_matrix_for_display(matrix_real, similarity, shared_min, shared_max)
+        display_generated = _normalize_similarity_matrix_for_display(
+            matrix_generated, similarity, shared_min, shared_max,
+        )
+    else:
+        display_real = _normalize_similarity_matrix_for_display(matrix_real, similarity)
+        display_generated = _normalize_similarity_matrix_for_display(matrix_generated, similarity)
+
+    target_size = max(display_real.shape[0], display_generated.shape[0])
+    resized_real = _resize_similarity_matrix(display_real, target_size)
+    resized_generated = _resize_similarity_matrix(display_generated, target_size)
+
+    return float(np.sqrt(np.mean((resized_real - resized_generated) ** 2)))
 
 
 def _configure_generation_log_parent(log_file: Path) -> tuple[QueueListener, multiprocessing.Queue]:
@@ -533,6 +610,9 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
     sr_se_sum = 0.0
     sr_n = 0
 
+    ssm_rmse_se_sum = 0.0
+    ssm_rmse_n = 0
+
     for beatmap_path in tqdm(beatmap_paths, desc=f"Metrics"):
         try:
             beatmap = Beatmap.from_path(beatmap_path)
@@ -573,13 +653,26 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
                     # Turn dict of tensors into list of dicts of tensors for DataLoader
                     beatmap_data = [{key: beatmap_data[key][i] for key in beatmap_data} for i in
                                     range(len(beatmap_data['input_ids']))]
+                    beatmap_features = []
                     for example in DataLoader(beatmap_data, batch_size=args.cm3p_batch_size):
                         outputs = cm3p_model(**example, return_loss=False)
                         beatmap_embeds = outputs.beatmap_embeds
-                        feature_list.append(beatmap_embeds.float().cpu().numpy())
+                        batch_features = beatmap_embeds.float().cpu().numpy()
+                        feature_list.append(batch_features)
+                        beatmap_features.append(batch_features)
 
-                process(beatmap, real_features_cm3p)
-                process(generated_beatmap, generated_features_cm3p)
+                    if not beatmap_features:
+                        return None
+                    return np.concatenate(beatmap_features, axis=0)
+
+                real_cm3p_features = process(beatmap, real_features_cm3p)
+                generated_cm3p_features = process(generated_beatmap, generated_features_cm3p)
+
+                if args.extra_stats:
+                    ssm_rmse = _ssm_rmse_for_pair(real_cm3p_features, generated_cm3p_features)
+                    if ssm_rmse is not None:
+                        ssm_rmse_se_sum += ssm_rmse * ssm_rmse
+                        ssm_rmse_n += 1
 
             if args.rhythm_stats:
                 # Calculate rhythm stats
@@ -657,6 +750,9 @@ def calculate_metrics(args: FidConfig, beatmap_paths: list[Path]):
 
         if sr_n > 0:
             logger.info(f"SR RMSE: {np.sqrt(sr_se_sum / sr_n)}")
+
+        if ssm_rmse_n > 0:
+            logger.info(f"SSM RMSE: {np.sqrt(ssm_rmse_se_sum / ssm_rmse_n)}")
 
 
 def test_training_set_overlap(beatmap_paths: list[Path], training_set_ids_path: Optional[str]):
