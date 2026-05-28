@@ -32,14 +32,17 @@
 
 # Mapperatorinator
 
-Try the generative model [here](https://colab.research.google.com/github/OliBomby/Mapperatorinator/blob/main/colab/mapperatorinator_inference.ipynb), or MaiMod [here](https://colab.research.google.com/github/OliBomby/Mapperatorinator/blob/main/colab/mai_mod_inference.ipynb). Check out a video showcase [here](https://youtu.be/FEr7t1L2EoA).
+Try the generative model [here](https://colab.research.google.com/github/OliBomby/Mapperatorinator/blob/main/colab/mapperatorinator_inference.ipynb), or MaiMod [here](https://colab.research.google.com/github/OliBomby/Mapperatorinator/blob/main/colab/mai_mod_inference.ipynb). Check out a video showcase [here](https://youtu.be/FEr7t1L2EoA). 
+Community Discord server [here](https://discord.gg/5uTwbXuACK).
+
+---
 
 Mapperatorinator is multi-model framework that uses spectrogram inputs to generate fully featured osu! beatmaps for all gamemodes and [assist modding beatmaps](#maimod-the-ai-driven-modding-tool).
 The goal of this project is to automatically generate rankable quality osu! beatmaps from any song with a high degree of customizability.
 
 This project is built upon [osuT5](https://github.com/gyataro/osuT5) and [osu-diffusion](https://github.com/OliBomby/osu-diffusion). In developing this, I spent about 5700 hours of GPU compute across 261 runs on my 4060 Ti and rented 4090 instances on vast.ai.
 
-#### Use this tool responsibly. Always disclose the use of AI in your beatmaps.
+### Use this tool responsibly. Always disclose the use of AI in your beatmaps.
 
 ## Installation
 
