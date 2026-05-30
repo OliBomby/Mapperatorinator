@@ -592,7 +592,7 @@ def get_dataloaders(tokenizer: Tokenizer, args: TrainConfig, shared: Namespace) 
             worker_init_fn=worker_init_fn if args.data.dataset_type in ["ors", "mmrs"] else None,
         )
 
-        if args.dataloader.balancer_buffer_size > 0:
+        if args.dataloader.balancer_buffer_size > 0 and num_workers > 0:
             # Empty the whole balancer buffer into the prefetch buffer, so it starts filling the balancer buffer immediately while training
             dataloader_kwargs["prefetch_factor"] = int(args.dataloader.balancer_buffer_size / batch_size * args.dataloader.balancer_prefetch_factor)
             dataloader_kwargs["batch_size"] = None
