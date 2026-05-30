@@ -6,22 +6,26 @@ compile: true          # PyTorch 2.0 optimization
 mixed_precision: 'bf16'         # Enable mixed precision (no/fp16/bf16)
 enable_lora: true              # Use LoRA for finetuning
 
-pretrained_path: "/workspace/Mapperatorinator/test/v32/RC2/gamemode=0"     # Path to pretrained model weights
+pretrained_path: "OliBomby/Mapperatorinator-v32"     # Path to pretrained model weights
+pretrained_gamemode: 0  # Only load weights for the specified gamemode from a multi-gamemode checkpoint
 
 data:                  # Data settings
   dataset_type: "mmrs"
-  train_dataset_path: "/workspace/datasets/Kroytz"
-  test_dataset_path: "/workspace/datasets/Kroytz"
+  train_dataset_path: "/workspace/datasets/Voxell"
+  test_dataset_path: "/workspace/datasets/Voxell"
   train_dataset_start: 0
-  train_dataset_end: 46
+  train_dataset_end: 10
   test_dataset_start: 0
   test_dataset_end: 0
   gamemodes: [0]
   ranked_statuses: [-2, -1, 0, 1, 2, 3, 4]  # List of ranked statuses to include in the dataset (-2 = graveyard, -1 = wip, 0 = pending, 1 = ranked, 2 = approved, 3 = qualified, 4 = loved)
+  min_year: null  # Must be null if you want to include unranked maps
+  max_year: null
 
 dataloader:             # Dataloader settings
-  num_workers: 8
+  num_workers: 1
   drop_last: false
+  balancer_buffer_size: 0
 
 optim:                  # Optimizer settings
   name: muon

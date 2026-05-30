@@ -11,6 +11,7 @@ seed: 42                # Project seed
 checkpoint_path: ''     # Project checkpoint directory (to resume training)
 pretrained_path: ''     # Path to pretrained model weights (to do transfer learning)
 pretrained_t5_compat: false  # Load weights from a T5 model with different vocab size
+pretrained_gamemode: null  # Only load weights for the specified gamemode from a multi-gamemode checkpoint
 enable_lora: false              # Use LoRA for finetuning
 mode: 'train'
 
