@@ -631,6 +631,22 @@ class TokenBalancedBatcher(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.buffer_size = buffer_size
 
+    @property
+    def start(self):
+        return self.source_dataset.start
+
+    @property
+    def end(self):
+        return self.source_dataset.end
+
+    @start.setter
+    def start(self, value):
+        self.source_dataset.start = value
+
+    @end.setter
+    def end(self, value):
+        self.source_dataset.end = value
+
     def __iter__(self):
         buffer = []
 
