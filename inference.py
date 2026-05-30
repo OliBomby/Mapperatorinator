@@ -1,4 +1,5 @@
 import logging
+import multiprocessing
 import sys
 
 import utils.excepthook  # noqa
@@ -67,6 +68,7 @@ def assert_package_versions():
 
 def setup_inference_environment(seed: int):
     assert_package_versions()
+    multiprocessing.set_start_method('spawn', force=True)
     torch.set_grad_enabled(False)
     torch.set_float32_matmul_precision('high')
     set_seed(seed)

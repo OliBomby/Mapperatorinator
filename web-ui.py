@@ -1,3 +1,4 @@
+import multiprocessing
 import traceback
 from dataclasses import asdict
 from pathlib import Path
@@ -882,6 +883,9 @@ def launch_webview_window(window_title, flask_url, window_width, window_height, 
 
 # --- Main Execution ---
 if __name__ == '__main__':
+    # Use spawn instead of fork to avoid issues with CUDA on Linux
+    multiprocessing.set_start_method('spawn', force=True)
+
     # Find an available port for Flask
     flask_port = find_available_port()
 
