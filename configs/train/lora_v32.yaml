@@ -16,6 +16,7 @@ data:                  # Data settings
   train_dataset_end: 46
   test_dataset_start: 0
   test_dataset_end: 0
+  gamemodes: [0]
   ranked_statuses: [-2, -1, 0, 1, 2, 3, 4]  # List of ranked statuses to include in the dataset (-2 = graveyard, -1 = wip, 0 = pending, 1 = ranked, 2 = approved, 3 = qualified, 4 = loved)
 
 dataloader:             # Dataloader settings
@@ -42,4 +43,7 @@ lora:
   lora_dropout: 0.05
   bias: "none"
   init_lora_weights: "pissa"
+
+lora_metadata:
+  ckpt_subfolders: ["gamemode=0"]  # Only apply this LoRA when inference loads the gamemode=0 checkpoint subfolder.
 

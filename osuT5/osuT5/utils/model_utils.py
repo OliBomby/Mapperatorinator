@@ -1,4 +1,6 @@
+import json
 import multiprocessing
+import re
 import time
 from multiprocessing.managers import Namespace
 from pathlib import Path
@@ -21,6 +23,10 @@ from ..model.configuration_mapperatorinator import MapperatorinatorConfig
 from ..model.modeling_mapperatorinator import Mapperatorinator
 from ..tokenizer import Tokenizer
 from ..config import TrainConfig
+
+
+LORA_METADATA_FILENAME = "mapperatorinator_lora_metadata.json"
+_GAMEMODE_SUBFOLDER_PATTERN = re.compile(r"^gamemode=(\d+)$")
 
 
 def get_shared_training_state() -> Namespace:
@@ -133,6 +139,125 @@ def _is_local_custom_checkpoint(ckpt_path: str | Path | None) -> bool:
     return isinstance(ckpt_path, Path) and (ckpt_path / "pytorch_model.bin").exists() and (ckpt_path / "custom_checkpoint_0.pkl").exists()
 
 
+def _normalize_ckpt_subfolder(ckpt_subfolder: str | None) -> str:
+    if not ckpt_subfolder:
+        return ""
+    return ckpt_subfolder.strip().replace("\\", "/").strip("/")
+
+
+def _normalize_ckpt_subfolders(ckpt_subfolders: list[str] | None) -> list[str] | None:
+    if ckpt_subfolders is None:
+        return None
+    return sorted({_normalize_ckpt_subfolder(ckpt_subfolder) for ckpt_subfolder in ckpt_subfolders})
+
+
+def get_lora_checkpoint_metadata(args: TrainConfig) -> dict:
+    return {
+        "format_version": 1,
+        "ckpt_subfolders": _normalize_ckpt_subfolders(args.lora_metadata.ckpt_subfolders),
+    }
+
+
+def save_lora_checkpoint_metadata(output_dir: str | Path, args: TrainConfig) -> Path:
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    metadata_path = output_dir / LORA_METADATA_FILENAME
+    with metadata_path.open("w", encoding="utf-8") as f:
+        json.dump(get_lora_checkpoint_metadata(args), f, indent=2, sort_keys=True)
+        f.write("\n")
+    return metadata_path
+
+
+def load_lora_checkpoint_metadata(lora_path: str | Path | None) -> dict | None:
+    lora_path = _normalize_ckpt_path(lora_path)
+    if not lora_path:
+        return None
+
+    if isinstance(lora_path, Path):
+        metadata_path = lora_path / LORA_METADATA_FILENAME
+        if not metadata_path.is_file():
+            return None
+    else:
+        try:
+            metadata_path = cached_file(
+                lora_path,
+                LORA_METADATA_FILENAME,
+                _raise_exceptions_for_gated_repo=False,
+                _raise_exceptions_for_missing_entries=False,
+                _raise_exceptions_for_connection_errors=False,
+            )
+        except Exception:
+            metadata_path = None
+
+        if metadata_path is None:
+            return None
+
+    try:
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Warning: Failed to read LoRA metadata from {metadata_path}: {exc}")
+        return None
+
+    ckpt_subfolders = metadata.get("ckpt_subfolders")
+    if ckpt_subfolders is not None:
+        if not isinstance(ckpt_subfolders, list) or not all(isinstance(item, str) for item in ckpt_subfolders):
+            print(f"Warning: Invalid LoRA checkpoint subfolder metadata in {metadata_path}: {ckpt_subfolders}")
+            return None
+        metadata["ckpt_subfolders"] = _normalize_ckpt_subfolders(ckpt_subfolders)
+    else:
+        metadata["ckpt_subfolders"] = None
+
+    return metadata
+
+
+def get_model_checkpoint_subfolder(ckpt_path: str | Path | None, ckpt_subfolder: str | None = None) -> str:
+    if ckpt_subfolder:
+        return _normalize_ckpt_subfolder(ckpt_subfolder)
+
+    if isinstance(ckpt_path, Path):
+        if _GAMEMODE_SUBFOLDER_PATTERN.fullmatch(ckpt_path.name):
+            return ckpt_path.name
+        return ""
+
+    if isinstance(ckpt_path, str):
+        for part in ckpt_path.replace("\\", "/").split("/"):
+            if _GAMEMODE_SUBFOLDER_PATTERN.fullmatch(part):
+                return part
+
+    return ""
+
+
+def resolve_compatible_lora_path(
+        lora_path: str | Path | None,
+        *,
+        ckpt_subfolder: str | None = None,
+        verbose: bool = True,
+) -> tuple[str | Path | None, dict | None]:
+    lora_path = _normalize_ckpt_path(lora_path)
+    if not lora_path:
+        return None, None
+
+    metadata = load_lora_checkpoint_metadata(lora_path)
+    if metadata is None:
+        return lora_path, None
+
+    compatible_ckpt_subfolders = metadata.get("ckpt_subfolders")
+    ckpt_subfolder = _normalize_ckpt_subfolder(ckpt_subfolder)
+    if compatible_ckpt_subfolders is None:
+        return lora_path, metadata
+
+    if compatible_ckpt_subfolders is not None and ckpt_subfolder not in compatible_ckpt_subfolders:
+        if verbose:
+            print(
+                f"Skipping LoRA {lora_path}: it supports checkpoint subfolders "
+                f"{compatible_ckpt_subfolders}, not {repr(ckpt_subfolder)}."
+            )
+        return None, metadata
+
+    return lora_path, metadata
+
+
 def _format_model_source(ckpt_path: str | Path | None, subfolder: str | None = None) -> str:
     if not ckpt_path:
         return ""
@@ -222,6 +347,11 @@ def load_model_loaders(
     resolved_source = _format_model_source(ckpt_path, ckpt_subfolder)
     if requested_source and requested_source != resolved_source:
         print(f"Using gamemode-specific model checkpoint: {resolved_source}")
+
+    lora_path, _ = resolve_compatible_lora_path(
+        lora_path,
+        ckpt_subfolder=get_model_checkpoint_subfolder(ckpt_path, ckpt_subfolder),
+    )
 
     def tokenizer_loader():
         if not ckpt_path:

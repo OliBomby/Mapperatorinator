@@ -222,6 +222,11 @@ class ProfileConfig:
 
 
 @dataclass
+class LoraMetadataConfig:
+    ckpt_subfolders: Optional[list[str]] = None  # Compatible checkpoint subfolders, e.g. ["gamemode=0"] or ["", "gamemode=0"]. None means unrestricted.
+
+
+@dataclass
 class TrainConfig:
     compile: bool = True
     device: str = "gpu"
@@ -234,6 +239,7 @@ class TrainConfig:
     pretrained_t5_compat: bool = False
     enable_lora: bool = False
     lora: dict = field(default_factory=lambda: {})
+    lora_metadata: LoraMetadataConfig = field(default_factory=LoraMetadataConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     data: DataConfig = field(default_factory=DataConfig)
     dataloader: DataloaderConfig = field(default_factory=DataloaderConfig)

@@ -29,7 +29,7 @@ from osuT5.osuT5.inference.server import InferenceClient
 from osuT5.osuT5.inference.super_timing_generator import SuperTimingGenerator
 from osuT5.osuT5.model import Mapperatorinator
 from osuT5.osuT5.tokenizer import ContextType
-from osuT5.osuT5.utils import load_model_loaders, resolve_model_checkpoint_path
+from osuT5.osuT5.utils import load_model_loaders, resolve_compatible_lora_path, resolve_model_checkpoint_path, get_model_checkpoint_subfolder
 from osu_diffusion import DiT_models
 from osu_diffusion.config import DiffusionTrainConfig
 
@@ -568,6 +568,7 @@ def load_model_with_server(ckpt_path: str | Path | None, t5_args: TrainConfig, d
         max_batch_size=max_batch_size,
         socket_path=get_server_address(
             ckpt_path,
+            lora_path=lora_path,
             gamemode=gamemode,
             auto_select_gamemode_model=auto_select_gamemode_model,
         ),
@@ -576,6 +577,7 @@ def load_model_with_server(ckpt_path: str | Path | None, t5_args: TrainConfig, d
 
 def get_server_address(
         ckpt_path_str: str | Path | None,
+        lora_path: str | Path | None = None,
         gamemode: int | None = None,
         auto_select_gamemode_model: bool = True,
 ):
@@ -590,6 +592,15 @@ def get_server_address(
     ckpt_path_str = "" if not resolved_ckpt_path else (resolved_ckpt_path.as_posix() if isinstance(resolved_ckpt_path, Path) else str(resolved_ckpt_path))
     if subfolder:
         ckpt_path_str = f"{ckpt_path_str}/{subfolder}"
+    ckpt_subfolder = get_model_checkpoint_subfolder(resolved_ckpt_path, subfolder)
+    effective_lora_path, _ = resolve_compatible_lora_path(
+        lora_path,
+        ckpt_subfolder=ckpt_subfolder,
+        verbose=False,
+    )
+    if effective_lora_path:
+        effective_lora_str = effective_lora_path.as_posix() if isinstance(effective_lora_path, Path) else str(effective_lora_path)
+        ckpt_path_str = f"{ckpt_path_str}__lora__{effective_lora_str}"
     ckpt_path_str = ckpt_path_str.replace(" ", "_").replace("/", "_").replace("\\", "_").replace(".", "_")
     # Check if the OS supports Unix sockets
     if os.name == 'posix':

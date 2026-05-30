@@ -21,6 +21,7 @@ from ..dataset.ors_dataset import LABEL_IGNORE_ID
 from ..tokenizer import Tokenizer, EventType, ContextType
 from ..model import Mapperatorinator
 from .log_utils import Averager
+from .model_utils import save_lora_checkpoint_metadata
 from ..config import TrainConfig
 
 logger = get_logger(__name__)
@@ -107,7 +108,9 @@ def maybe_save_checkpoint(model, accelerator: Accelerator, args: TrainConfig, sh
 
         if args.enable_lora:
             unwrapped_model = accelerator.unwrap_model(model)
-            unwrapped_model.save_pretrained(output_dir / "lora")
+            lora_output_dir = output_dir / "lora"
+            unwrapped_model.save_pretrained(lora_output_dir)
+            save_lora_checkpoint_metadata(lora_output_dir, args)
 
         wandb_tracker = accelerator.get_tracker("wandb")
         if wandb_tracker is not None:

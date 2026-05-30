@@ -376,9 +376,11 @@ Important LoRA parameters to consider:
 - `lora_alpha`: Scaling factor for the LoRA updates.
 - `total_steps`: Total number of training steps. Balance this according to your dataset size.
 - `enable_lora`: Whether to use LoRA or full model fine-tuning.
+- `lora_metadata.ckpt_subfolders`: Which checkpoint subfolder(s) the LoRA can be applied to during inference, e.g. `["gamemode=0"]` or `["", "gamemode=0"]`. If omitted or left `null`, the LoRA is always allowed to load.
 
 During inference, you can specify the LoRA weights to use with the `lora_path` argument.
 This can be a local path or a Hugging Face repo.
+The training checkpoint writes a `mapperatorinator_lora_metadata.json` file into the LoRA folder, and inference reads it to skip incompatible LoRAs automatically when the current model checkpoint subfolder does not match.
 
 ## See also
 - [Mapper Classifier](./classifier/README.md)

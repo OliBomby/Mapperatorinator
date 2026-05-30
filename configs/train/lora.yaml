@@ -38,3 +38,6 @@ lora:
   bias: "none"
   init_lora_weights: "pissa"
 
+lora_metadata:
+  ckpt_subfolders: null  # Null means no checkpoint-subfolder restriction.
+
