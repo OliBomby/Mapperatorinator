@@ -310,6 +310,26 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
     def can_generate(self) -> bool:
         return True
 
+    def tie_weights(self):
+        self.transformer.tie_weights()
+
+    def get_input_embeddings(self):
+        if self.embed_decoder_input:
+            return self.decoder_embedder
+        return self.transformer.get_input_embeddings()
+
+    def set_input_embeddings(self, value):
+        if self.embed_decoder_input:
+            self.decoder_embedder = value
+            return
+        self.transformer.set_input_embeddings(value)
+
+    def get_output_embeddings(self):
+        return self.transformer.get_output_embeddings()
+
+    def set_output_embeddings(self, new_embeddings):
+        self.transformer.set_output_embeddings(new_embeddings)
+
     def get_encoder(self):
         return OsuTEncoder(
             self.transformer.get_encoder(),
