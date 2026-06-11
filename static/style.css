@@ -487,6 +487,24 @@ button[type="submit"]:hover {
     padding-bottom: 5px;
 }
 
+.progress-card-throughput {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 0.92em;
+    margin-bottom: 8px;
+}
+
+.progress-card-throughput-label {
+    font-weight: 600;
+}
+
+.progress-card-throughput-value {
+    color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+}
+
 .animated-header, .animated-footer {
     animation: headerFadeIn 1s ease-out;
 }

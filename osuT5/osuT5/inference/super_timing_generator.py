@@ -56,7 +56,8 @@ class SuperTimingGenerator:
             print("Generating timing")
 
         iterations = self.iterations
-        iterator = tqdm(list(range(iterations))) if verbose else range(iterations)
+        tokens_per_second_meter = self.processor._create_tokens_per_second_meter()
+        iterator = tqdm(list(range(iterations)), smoothing=0.1, dynamic_ncols=True) if verbose else range(iterations)
         for _ in iterator:
             audio_offset = np.random.randint(-(self.miliseconds_per_sequence // 2), self.miliseconds_per_sequence // 2)
             begin_pad = max(0, audio_offset * self.sample_rate // MILISECONDS_PER_SECOND)
@@ -69,6 +70,8 @@ class SuperTimingGenerator:
                 out_context=[ContextType.MAP] if self.args.train.data.add_timing else [ContextType.TIMING],
                 verbose=False,
             )[0]
+            if verbose:
+                self.processor._update_tokens_per_second_meter(iterator, tokens_per_second_meter, self.processor.last_generation_stats)
             groups, _ = get_groups(events, types_first=self.types_first)
             last_beat_time = None
             last_group_type = None

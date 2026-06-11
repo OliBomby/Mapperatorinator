@@ -951,6 +951,11 @@ $(document).ready(function() {
             job.elements.$warningLogLinkAnchor.text(I18nUtils.link('view_warning_log', 'View warning log'));
             job.elements.$beatmapLinkAnchor.text(I18nUtils.link('open_folder', 'Click here to open the folder containing your map.'));
             job.elements.$errorLogLinkAnchor.text(I18nUtils.link('open_log', 'See why... (opens error log)'));
+            job.elements.$throughputLabel.text(I18nUtils.progress('throughput', 'Throughput'));
+
+            if (job.latestTokensPerSecond !== null) {
+                job.elements.$throughputValue.text(`${job.latestTokensPerSecond} tok/s`);
+            }
 
             if (job.cancelState === 'cancelling') {
                 job.elements.$cancelButton.text(I18nUtils.button('cancelling', 'Cancelling...'));
@@ -965,6 +970,34 @@ $(document).ready(function() {
 
         refreshAllJobTranslations() {
             AppState.jobs.forEach((job) => this.refreshJobTranslations(job));
+        },
+
+        setJobThroughput(job, tokensPerSecondText) {
+            const normalizedText = (tokensPerSecondText || '').toString().trim();
+            if (!normalizedText) {
+                job.latestTokensPerSecond = null;
+                job.elements.$throughputValue.text('');
+                job.elements.$throughputContainer.hide();
+                return;
+            }
+
+            job.latestTokensPerSecond = normalizedText;
+            job.elements.$throughputValue.text(`${normalizedText} tok/s`);
+            job.elements.$throughputContainer.show();
+        },
+
+        extractTokensPerSecond(messageData) {
+            if (!messageData) {
+                return null;
+            }
+
+            const directMatch = messageData.match(/(\d+(?:\.\d+)?)\s+tok\/s\b/i);
+            if (directMatch) {
+                return directMatch[1];
+            }
+
+            const keyedMatch = messageData.match(/tok\/s\s*[=:]\s*(\d+(?:\.\d+)?)/i);
+            return keyedMatch ? keyedMatch[1] : null;
         },
 
         async handleSubmit(e) {
@@ -1034,6 +1067,10 @@ $(document).ready(function() {
                         <button type="button" class="progress-card-close" title="Remove">×</button>
                     </div>
                     <div class="progress-card-status">Starting...</div>
+                    <div class="progress-card-throughput" style="display:none;">
+                        <span class="progress-card-throughput-label">Throughput</span>
+                        <span class="progress-card-throughput-value"></span>
+                    </div>
                     <div class="warning-text" style="display:none; font-size: 12px; color: var(--accent-color); margin-top: 4px;">
                         Warning on this job (Will continue to generate)
                     </div>
@@ -1074,6 +1111,7 @@ $(document).ready(function() {
                 warningCaptureRemaining: 0,
                 warningSuppressed: false,
                 cancelState: 'idle',
+                latestTokensPerSecond: null,
                 evtSource: null,
                 isCancelled: false,
                 inferenceErrorOccurred: false,
@@ -1082,6 +1120,9 @@ $(document).ready(function() {
                 elements: {
                     $card,
                     $status: $card.find('.progress-card-status'),
+                    $throughputContainer: $card.find('.progress-card-throughput'),
+                    $throughputLabel: $card.find('.progress-card-throughput-label'),
+                    $throughputValue: $card.find('.progress-card-throughput-value'),
                     $warningText: $card.find('.warning-text'),
                     $initMessage: $card.find('.init-message'),
                     $progressBar: $card.find('.progressBar'),
@@ -1333,6 +1374,11 @@ $(document).ready(function() {
                     }
                 }
             });
+
+            const tokensPerSecond = this.extractTokensPerSecond(messageData);
+            if (tokensPerSecond !== null) {
+                this.setJobThroughput(job, tokensPerSecond);
+            }
 
             // Update progress bar
             const progressMatch = messageData.match(/^\s*(\d+)%\|/);
