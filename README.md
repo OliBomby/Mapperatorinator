@@ -370,6 +370,12 @@ To do this, adapt `configs/train/lora_v32.yaml` to your needs and run the `lora_
 python osuT5/train.py -cn lora_v32 train_dataset_path="/workspace/datasets/cool_dataset" test_dataset_path="/workspace/datasets/cool_dataset" train_dataset_end=90 test_dataset_start=90 test_dataset_end=100
 ```
 
+I recommend making a dataset with:
+- At least 10 beatmaps
+- All songs fully mapped, no unfinished sections
+- A consistent mapping style or theme across the whole dataset
+- Varied song genres and difficulty ratings
+
 Important LoRA parameters to consider:
 - `pretrained_path`: Path or HF repo of the base model to fine-tune.
 - `r`: Rank of the LoRA matrices. Higher values increase model capacity but also memory usage.
