@@ -11,7 +11,7 @@
  *   4. Use I18n.t('key.path') to get translated strings in JavaScript
  */
 
-const I18n = (function() {
+const I18n = (function () {
     'use strict';
 
     // Private variables
@@ -22,6 +22,7 @@ const I18n = (function() {
     const DEFAULT_LANGUAGE = 'en';
     const SUPPORTED_LANGUAGES = [
         { code: 'en', name: 'English' },
+        { code: 'ru', name: 'Русский' },
         { code: 'zh-CN', name: '简体中文' },
         { code: 'bpd_catgirl', name: 'BPD Catgirl' }
     ];
@@ -103,7 +104,7 @@ const I18n = (function() {
      */
     function t(keyPath, params) {
         let result = getNestedValue(translations, keyPath);
-        
+
         // Fallback to English if not found
         if (result === undefined) {
             result = getNestedValue(fallbackTranslations, keyPath);
@@ -133,17 +134,17 @@ const I18n = (function() {
      */
     function getNestedValue(obj, path) {
         if (!obj || !path) return undefined;
-        
+
         const keys = path.split('.');
         let current = obj;
-        
+
         for (const key of keys) {
             if (current === undefined || current === null) {
                 return undefined;
             }
             current = current[key];
         }
-        
+
         return current;
     }
 
@@ -242,14 +243,14 @@ const I18n = (function() {
             } else {
                 translations = await loadLanguageFile(lang);
             }
-            
+
             currentLanguage = lang;
             localStorage.setItem(STORAGE_KEY, lang);
             applyTranslations();
-            
+
             // Trigger custom event for components that need to update
             window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lang } }));
-            
+
             console.log(`[i18n] Language changed to: ${lang}`);
             return true;
         } catch (error) {
@@ -282,7 +283,7 @@ const I18n = (function() {
         const select = document.createElement('select');
         select.id = 'language-selector';
         select.className = 'styled-select language-select';
-        
+
         getSupportedLanguages().forEach(lang => {
             const option = document.createElement('option');
             option.value = lang.code;
@@ -323,7 +324,7 @@ if (typeof document !== 'undefined') {
             if (pageTitle && pageTitle !== 'page.title') {
                 document.title = pageTitle;
                 if (window.pywebview?.api?.set_window_title) {
-                    Promise.resolve(window.pywebview.api.set_window_title(pageTitle)).catch(() => {});
+                    Promise.resolve(window.pywebview.api.set_window_title(pageTitle)).catch(() => { });
                 }
             }
         }
