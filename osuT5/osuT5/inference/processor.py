@@ -150,6 +150,7 @@ class Processor(object):
 
         self.timeshift_bias = args.timeshift_bias
         self.types_first = args.train.data.types_first
+        self.last_generation_stats: dict[str, float | int] | None = None
 
     def model_generate(self, model_kwargs, **generate_kwargs: Any) -> Any:
         generate_kwargs2 = generate_kwargs | dict(
@@ -169,7 +170,8 @@ class Processor(object):
         )
 
         if isinstance(self.model, InferenceClient):
-            return self.model.generate(model_kwargs, generate_kwargs2)
+            response = self.model.generate(model_kwargs, generate_kwargs2)
+            return response, getattr(self.model, "last_generation_stats", None)
         else:
             return model_generate(self.model, self.tokenizer, model_kwargs, generate_kwargs2)
 
@@ -246,6 +248,7 @@ class Processor(object):
         )
 
         generate_func = self.generate_parallel if self.parallel else self.generate_sequential
+        self._reset_generation_stats()
         if isinstance(self.model, InferenceClient):
             with self.model:
                 generate_func(**inputs)
@@ -320,7 +323,8 @@ class Processor(object):
 
             if verbose:
                 print(f"Generating {context['context_type'].value}")
-            iterator = tqdm(list(zip(*sequences[:2]))) if verbose else zip(*sequences[:2])
+            tokens_per_second_meter = self._create_tokens_per_second_meter()
+            iterator = tqdm(list(zip(*sequences[:2])), dynamic_ncols=True) if verbose else zip(*sequences[:2])
             for sequence_index, (frames, frame_time) in enumerate(iterator):
                 trim_lookback = sequence_index != 0 and self.types_first and self.lookback_time > 0
                 trim_lookahead = sequence_index != len(sequences[0]) - 1
@@ -343,7 +347,7 @@ class Processor(object):
                     global_pos_end = (frame_time + self.miliseconds_per_sequence) / song_length
                     model_kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32).unsqueeze(0)
 
-                result = self.model_generate(
+                result, generation_stats = self.model_generate(
                     model_kwargs | dict(
                         inputs=frames,
                         decoder_input_ids=prompt,
@@ -355,6 +359,9 @@ class Processor(object):
                     lookahead_time=self.lookahead_time if trim_lookahead else 0,
                     context_type=context["context_type"].value,
                 )
+                self._record_generation_stats(generation_stats)
+                if verbose:
+                    self._update_tokens_per_second_meter(iterator, tokens_per_second_meter, generation_stats)
 
                 # Only support batch size 1
                 predicted_tokens = result[0, max_len:].cpu()
@@ -393,7 +400,7 @@ class Processor(object):
         )
 
         sequence_index = 0
-        for batch in result:
+        for batch, _ in result:
             for sequence in batch:
                 frame_time = frame_times[sequence_index].item()
                 if self.add_out_context_types:
@@ -469,7 +476,7 @@ class Processor(object):
         )
 
         sequence_index = 0
-        for batch in results:
+        for batch, _ in results:
             for result in batch:
                 for context in out_context_data:
                     trim_lookback = sequence_index != 0
@@ -698,8 +705,8 @@ class Processor(object):
         model_kwarg_keys = list(model_kwargses[0].keys())
 
         # Process each batch
-        iterator = tqdm(list(range(0, num_samples, max_batch_size))) if verbose else range(0, num_samples,
-                                                                                           max_batch_size)
+        tokens_per_second_meter = self._create_tokens_per_second_meter()
+        iterator = tqdm(list(range(0, num_samples, max_batch_size)), dynamic_ncols=True) if verbose else range(0, num_samples, max_batch_size)
         for i in iterator:
             frames_batch = frames[i:i + max_batch_size]
             cond_prompt_batch = cond_prompt[i:i + max_batch_size]
@@ -720,7 +727,15 @@ class Processor(object):
                 ),
             )
 
-            yield result
+            generation_stats = None
+            if isinstance(result, tuple) and len(result) == 2:
+                result, generation_stats = result
+
+            self._record_generation_stats(generation_stats)
+            if verbose:
+                self._update_tokens_per_second_meter(iterator, tokens_per_second_meter, generation_stats)
+
+            yield result, generation_stats
 
         torch.cuda.empty_cache()
 
@@ -1299,3 +1314,44 @@ class Processor(object):
                 new_events.append(event)
                 new_event_times.append(event_times[i])
         return new_events, new_event_times
+
+    def _reset_generation_stats(self) -> None:
+        self.last_generation_stats = {
+            "generated_tokens": 0,
+            "elapsed_seconds": 0.0,
+            "tokens_per_second": 0.0,
+        }
+
+    def _record_generation_stats(self, stats: Any) -> None:
+        if not isinstance(stats, dict):
+            return
+
+        if self.last_generation_stats is None:
+            self._reset_generation_stats()
+
+        generated_tokens = int(stats.get("generated_tokens", 0) or 0)
+        elapsed_seconds = float(stats.get("elapsed_seconds", 0.0) or 0.0)
+        self.last_generation_stats["generated_tokens"] += generated_tokens
+        self.last_generation_stats["elapsed_seconds"] += elapsed_seconds
+
+        total_elapsed = float(self.last_generation_stats["elapsed_seconds"])
+        total_tokens = int(self.last_generation_stats["generated_tokens"])
+        self.last_generation_stats["tokens_per_second"] = total_tokens / total_elapsed if total_elapsed > 0 else 0.0
+
+    @staticmethod
+    def _create_tokens_per_second_meter(alpha: float = 0.1) -> dict[str, float | None]:
+        return {"alpha": alpha, "ema": None}
+
+    @staticmethod
+    def _update_tokens_per_second_meter(progress_bar, meter: dict[str, float | None], stats: Any) -> None:
+        if progress_bar is None or not isinstance(stats, dict):
+            return
+
+        tokens_per_second = stats.get("tokens_per_second")
+        if tokens_per_second is None or tokens_per_second <= 0:
+            return
+
+        previous = meter.get("ema")
+        alpha = float(meter.get("alpha", 0.1))
+        meter["ema"] = float(tokens_per_second) if previous is None else (alpha * float(tokens_per_second) + (1 - alpha) * float(previous))
+        progress_bar.set_postfix_str(f"{meter['ema']:.1f} tok/s", refresh=False)

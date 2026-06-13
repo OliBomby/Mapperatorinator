@@ -25,6 +25,50 @@ MILISECONDS_PER_STEP = 10
 RETRY_SIGNAL = "RETRY_SIGNAL"
 
 
+def _prompt_token_counts(model_kwargs, pad_token_id: int | None) -> torch.Tensor | None:
+    decoder_attention_mask = model_kwargs.get("decoder_attention_mask")
+    if isinstance(decoder_attention_mask, torch.Tensor):
+        return decoder_attention_mask.to(torch.long).sum(dim=-1).cpu()
+
+    decoder_input_ids = model_kwargs.get("decoder_input_ids")
+    if not isinstance(decoder_input_ids, torch.Tensor):
+        return None
+
+    if pad_token_id is None:
+        return torch.full((decoder_input_ids.shape[0],), decoder_input_ids.shape[1], dtype=torch.long)
+
+    return decoder_input_ids.ne(pad_token_id).to(torch.long).sum(dim=-1).cpu()
+
+
+def _output_token_counts(result: torch.Tensor, pad_token_id: int | None) -> torch.Tensor:
+    if pad_token_id is None:
+        return torch.full((result.shape[0],), result.shape[1], dtype=torch.long)
+
+    return result.ne(pad_token_id).to(torch.long).sum(dim=-1)
+
+
+def _build_generation_stats(
+        result: torch.Tensor,
+        model_kwargs: dict,
+        pad_token_id: int | None,
+        elapsed_seconds: float,
+) -> dict:
+    prompt_token_counts = _prompt_token_counts(model_kwargs, pad_token_id)
+    generated_token_counts = _output_token_counts(result, pad_token_id)
+    if prompt_token_counts is not None:
+        generated_token_counts = torch.clamp(generated_token_counts - prompt_token_counts, min=0)
+
+    generated_tokens = int(generated_token_counts.sum().item())
+    tokens_per_second = generated_tokens / elapsed_seconds if elapsed_seconds > 0 else 0.0
+
+    return {
+        "generated_tokens": generated_tokens,
+        "generated_tokens_per_sample": generated_token_counts.tolist(),
+        "elapsed_seconds": float(elapsed_seconds),
+        "tokens_per_second": tokens_per_second,
+    }
+
+
 def get_eos_token_id(tokenizer, lookback_time: float = 0, lookahead_time: float = 0, context_type: ContextType = None):
     eos_token_id = [tokenizer.eos_id]
     if context_type is not None and context_type in tokenizer.context_eos:
@@ -91,9 +135,11 @@ def model_generate(model, tokenizer, model_kwargs, generate_kwargs):
 
     # Prepare cache
     cache = get_cache(model, batch_size, generate_kwargs.get('num_beams', 1), cfg_scale)
+    pad_token_id = generate_kwargs.get('pad_token_id', getattr(tokenizer, 'pad_id', None))
 
     # Perform batched generation
     with torch.autocast(device_type=model.device.type, dtype=torch.bfloat16, enabled=precision == 'amp'):
+        start_time = time.perf_counter()
         result = model.generate(
             **model_kwargs,
             **generate_kwargs,
@@ -101,9 +147,13 @@ def model_generate(model, tokenizer, model_kwargs, generate_kwargs):
             past_key_values=cache,
             logits_processor=logits_processor_list,
             eos_token_id=get_eos_token_id(tokenizer, lookback_time=lookback_time, lookahead_time=lookahead_time, context_type=context_type),
-        ).cpu()
+        )
+        elapsed_seconds = time.perf_counter() - start_time
 
-    return result
+    result = result.cpu()
+    stats = _build_generation_stats(result, model_kwargs, pad_token_id, elapsed_seconds)
+
+    return result, stats
 
 
 @torch.no_grad()
@@ -240,7 +290,16 @@ class InferenceServer:
                     # Prepare a response event
                     response_event = threading.Event()
                     batch_size = model_kwargs['inputs'].shape[0]
-                    record = {'model_kwargs': model_kwargs, 'total_work': batch_size, 'work_done': 0, 'conn': conn, 'event': response_event, 'result': None}
+                    record = {
+                        'model_kwargs': model_kwargs,
+                        'total_work': batch_size,
+                        'work_done': 0,
+                        'conn': conn,
+                        'event': response_event,
+                        'result': None,
+                        'generated_tokens': 0,
+                        'elapsed_seconds': 0.0,
+                    }
 
                     # Enqueue request
                     with self.lock:
@@ -310,18 +369,32 @@ class InferenceServer:
                         kwargses = [torch.nn.functional.pad(tensor, (max_len - tensor.size(-1), 0)) for tensor in kwargses]
                     model_kwargs[k] = torch.cat(kwargses, dim=0)
 
-                outputs = model_generate(self.model, self.tokenizer, model_kwargs, generate_kwargs)
+                outputs, stats = model_generate(self.model, self.tokenizer, model_kwargs, generate_kwargs)
+                generated_tokens_per_sample = stats.get('generated_tokens_per_sample', [])
 
                 # Split and dispatch results
                 batch_i = 0
                 for i, (_, request, work_done) in enumerate(batch_requests):
                     padding = paddings[i]
                     out = outputs[batch_i:batch_i + work_done, padding:]  # Remove padding from the left
+                    request_generated_tokens = sum(generated_tokens_per_sample[batch_i:batch_i + work_done])
                     batch_i += work_done
                     request['result'] = out if request['result'] is None else torch.cat((request['result'], out), dim=0)
                     request['work_done'] += work_done
+                    request['generated_tokens'] += request_generated_tokens
+                    request['elapsed_seconds'] += stats.get('elapsed_seconds', 0.0)
                     if request['work_done'] >= request['total_work']:
                         # All work done for this record, signal completion
+                        elapsed_seconds = request['elapsed_seconds']
+                        generated_tokens = request['generated_tokens']
+                        request['result'] = {
+                            'output': request['result'],
+                            'stats': {
+                                'generated_tokens': generated_tokens,
+                                'elapsed_seconds': elapsed_seconds,
+                                'tokens_per_second': generated_tokens / elapsed_seconds if elapsed_seconds > 0 else 0.0,
+                            },
+                        }
                         request['event'].set()
             except Exception as e:
                 print(f"[Batch Thread] Error processing batch: {e}")
@@ -380,6 +453,7 @@ class InferenceClient:
         self.idle_timeout = idle_timeout
         self.socket_path = socket_path
         self.conn = None
+        self.last_generation_stats = None
 
     def __enter__(self):
         self._reconnect()
@@ -436,6 +510,10 @@ class InferenceClient:
                 attempts += 1
                 continue
             else:
+                if isinstance(result, dict) and 'output' in result:
+                    self.last_generation_stats = result.get('stats')
+                    return result['output']
+                self.last_generation_stats = None
                 return result
 
         raise RuntimeError(f"Failed to get a valid response after {max_retries} attempts.")
@@ -506,3 +584,4 @@ if __name__ == "__main__":
     result = client.generate(model_kwargs, generate_kwargs)
     events = [tokenizer.decode(t) if t > 10 else t for t in result[0].numpy()]
     print(events)  # Process the result as needed
+    print(client.last_generation_stats)
