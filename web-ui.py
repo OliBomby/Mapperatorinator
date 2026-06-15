@@ -35,7 +35,7 @@ from config import InferenceConfig
 from osuT5.osuT5.event import ContextType
 from osuT5.osuT5.inference.server import InferenceClient
 from osuT5.osuT5.utils import load_model_loaders
-from inference import compile_args, get_server_address, main
+from inference import compile_args, get_server_address, main, should_load_separate_timing_model
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(script_dir, 'template')
@@ -289,7 +289,7 @@ cancelled_jobs = set()
 process_lock = threading.Lock()
 
 
-def _ensure_inference_server(args):
+def _ensure_model_server(args, *, auto_select_gamemode_model: bool):
     model_loader, tokenizer_loader = load_model_loaders(
         ckpt_path=args.model_path,
         t5_args=args.train,
@@ -300,22 +300,33 @@ def _ensure_inference_server(args):
         pickle_module=routed_pickle,
         lora_path=args.lora_path,
         gamemode=args.gamemode,
-        auto_select_gamemode_model=args.auto_select_gamemode_model,
+        auto_select_gamemode_model=auto_select_gamemode_model,
     )
     _server_owner_client = InferenceClient(
         model_loader,
         tokenizer_loader,
         max_batch_size=args.max_batch_size,
+        idle_timeout=3600,
         socket_path=get_server_address(
             args.model_path,
             lora_path=args.lora_path,
             gamemode=args.gamemode,
-            auto_select_gamemode_model=args.auto_select_gamemode_model,
+            auto_select_gamemode_model=auto_select_gamemode_model,
         ),
     )
 
     # Start the server in a dedicated thread that outlives per-job workers.
     _server_owner_client.ensure_server()
+
+
+def _ensure_inference_server(args):
+    _ensure_model_server(
+        args,
+        auto_select_gamemode_model=args.auto_select_gamemode_model,
+    )
+
+    if should_load_separate_timing_model(args):
+        _ensure_model_server(args, auto_select_gamemode_model=False)
 
 
 def _coerce_optional_int(v):
