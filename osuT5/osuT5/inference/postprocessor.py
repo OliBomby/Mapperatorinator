@@ -493,18 +493,18 @@ class Postprocessor(object):
 
         return beatmap.pack()
 
-    def write_result(self, result: str, output_path: str):
+    def write_result(self, output_path: str, result: str):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         # Write .osu file to directory
         with open(output_path, "w", encoding='utf-8-sig') as osu_file:
             osu_file.write(result)
 
-    def export_osz(self, osu_path: str, audio_path: str, output_path: str, background_path: str = None):
+    def export_osz(self, output_path: str, osu_content: str, osu_filename: str, audio_path: str, background_path: str = None):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         with zipfile.ZipFile(output_path, 'w') as zipf:
-            zipf.write(osu_path, os.path.basename(osu_path))
+            zipf.writestr(osu_filename, osu_content)
             zipf.write(audio_path, os.path.basename(audio_path))
 
             # Add background image if provided and exists

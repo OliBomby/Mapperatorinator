@@ -28,6 +28,7 @@ class SuperTimingGenerator:
         self.processor.num_beams = args.timer_num_beams
         self.processor.top_p = 1
         self.processor.top_k = 50
+        self.processor.add_to_beatmap = False
         self.bpm_change_threshold = args.timer_bpm_threshold
         self.types_first = args.train.data.types_first
         self.iterations = args.timer_iterations

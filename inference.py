@@ -441,6 +441,8 @@ def generate(
         # Validate beatmap file type
         if beatmap_path_obj.suffix.lower() != '.osu':
             raise ValueError(f"Beatmap file must have .osu extension: {beatmap_path}")
+    if (output_path is None or output_path == "") and (not args.add_to_beatmap or not args.overwrite_reference_beatmap or args.export_osz):
+        raise ValueError("Output path is required.")
 
     preprocessor = Preprocessor(args, parallel=args.parallel)
     processor = Processor(args, model, tokenizer)
@@ -470,6 +472,7 @@ def generate(
             generation_config=generation_config,
             in_context=[ContextType.NONE],
             out_context=[ContextType.TIMING],
+            beatmap_path=beatmap_path,
             verbose=verbose,
         )[0]
         timing_events, timing_times = events_of_type(timing_events, timing_times, TIMING_TYPES)
@@ -529,20 +532,23 @@ def generate(
     result_path = None
     osz_path = None
 
-    if output_path is not None and output_path != "":
-        if args.add_to_beatmap and args.overwrite_reference_beatmap:
-            result_path = beatmap_path
-        else:
-            result_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osu")
-        postprocessor.write_result(result, result_path)
-        if verbose:
-            logger.info(f"Generated beatmap saved to {result_path}")
+    if args.add_to_beatmap and args.overwrite_reference_beatmap:
+        output_osu_path = Path(beatmap_path)
+    else:
+        # noinspection PyTypeChecker
+        output_osu_path = Path(output_path) / f"beatmap{str(uuid.uuid4().hex)}.osu"
 
     if args.export_osz:
-        osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
-        postprocessor.export_osz(result_path, audio_path, osz_path, args.background)
+        # noinspection PyTypeChecker
+        osz_path = Path(output_path) / f"beatmap{str(uuid.uuid4().hex)}.osz"
+        postprocessor.export_osz(osz_path, result, output_osu_path.name, audio_path, args.background)
         if verbose:
             logger.info(f"Generated .osz saved to {osz_path}")
+    else:
+        postprocessor.write_result(output_osu_path, result)
+        if verbose:
+            logger.info(f"Generated beatmap saved to {output_osu_path}")
+
 
     return result, result_path, osz_path
 
