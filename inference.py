@@ -529,8 +529,6 @@ def generate(
         if verbose:
             logger.info(f"Merged generated content with reference beatmap")
 
-    osz_path = None
-
     if args.add_to_beatmap and args.overwrite_reference_beatmap:
         output_osu_path = Path(beatmap_path)
     else:
@@ -539,18 +537,18 @@ def generate(
 
     if args.export_osz:
         # noinspection PyTypeChecker
-        osz_path = Path(output_path) / f"beatmap{str(uuid.uuid4().hex)}.osz"
-        postprocessor.export_osz(osz_path, result, output_osu_path.name, audio_path, args.background)
-        output_osu_path = None
+        result_path = Path(output_path) / f"beatmap{str(uuid.uuid4().hex)}.osz"
+        postprocessor.export_osz(result_path, result, output_osu_path.name, audio_path, args.background)
         if verbose:
-            logger.info(f"Generated .osz saved to {osz_path}")
+            logger.info(f"Generated .osz saved to {result_path}")
     else:
-        postprocessor.write_result(output_osu_path, result)
+        result_path = output_osu_path
+        postprocessor.write_result(result_path, result)
         if verbose:
-            logger.info(f"Generated beatmap saved to {output_osu_path}")
+            logger.info(f"Generated beatmap saved to {result_path}")
 
 
-    return result, output_osu_path, osz_path
+    return result, result_path
 
 
 def load_model_with_server(ckpt_path: str | Path | None, t5_args: TrainConfig, device, max_batch_size: int = 8,
