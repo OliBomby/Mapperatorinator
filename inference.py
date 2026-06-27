@@ -667,7 +667,6 @@ def main(args: InferenceConfig):
             use_server=args.use_server,
             precision=args.precision,
             attn_implementation=args.attn_implementation,
-            lora_path=args.lora_path,
             gamemode=args.gamemode,
             auto_select_gamemode_model=False,
         )

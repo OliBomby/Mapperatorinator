@@ -289,7 +289,7 @@ cancelled_jobs = set()
 process_lock = threading.Lock()
 
 
-def _ensure_model_server(args, *, auto_select_gamemode_model: bool):
+def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: str | None):
     model_loader, tokenizer_loader = load_model_loaders(
         ckpt_path=args.model_path,
         t5_args=args.train,
@@ -298,7 +298,7 @@ def _ensure_model_server(args, *, auto_select_gamemode_model: bool):
         attn_implementation=args.attn_implementation,
         eval_mode=True,
         pickle_module=routed_pickle,
-        lora_path=args.lora_path,
+        lora_path=lora_path,
         gamemode=args.gamemode,
         auto_select_gamemode_model=auto_select_gamemode_model,
     )
@@ -309,7 +309,7 @@ def _ensure_model_server(args, *, auto_select_gamemode_model: bool):
         idle_timeout=3600,
         socket_path=get_server_address(
             args.model_path,
-            lora_path=args.lora_path,
+            lora_path=lora_path,
             gamemode=args.gamemode,
             auto_select_gamemode_model=auto_select_gamemode_model,
         ),
@@ -323,10 +323,11 @@ def _ensure_inference_server(args):
     _ensure_model_server(
         args,
         auto_select_gamemode_model=args.auto_select_gamemode_model,
+        lora_path=args.lora_path
     )
 
     if should_load_separate_timing_model(args):
-        _ensure_model_server(args, auto_select_gamemode_model=False)
+        _ensure_model_server(args, auto_select_gamemode_model=False, lora_path=None)
 
 
 def _coerce_optional_int(v):
