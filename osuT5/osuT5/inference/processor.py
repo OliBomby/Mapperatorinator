@@ -622,9 +622,15 @@ class Processor(object):
                 gen_out_context.remove(ContextType.SV)
 
         # We have to generate the out contexts in order of the template
+        requested_out_context_was_explicit = len(requested_out_context) > 0
         requested_out_context = [oc for oc in requested_out_context if oc in gen_out_context]
-        out_context_count = max(all_out_context.index(oc) for oc in requested_out_context) + 1
-        gen_out_context = all_out_context[:out_context_count]
+        if len(requested_out_context) == 0:
+            if requested_out_context_was_explicit:
+                raise ValueError("No requested output contexts are available for the selected template and gamemode.")
+            gen_out_context = all_out_context.copy()
+        else:
+            out_context_count = max(all_out_context.index(oc) for oc in requested_out_context) + 1
+            gen_out_context = all_out_context[:out_context_count]
 
         return gen_in_context, gen_out_context, req_special_tokens
 
