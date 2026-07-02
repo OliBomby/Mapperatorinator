@@ -1,5 +1,6 @@
 import multiprocessing
 import traceback
+import atexit
 from dataclasses import asdict
 from pathlib import Path
 import json
@@ -287,9 +288,27 @@ class Api:
 processes = {}
 cancelled_jobs = set()
 process_lock = threading.Lock()
+owned_server_clients = {}
+owned_server_clients_lock = threading.Lock()
+shutdown_lock = threading.Lock()
+shutdown_started = False
 
 
 def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: str | None):
+    socket_path = get_server_address(
+        args.model_path,
+        lora_path=lora_path,
+        gamemode=args.gamemode,
+        auto_select_gamemode_model=auto_select_gamemode_model,
+    )
+
+    with owned_server_clients_lock:
+        existing_client = owned_server_clients.get(socket_path)
+
+    if existing_client is not None:
+        existing_client.ensure_server()
+        return
+
     model_loader, tokenizer_loader = load_model_loaders(
         ckpt_path=args.model_path,
         t5_args=args.train,
@@ -307,16 +326,15 @@ def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: s
         tokenizer_loader,
         max_batch_size=args.max_batch_size,
         idle_timeout=3600,
-        socket_path=get_server_address(
-            args.model_path,
-            lora_path=lora_path,
-            gamemode=args.gamemode,
-            auto_select_gamemode_model=auto_select_gamemode_model,
-        ),
+        server_thread_daemon=True,
+        socket_path=socket_path,
     )
 
     # Start the server in a dedicated thread that outlives per-job workers.
     _server_owner_client.ensure_server()
+
+    with owned_server_clients_lock:
+        owned_server_clients.setdefault(socket_path, _server_owner_client)
 
 
 def _ensure_inference_server(args):
@@ -328,6 +346,66 @@ def _ensure_inference_server(args):
 
     if should_load_separate_timing_model(args):
         _ensure_model_server(args, auto_select_gamemode_model=False, lora_path=None)
+
+
+def _shutdown_inference_processes():
+    with process_lock:
+        active_processes = list(processes.items())
+        processes.clear()
+        cancelled_jobs.update(job_id for job_id, _ in active_processes)
+
+    for _, rec in active_processes:
+        proc = rec.get("process")
+        q = rec.get("queue")
+
+        if proc is not None:
+            try:
+                if proc.is_alive():
+                    if sys.platform == 'win32':
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)], capture_output=True, timeout=5)
+                    else:
+                        proc.terminate()
+            except Exception:
+                pass
+
+            try:
+                proc.join(timeout=5)
+            except Exception:
+                pass
+
+        if q is not None:
+            try:
+                q.cancel_join_thread()
+            except Exception:
+                pass
+            try:
+                q.close()
+            except Exception:
+                pass
+
+
+def _shutdown_owned_model_servers():
+    with owned_server_clients_lock:
+        server_clients = list(owned_server_clients.values())
+        owned_server_clients.clear()
+
+    for client in server_clients:
+        try:
+            client.shutdown_server()
+        except Exception:
+            traceback.print_exc()
+
+
+def _shutdown_application_resources():
+    global shutdown_started
+
+    with shutdown_lock:
+        if shutdown_started:
+            return
+        shutdown_started = True
+
+    _shutdown_inference_processes()
+    _shutdown_owned_model_servers()
 
 
 def _coerce_optional_int(v):
@@ -653,6 +731,22 @@ def stream_output():
                 processes.pop(job_id, None)
                 cancelled_jobs.discard(job_id)
 
+            try:
+                if proc is not None:
+                    proc.join(timeout=1)
+            except Exception:
+                pass
+
+            try:
+                q.cancel_join_thread()
+            except Exception:
+                pass
+
+            try:
+                q.close()
+            except Exception:
+                pass
+
     return Response(generate(), mimetype='text/event-stream')
 
 
@@ -870,6 +964,8 @@ def launch_browser_fallback(flask_url, flask_thread):
             time.sleep(1)
     except KeyboardInterrupt:
         print("\nStopping server...")
+    finally:
+        _shutdown_application_resources()
 
 
 def launch_webview_window(window_title, flask_url, window_width, window_height, api):
@@ -885,7 +981,9 @@ def launch_webview_window(window_title, flask_url, window_width, window_height, 
             js_api=api,
         )
         webview.start()
-        print("Pywebview window closed. Exiting application.")
+        print("Pywebview window closed. Shutting down application resources...")
+        _shutdown_application_resources()
+        print("Application shutdown complete. Exiting.")
         return True
     except Exception as e:
         print(f"pywebview could not start an embedded window: {e}")
@@ -897,6 +995,7 @@ def launch_webview_window(window_title, flask_url, window_width, window_height, 
 if __name__ == '__main__':
     # Use spawn instead of fork to avoid issues with CUDA on Linux
     multiprocessing.set_start_method('spawn', force=True)
+    atexit.register(_shutdown_application_resources)
 
     # Find an available port for Flask
     flask_port = find_available_port()

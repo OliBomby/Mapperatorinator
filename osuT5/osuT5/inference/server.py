@@ -258,6 +258,18 @@ class InferenceServer:
         # Start idle monitor
         threading.Thread(target=self._idle_monitor, daemon=True).start()
 
+    def stop(self):
+        self.shutdown_flag.set()
+        try:
+            if self.listener is not None:
+                self.listener.close()
+        except Exception:
+            pass
+        try:
+            os.unlink(self.socket_path)
+        except Exception:
+            pass
+
     def _listener_thread(self):
         while not self.shutdown_flag.is_set():
             try:
@@ -435,6 +447,7 @@ class InferenceClient:
             max_batch_size=8,
             batch_timeout=0.2,
             idle_timeout=20,
+            server_thread_daemon=False,
             socket_path=SOCKET_PATH,
     ):
         """
@@ -444,6 +457,7 @@ class InferenceClient:
         :param max_batch_size: Maximum batch size for processing requests.
         :param batch_timeout: Time in seconds to wait for more requests before processing a batch.
         :param idle_timeout: Time in seconds to wait before shutting down due to no clients.
+        :param server_thread_daemon: Whether the auto-started background server thread should be daemonized.
         :param socket_path: The address used for IPC.
         """
         self.model_loader = model_loader
@@ -451,9 +465,12 @@ class InferenceClient:
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
         self.idle_timeout = idle_timeout
+        self.server_thread_daemon = server_thread_daemon
         self.socket_path = socket_path
         self.conn = None
         self.last_generation_stats = None
+        self._server = None
+        self._server_thread = None
 
     def __enter__(self):
         self._reconnect()
@@ -465,11 +482,22 @@ class InferenceClient:
                 self.conn = Client(self.socket_path)
             except FileNotFoundError:
                 # No server: start one
-                threading.Thread(target=self._start_server, args=(self.model_loader, self.tokenizer_loader), daemon=False).start()
+                self._start_server_thread()
                 # Wait for server socket to appear
                 while not os.path.exists(self.socket_path):
                     time.sleep(0.1)
                 self.conn = Client(self.socket_path)
+
+    def _start_server_thread(self):
+        if self._server_thread is not None and self._server_thread.is_alive():
+            return
+
+        self._server_thread = threading.Thread(
+            target=self._start_server,
+            args=(self.model_loader, self.tokenizer_loader),
+            daemon=self.server_thread_daemon,
+        )
+        self._server_thread.start()
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         if self.conn:
@@ -487,10 +515,12 @@ class InferenceClient:
             idle_timeout=self.idle_timeout,
             socket_path=self.socket_path
         )
+        self._server = server
         server.start()
         # Block until shutdown
         while not server.shutdown_flag.is_set():
             time.sleep(1)
+        self._server = None
 
     def generate(self, model_kwargs, generate_kwargs, max_retries=3):
         attempts = 0
@@ -527,16 +557,27 @@ class InferenceClient:
         """
         with Locker():
             if not os.path.exists(self.socket_path):
-                # Start server in a dedicated (non-daemon) thread.
-                threading.Thread(
-                    target=self._start_server,
-                    args=(self.model_loader, self.tokenizer_loader),
-                    daemon=False,
-                ).start()
+                self._start_server_thread()
 
         # Wait for server socket to appear.
         while not os.path.exists(self.socket_path):
             time.sleep(0.1)
+
+    def shutdown_server(self, join_timeout=5.0):
+        if self.conn:
+            try:
+                self.conn.close()
+            except Exception:
+                pass
+            finally:
+                self.conn = None
+
+        if self._server is not None:
+            self._server.stop()
+
+        server_thread = self._server_thread
+        if server_thread is not None and server_thread.is_alive():
+            server_thread.join(timeout=join_timeout)
 
 
 if __name__ == "__main__":
