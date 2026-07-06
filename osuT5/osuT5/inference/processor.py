@@ -1260,7 +1260,8 @@ class Processor(object):
                 # quantization error to ~0 (mean -4.82 -> +0.18ms). This is
                 # self-consistent with _encode's truncation on context round-trips:
                 # the +5 is truncated back to the same step.
-                event.value = frame_time + event.value * MILISECONDS_PER_STEP + MILISECONDS_PER_STEP // 2
+                half_step = MILISECONDS_PER_STEP // 2 if event.value >= 0 else 0
+                event.value = frame_time + event.value * MILISECONDS_PER_STEP + half_step
 
             events.append(event)
 
