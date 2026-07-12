@@ -76,6 +76,9 @@ class InferenceConfig:
     max_batch_size: int = 16  # Maximum batch size for inference (only used for parallel sampling or super timing)
     resnap_events: bool = True  # Resnap notes to the timing after generation
     snap_near_perfect_overlaps: bool = True  # Snap nearly overlapping positions to each other
+    fast_encoder_precompute: bool = False  # Precompute all encoder outputs in a batched pass before the decode loop (major speedup, bit-compatible)
+    compiled_decode: bool = False  # CUDA-graph decode loop (auto-enables fast_encoder_precompute); ~2-6x faster decode (fp16/bf16 > fp32), quality-equivalent
+    super_timing_compiled: bool = False  # Use the compiled CUDA-graph decode path for super timing instead of the batched-parallel path. Separate from compiled_decode because super timing's parallel path may be faster on some GPUs; benchmark before enabling.
 
     # Metadata settings
     bpm: Optional[int] = None  # Beats per minute of input audio
