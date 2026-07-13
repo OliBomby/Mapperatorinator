@@ -328,6 +328,7 @@ def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: s
         idle_timeout=3600,
         server_thread_daemon=True,
         socket_path=socket_path,
+        fast_decoder_loop=getattr(args, "fast_decoder_loop", False),
     )
 
     # Start the server in a dedicated thread that outlives per-job workers.

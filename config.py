@@ -44,7 +44,7 @@ class InferenceConfig:
     # Inference settings
     seed: Optional[int] = None  # Random seed
     device: str = 'auto'  # Inference device (cpu/cuda/mps/auto)
-    precision: str = 'fp32'         # Lower precision for speed (fp32/bf16/amp)
+    precision: str = 'bf16'         # Lower precision for speed (fp32/bf16/fp16/amp); auto-falls back to fp32 where bf16 is unsupported
     attn_implementation: str = 'auto'  # Attention implementation (auto/eager/sdpa/flash_attention_2)
     add_to_beatmap: bool = False  # Add generated content to the reference beatmap
     overwrite_reference_beatmap: bool = False  # Overwrite the reference beatmap instead of creating a new one
@@ -76,9 +76,8 @@ class InferenceConfig:
     max_batch_size: int = 16  # Maximum batch size for inference (only used for parallel sampling or super timing)
     resnap_events: bool = True  # Resnap notes to the timing after generation
     snap_near_perfect_overlaps: bool = True  # Snap nearly overlapping positions to each other
-    fast_encoder_precompute: bool = False  # Precompute all encoder outputs in a batched pass before the decode loop (major speedup, bit-compatible)
-    compiled_decode: bool = False  # CUDA-graph decode loop (auto-enables fast_encoder_precompute); ~2-6x faster decode (fp16/bf16 > fp32), quality-equivalent
-    super_timing_compiled: bool = False  # Use the compiled CUDA-graph decode path for super timing instead of the batched-parallel path. Separate from compiled_decode because super timing's parallel path may be faster on some GPUs; benchmark before enabling.
+    fast_decoder_loop: bool = False  # Replace HF generate with a CUDA-graph decode loop; ~2-6x faster decode (fp16/bf16 > fp32), quality-equivalent. Requires CUDA; falls back to the stock loop where unsupported.
+    super_timing_fast_loop: bool = False  # Use the fast decoder loop for super timing instead of the batched-parallel path. Separate from fast_decoder_loop because super timing's parallel path may be faster on some GPUs; benchmark before enabling.
 
     # Metadata settings
     bpm: Optional[int] = None  # Beats per minute of input audio
