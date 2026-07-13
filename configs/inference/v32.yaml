@@ -16,3 +16,5 @@ generate_positions: false
 snap_near_perfect_overlaps: false
 # Fast inference: confirmed working on this model
 fast_decoder_loop: true
+super_timing_fast_loop: true
+precision: 'bf16'

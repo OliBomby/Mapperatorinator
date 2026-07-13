@@ -127,7 +127,7 @@
         "super_timing": "Супер-тайминг",
         "super_timing_tooltip": "Использовать медленный точный генератор переменного BPM тайминга",
         "enable_bf16": "BF16 Precision",
-        "enable_bf16_tooltip": "Использовать точность BF16 для ~15% более быстрой генерации на GPU Ampere+ (RTX 30xx/40xx)"
+        "enable_bf16_tooltip": "Использовать точность BF16 для ~100% более быстрой генерации на GPU Ampere+ (RTX 30xx/40xx)"
     },
     "in_context_options": {
         "TIMING": "Тайминг",

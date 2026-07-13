@@ -133,7 +133,7 @@ def compile_device_and_seed(args: InferenceConfig, verbose=True):
     # The fast decoder loop uses CUDA graphs, which need a CUDA device. On CUDA
     # devices where graph capture fails at runtime (e.g. some ROCm setups) it
     # falls back to the stock generate loop on its own.
-    if getattr(args, "fast_decoder_loop", False) and args.device != "cuda":
+    if args.fast_decoder_loop and args.device != "cuda":
         if verbose:
             print(f"fast_decoder_loop requires CUDA; disabling on '{args.device}'.")
         args.fast_decoder_loop = False
