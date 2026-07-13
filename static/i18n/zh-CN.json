@@ -127,7 +127,7 @@
         "super_timing": "超级 Timing",
         "super_timing_tooltip": "是否使用慢速精确的可变 BPM Timing 生成器",
         "enable_bf16": "BF16 精度",
-        "enable_bf16_tooltip": "在 Ampere+ GPU（RTX 30xx/40xx）上使用 BF16 精度，推理速度提升约 15%"
+        "enable_bf16_tooltip": "在 Ampere+ GPU（RTX 30xx/40xx）上使用 BF16 精度，推理速度提升约 100%"
     },
     "in_context_options": {
         "TIMING": "Timing",

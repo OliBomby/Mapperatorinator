@@ -127,7 +127,7 @@
     "super_timing": "Super Timing",
     "super_timing_tooltip": "Use the slow, perfect timing thingy",
     "enable_bf16": "BF16 Precision",
-    "enable_bf16_tooltip": "Go faster on fancy GPUs (RTX 30xx/40xx) nyaa~"
+    "enable_bf16_tooltip": "Go brrrrr on fancy GPUs (RTX 30xx/40xx) nyaa~"
   },
   "in_context_options": {
     "TIMING": "Timing",

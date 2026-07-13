@@ -20,11 +20,21 @@ class MapperatorinatorCache(EncoderDecoderCache):
         self.cross_attention_cache.reorder_cache(beam_idx)
 
 
-def get_cache(model: Mapperatorinator, batch_size: int, num_beams: int = 1, cfg_scale: float = 1.0):
+def get_cache(model: Mapperatorinator, batch_size: int, num_beams: int = 1, cfg_scale: float = 1.0,
+              max_cache_len: int | None = None):
+    """Build the encoder-decoder cache.
+
+    ``max_cache_len`` overrides the decoder (self-attention) cache length. Static
+    caches attend over their full allocated length every decode step, so sizing
+    this to what a window actually needs (rather than the model max of
+    ``max_target_positions``) makes each step markedly cheaper. Must be >= the
+    longest prompt+generation the window will reach, or generation is truncated.
+    """
+    decoder_cache_len = max_cache_len or model.config.max_target_positions
     cache_kwargs = {
         "config": model.config,
         "max_batch_size": batch_size * num_beams * 2 if cfg_scale > 1 else batch_size * num_beams,
-        "max_cache_len": model.config.max_target_positions,
+        "max_cache_len": decoder_cache_len,
         "device": model.device,
         "dtype": model.dtype,
     }

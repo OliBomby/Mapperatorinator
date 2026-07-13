@@ -74,6 +74,18 @@ def setup_inference_environment(seed: int):
     set_seed(seed)
 
 
+def _cuda_native_bf16() -> bool:
+    """Whether the current CUDA device supports bf16 natively (not emulated).
+
+    Works on both NVIDIA (compute capability >= 8.0) and ROCm builds, unlike a
+    raw compute-capability check whose numbering is NVIDIA-specific.
+    """
+    try:
+        return torch.cuda.is_bf16_supported(including_emulation=False)
+    except TypeError:  # torch < 2.3 has no emulation flag (and no emulation)
+        return torch.cuda.is_bf16_supported()
+
+
 def compile_device_and_seed(args: InferenceConfig, verbose=True):
     message = None
     if args.device == "auto":
@@ -101,6 +113,30 @@ def compile_device_and_seed(args: InferenceConfig, verbose=True):
 
     if verbose and message is not None:
         print(message)
+
+    # Resolve precision against the device. bf16 is the default, but low
+    # precision only helps on CUDA, and native bf16 needs hardware support
+    # (Ampere or newer on NVIDIA); emulated bf16 on older GPUs is slower than
+    # fp32. Fall back to fp32 there rather than risk fp16 numerics.
+    message = None
+    if args.precision in ("bf16", "fp16") and args.device != "cuda":
+        message = f"{args.precision} precision requires CUDA; using fp32 on '{args.device}'."
+        args.precision = "fp32"
+    elif args.precision == "bf16" and args.device == "cuda" and not _cuda_native_bf16():
+        message = ("GPU does not natively support bf16; falling back to fp32. "
+                   "Set precision=fp16 manually if your GPU has fast fp16.")
+        args.precision = "fp32"
+
+    if verbose and message is not None:
+        print(message)
+
+    # The fast decoder loop uses CUDA graphs, which need a CUDA device. On CUDA
+    # devices where graph capture fails at runtime (e.g. some ROCm setups) it
+    # falls back to the stock generate loop on its own.
+    if args.fast_decoder_loop and args.device != "cuda":
+        if verbose:
+            print(f"fast_decoder_loop requires CUDA; disabling on '{args.device}'.")
+        args.fast_decoder_loop = False
 
     message = None
     if args.attn_implementation == "auto":
@@ -554,7 +590,7 @@ def generate(
 def load_model_with_server(ckpt_path: str | Path | None, t5_args: TrainConfig, device, max_batch_size: int = 8,
                            use_server: bool = False, precision: str = "fp32", attn_implementation: str = "sdpa",
                            eval_mode: bool = True, lora_path=None, gamemode: int | None = None,
-                           auto_select_gamemode_model: bool = True):
+                           auto_select_gamemode_model: bool = True, fast_decoder_loop: bool = False):
     model_loader, tokenizer_loader = load_model_loaders(
         ckpt_path=ckpt_path,
         t5_args=t5_args,
@@ -572,6 +608,7 @@ def load_model_with_server(ckpt_path: str | Path | None, t5_args: TrainConfig, d
         model_loader,
         tokenizer_loader,
         max_batch_size=max_batch_size,
+        fast_decoder_loop=fast_decoder_loop,
         socket_path=get_server_address(
             ckpt_path,
             lora_path=lora_path,
@@ -654,7 +691,8 @@ def main(args: InferenceConfig):
                                               max_batch_size=args.max_batch_size, use_server=args.use_server,
                                               precision=args.precision, attn_implementation=args.attn_implementation,
                                               lora_path=args.lora_path, gamemode=args.gamemode,
-                                              auto_select_gamemode_model=args.auto_select_gamemode_model)
+                                              auto_select_gamemode_model=args.auto_select_gamemode_model,
+                                              fast_decoder_loop=args.fast_decoder_loop)
 
     timing_model, timing_tokenizer = None, None
     if should_load_separate_timing_model(args):
@@ -669,6 +707,7 @@ def main(args: InferenceConfig):
             attn_implementation=args.attn_implementation,
             gamemode=args.gamemode,
             auto_select_gamemode_model=False,
+            fast_decoder_loop=args.fast_decoder_loop,
         )
 
     diff_model, diff_tokenizer, refine_model = None, None, None

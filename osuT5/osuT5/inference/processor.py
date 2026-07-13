@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time as _time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -11,7 +12,8 @@ from slider import Beatmap, TimingPoint
 from tqdm import tqdm
 
 from config import InferenceConfig
-from .server import InferenceClient, model_generate, model_forward
+from .compiled_decode import model_generate_compiled
+from .server import InferenceClient, model_generate, model_forward, precompute_encoder_outputs
 from ..dataset.osu_parser import OsuParser
 from ..dataset.data_utils import (update_event_times, remove_events_of_type, get_hold_note_ratio,
                                   get_scroll_speed_ratio, get_hitsounded_status, calculate_difficulty)
@@ -150,6 +152,10 @@ class Processor(object):
 
         self.timeshift_bias = args.timeshift_bias
         self.types_first = args.train.data.types_first
+        # CUDA-graph fast decoder loop (see compiled_decode.py). Requires CUDA;
+        # inference.py disables it on other devices. When the model is an
+        # InferenceClient this flag lives on the server instead.
+        self.fast_decoder_loop = args.fast_decoder_loop
         self.last_generation_stats: dict[str, float | int] | None = None
 
     def model_generate(self, model_kwargs, **generate_kwargs: Any) -> Any:
@@ -172,8 +178,16 @@ class Processor(object):
         if isinstance(self.model, InferenceClient):
             response = self.model.generate(model_kwargs, generate_kwargs2)
             return response, getattr(self.model, "last_generation_stats", None)
-        else:
-            return model_generate(self.model, self.tokenizer, model_kwargs, generate_kwargs2)
+        # Batch-1 requests with precomputed encoder outputs go through the fast
+        # decoder loop when enabled (it is captured for a fixed batch size and
+        # cannot do beam search). With an InferenceClient the equivalent dispatch
+        # happens on the server.
+        if (self.fast_decoder_loop
+                and isinstance(model_kwargs.get('encoder_outputs'), torch.Tensor)
+                and model_kwargs['encoder_outputs'].shape[0] == 1
+                and self.num_beams == 1):
+            return model_generate_compiled(self.model, self.tokenizer, model_kwargs, generate_kwargs2)
+        return model_generate(self.model, self.tokenizer, model_kwargs, generate_kwargs2)
 
     def model_forward(self, model_kwargs) -> Any:
         generate_kwargs2 = dict(
@@ -315,7 +329,51 @@ class Processor(object):
             req_special_tokens: list[str],
             verbose: bool = True,
     ):
+        """Generate windows sequentially, reusing encoder outputs precomputed in a
+        single batched pass before the decode loop. Each window skips the
+        per-window encoder prefill; the encoder is a pure function of the audio
+        window + static conditioning, so hoisting it out of the sequential loop
+        changes only timing, not values.
+        """
         song_length = sequences[2]
+        all_frames = self.prepare_frames(sequences[0])  # (N, L_raw)
+        frame_times = sequences[1]
+        n_windows = all_frames.shape[0]
+
+        # Static conditioning broadcast across windows (beatmap_idx/difficulty/mapper_idx)
+        cond_kwargs = {k: v for k, v in model_kwargs.items()
+                       if k in ("beatmap_idx", "difficulty", "mapper_idx") and isinstance(v, torch.Tensor)}
+
+        # Per-window song positions
+        if self.do_song_position_embed:
+            starts = (frame_times / song_length).to(torch.float32)
+            ends = ((frame_times + self.miliseconds_per_sequence) / song_length).to(torch.float32)
+            song_positions = torch.stack([starts, ends], dim=1)  # (N, 2)
+        else:
+            song_positions = None
+
+        # Precompute encoder outputs for all windows in one batched pass
+        t0 = _time.perf_counter() if verbose else 0
+        if verbose:
+            print(f"Precomputing encoder outputs for {n_windows} windows...")
+        if isinstance(self.model, InferenceClient):
+            # The client doesn't own the model, so the server precomputes.
+            # Conditioning is expanded per window because the server may split
+            # the request into multiple batches.
+            precompute_kwargs = {k: v.expand(n_windows).contiguous() for k, v in cond_kwargs.items()}
+            precompute_kwargs["inputs"] = all_frames
+            if song_positions is not None:
+                precompute_kwargs["song_position"] = song_positions
+            enc_hidden = self.model.precompute_encoder(precompute_kwargs)  # (N, L_enc, D)
+        else:
+            with torch.no_grad():
+                enc_hidden = precompute_encoder_outputs(
+                    self.model, all_frames, cond_kwargs, song_positions,
+                    batch_size=self.max_batch_size,
+                )
+        if verbose:
+            print(f"Encoder precompute: {_time.perf_counter() - t0:.2f}s "
+                  f"({(_time.perf_counter() - t0) / n_windows * 1000:.1f} ms/window)")
 
         for i, context in enumerate(out_context):
             if context["finished"]:
@@ -324,13 +382,10 @@ class Processor(object):
             if verbose:
                 print(f"Generating {context['context_type'].value}")
             tokens_per_second_meter = self._create_tokens_per_second_meter()
-            iterator = tqdm(list(zip(*sequences[:2])), dynamic_ncols=True) if verbose else zip(*sequences[:2])
-            for sequence_index, (frames, frame_time) in enumerate(iterator):
+            iterator = tqdm(list(zip(range(n_windows), frame_times)), dynamic_ncols=True) if verbose else zip(range(n_windows), frame_times)
+            for sequence_index, (wi, frame_time) in enumerate(iterator):
                 trim_lookback = sequence_index != 0 and self.types_first and self.lookback_time > 0
-                trim_lookahead = sequence_index != len(sequences[0]) - 1
-
-                # noinspection PyUnresolvedReferences
-                frames = self.prepare_frames(frames)
+                trim_lookahead = sequence_index != n_windows - 1
                 frame_time = frame_time.item()
 
                 # Get relevant tokens for current frame
@@ -341,15 +396,9 @@ class Processor(object):
 
                 [prompt, uncond_prompt], max_len = self.pad_prompts([cond_prompt, uncond_prompt])
 
-                # Prepare additional model kwargs
-                if self.do_song_position_embed:
-                    global_pos_start = frame_time / song_length
-                    global_pos_end = (frame_time + self.miliseconds_per_sequence) / song_length
-                    model_kwargs["song_position"] = torch.tensor([global_pos_start, global_pos_end], dtype=torch.float32).unsqueeze(0)
-
                 result, generation_stats = self.model_generate(
                     model_kwargs | dict(
-                        inputs=frames,
+                        encoder_outputs=enc_hidden[wi:wi + 1],
                         decoder_input_ids=prompt,
                         decoder_attention_mask=prompt.ne(self.tokenizer.pad_id),
                         negative_prompt=uncond_prompt,

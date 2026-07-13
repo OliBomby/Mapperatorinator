@@ -127,7 +127,7 @@
         "super_timing": "Super Timing",
         "super_timing_tooltip": "Whether to use slow accurate variable BPM timing generator",
         "enable_bf16": "BF16 Precision",
-        "enable_bf16_tooltip": "Use BF16 precision for ~15% faster inference on Ampere+ GPUs (RTX 30xx/40xx)"
+        "enable_bf16_tooltip": "Use BF16 precision for ~100% faster inference on Ampere+ GPUs (RTX 30xx/40xx, requires restart)"
     },
     "in_context_options": {
         "TIMING": "Timing",

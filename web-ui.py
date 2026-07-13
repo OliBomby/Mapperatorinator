@@ -328,6 +328,7 @@ def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: s
         idle_timeout=3600,
         server_thread_daemon=True,
         socket_path=socket_path,
+        fast_decoder_loop=args.fast_decoder_loop,
     )
 
     # Start the server in a dedicated thread that outlives per-job workers.
@@ -605,6 +606,8 @@ def start_inference():
     # Precision
     if _coerce_bool_checkbox(request.form, 'enable_bf16'):
         cfg.precision = 'bf16'
+    else:
+        cfg.precision = 'fp32'
 
     # Descriptor lists
     descriptors = request.form.getlist('descriptors')
