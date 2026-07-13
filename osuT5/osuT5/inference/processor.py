@@ -155,7 +155,7 @@ class Processor(object):
         # CUDA-graph fast decoder loop (see compiled_decode.py). Requires CUDA;
         # inference.py disables it on other devices. When the model is an
         # InferenceClient this flag lives on the server instead.
-        self.fast_decoder_loop = getattr(args, "fast_decoder_loop", False)
+        self.fast_decoder_loop = args.fast_decoder_loop
         self.last_generation_stats: dict[str, float | int] | None = None
 
     def model_generate(self, model_kwargs, **generate_kwargs: Any) -> Any:
