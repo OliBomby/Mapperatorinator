@@ -18,32 +18,31 @@ class SuperTimingGenerator:
             args: InferenceConfig,
             model,
             tokenizer,
-            compiled: bool | None = None,
+            fast_loop: bool | None = None,
     ):
         self.args = args
         self.model = model
-        # Compiled decode is a single-window, batch-1 CUDA-graph loop: it cannot do
-        # beam search and does not use the batched-parallel path. When enabled we
-        # force greedy + num_beams=1 + the sequential fast-encoder path.
+        # The fast decoder loop is a single-window, batch-1 CUDA-graph loop: it
+        # cannot do beam search and does not use the batched-parallel path. When
+        # enabled we force greedy + num_beams=1 + the sequential path.
         #
-        # This is gated by its OWN flag (super_timing_compiled), NOT compiled_decode:
-        # super timing's default is the batched-parallel path, which better utilises
-        # GPUs with spare compute/VRAM and can be faster there than the batch-1
-        # compiled loop. On the flip side, compiled uses far less VRAM (no window
-        # batching). Benchmark on the target GPU before enabling; keeping it separate
-        # avoids silently regressing super timing when compiled_decode is turned on
-        # for map generation.
-        if compiled is None:
-            compiled = getattr(args, "super_timing_compiled", False)
-        self.compiled = compiled
-        self.preprocessor = Preprocessor(args, parallel=not compiled)
+        # This is gated by its OWN flag (super_timing_fast_loop), NOT
+        # fast_decoder_loop: super timing's default is the batched-parallel path,
+        # which better utilises GPUs with spare compute/VRAM and can be faster
+        # there than the batch-1 fast loop. On the flip side, the fast loop uses
+        # far less VRAM (no window batching). Benchmark on the target GPU before
+        # enabling; keeping it separate avoids silently regressing super timing
+        # when fast_decoder_loop is turned on for map generation.
+        if fast_loop is None:
+            fast_loop = getattr(args, "super_timing_fast_loop", False)
+        self.fast_loop = fast_loop
+        self.preprocessor = Preprocessor(args, parallel=not fast_loop)
         self.processor = Processor(args, model, tokenizer, cfg_scale=args.timer_cfg_scale)
         self.processor.do_sample = False
-        if compiled:
+        if fast_loop:
             self.processor.parallel = False
             self.processor.num_beams = 1
-            self.processor.fast_encoder_precompute = True
-            self.processor.compiled_decode = True
+            self.processor.fast_decoder_loop = True
         else:
             self.processor.parallel = True
             self.processor.num_beams = args.timer_num_beams

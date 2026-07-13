@@ -13,9 +13,9 @@ reused across all windows. The encoder hidden state is a static buffer rewritten
 per window; the StaticCache is reset (not reallocated) per window.
 
 Output is quality-equivalent (not bit-identical) to HF generate: the sampling RNG
-draw order differs, and (when enabled) the batched encoder precompute perturbs the
-encoder hidden states at the last bit, so sampled tokens can diverge. Greedy
-decoding matches HF token-for-token.
+draw order differs, and the batched encoder precompute perturbs the encoder
+hidden states at the last bit, so sampled tokens can diverge. Greedy decoding
+matches HF token-for-token.
 """
 import time
 import torch
@@ -24,10 +24,13 @@ from transformers.modeling_outputs import BaseModelOutput
 from transformers import LogitsProcessorList
 
 from .cache_utils import get_cache
-from .server import get_eos_token_id, _build_generation_stats
+from .server import get_eos_token_id, _build_generation_stats, build_logits_processors, model_generate
 from ..event import ContextType, EventType
-from .fast_generate import build_logits_processors
 from .logit_processors import MonotonicTimeShiftLogitsProcessor
+
+
+class CaptureError(RuntimeError):
+    """CUDA graph capture failed (unsupported GPU/backend or model architecture)."""
 
 
 def neutralize_dynamic_rope(model) -> int:
@@ -240,7 +243,10 @@ def _get_decoder(model, batch_size, cfg_scale, enc_shape, dtype, cache_len):
     if key not in _decoder_cache:
         cache = get_cache(model, batch_size, 1, cfg_scale, max_cache_len=cache_len)
         decoder = CUDAGraphDecoder(model, batch_size, enc_shape, dtype)
-        decoder.capture(cache)
+        try:
+            decoder.capture(cache)
+        except Exception as e:
+            raise CaptureError(str(e)) from e
         # After capture the cache holds garbage from the warmup forwards. The
         # decode loop calls _reset_cache + prefill before each window, which
         # restores correct state, so the capture corruption is harmless.
@@ -260,10 +266,26 @@ def _reset_cache(cache):
     cache.reset()
 
 
+# Set on the first capture failure (e.g. a CUDA-like backend without working
+# graph capture); all subsequent calls go straight to the stock generate.
+_capture_unsupported = False
+
+
 @torch.no_grad()
-def model_generate_compiled(model, tokenizer, model_kwargs, generate_kwargs,
-                            encoder_outputs: BaseModelOutput):
-    """Custom decode loop with CUDA-graph-captured forward."""
+def model_generate_compiled(model, tokenizer, model_kwargs, generate_kwargs):
+    """Custom decode loop with CUDA-graph-captured forward.
+
+    Expects precomputed encoder hidden states as model_kwargs['encoder_outputs']
+    (a (B, L_enc, D) tensor, see server.precompute_encoder_outputs). If graph
+    capture fails on this system, falls back to the stock generate permanently
+    for this process.
+    """
+    global _capture_unsupported
+    if _capture_unsupported:
+        return model_generate(model, tokenizer, model_kwargs, generate_kwargs)
+    # Shallow copies so a capture-failure fallback still sees the kwargs consumed below
+    fallback_args = (dict(model_kwargs), dict(generate_kwargs))
+
     # Dynamic-RoPE models (e.g. v30) can't be graph-captured until their no-op
     # frequency update is disabled. Idempotent: a no-op once already flipped.
     neutralize_dynamic_rope(model)
@@ -272,6 +294,7 @@ def model_generate_compiled(model, tokenizer, model_kwargs, generate_kwargs,
                     for k, v in model_kwargs.items()}
     model_kwargs = {k: v.to(model.dtype) if k != "inputs" and isinstance(v, torch.Tensor)
                     and v.dtype == torch.float32 else v for k, v in model_kwargs.items()}
+    encoder_outputs = BaseModelOutput(last_hidden_state=model_kwargs.pop('encoder_outputs'))
 
     precision = generate_kwargs.pop('precision', 'fp32')
     cfg_scale = generate_kwargs.pop('cfg_scale', 1.0)
@@ -396,17 +419,23 @@ def model_generate_compiled(model, tokenizer, model_kwargs, generate_kwargs,
         return generated, truncated
 
     start_time = time.perf_counter()
-    # Start with a small bucket sized for the common short-generation case.
-    cache_len = _pick_bucket(prompt_len, model_max)
-    generated, truncated = _run_window(cache_len)
-    # If the window filled its bucket without hitting EOS while the model was still
-    # allowed to generate (bucket < hard_cap), the bucket was too small and we'd
-    # otherwise emit a truncated sequence (seen with small lookahead, where windows
-    # generate far more than the default headroom). Retry once with a cache big
-    # enough for the full budget so compiled output matches the non-compiled path.
-    if truncated and cache_len < hard_cap:
-        cache_len = _bucket_ceil(hard_cap, model_max)
+    try:
+        # Start with a small bucket sized for the common short-generation case.
+        cache_len = _pick_bucket(prompt_len, model_max)
         generated, truncated = _run_window(cache_len)
+        # If the window filled its bucket without hitting EOS while the model was still
+        # allowed to generate (bucket < hard_cap), the bucket was too small and we'd
+        # otherwise emit a truncated sequence (seen with small lookahead, where windows
+        # generate far more than the default headroom). Retry once with a cache big
+        # enough for the full budget so compiled output matches the non-compiled path.
+        if truncated and cache_len < hard_cap:
+            cache_len = _bucket_ceil(hard_cap, model_max)
+            generated, truncated = _run_window(cache_len)
+    except CaptureError as e:
+        _capture_unsupported = True
+        print(f"CUDA graph capture is not supported on this system; "
+              f"falling back to the stock generate loop. ({e})")
+        return model_generate(model, tokenizer, *fallback_args)
     elapsed = time.perf_counter() - start_time
 
     gen_tensor = torch.cat(generated, dim=1) if generated else torch.empty(
