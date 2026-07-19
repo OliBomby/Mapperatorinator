@@ -88,7 +88,7 @@ class LookbackBiasLogitsWarper(LogitsProcessor):
     generating the next token, so we nill the scores of the lookback tokens and increase the chance of eos.
     """
     def __init__(self, lookback_max_time: float, tokenizer: Tokenizer, types_first: bool, device):
-        self.types_first = types_first  # Lookback bias is only supported for types_first=True
+        self.types_first = types_first
         self.lookback_start = tokenizer.event_start[EventType.TIME_SHIFT]
         self.lookback_end = tokenizer.encode(Event(EventType.TIME_SHIFT, int(lookback_max_time / MILISECONDS_PER_STEP)))
         self.lookback_range = torch.full((tokenizer.vocab_size_out,), False, dtype=torch.bool, device=device)
