@@ -219,6 +219,9 @@ class Postprocessor(object):
                     timing = self.set_sv(timedelta(milliseconds=int(round(group.time))), group.scroll_speed, timing)
 
             elif hit_type == EventType.HOLD_NOTE:
+                if hold_note_start is not None:
+                    self.logger.warning(f"Warning: Incomplete hold note at {int(round(hold_note_start.time))}")
+
                 hold_note_start = group
 
             elif hit_type == EventType.HOLD_NOTE_END and hold_note_start is not None:
@@ -236,6 +239,9 @@ class Postprocessor(object):
                 hold_note_start = None
 
             elif hit_type == EventType.DRUMROLL:
+                if drumroll_start is not None:
+                    self.logger.warning(f"Warning: Incomplete drumroll at {int(round(drumroll_start.time))}")
+
                 drumroll_start = group
 
             elif hit_type == EventType.DRUMROLL_END and drumroll_start is not None:
@@ -271,6 +277,9 @@ class Postprocessor(object):
                 drumroll_start = None
 
             elif hit_type == EventType.DENDEN:
+                if denden_start is not None:
+                    self.logger.warning(f"Warning: Incomplete denden at {int(round(denden_start.time))}")
+
                 denden_start = group
 
             elif hit_type == EventType.DENDEN_END and denden_start is not None:
@@ -289,6 +298,9 @@ class Postprocessor(object):
                 denden_start = None
 
             elif hit_type == EventType.SPINNER:
+                if spinner_start is not None:
+                    self.logger.warning(f"Warning: Incomplete spinner at {int(round(spinner_start.time))}")
+
                 spinner_start = group
 
             elif hit_type == EventType.SPINNER_END and spinner_start is not None:
