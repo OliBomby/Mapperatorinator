@@ -637,19 +637,19 @@ class Postprocessor(object):
         if len(timing) == 0:
             return time
 
-        before_tp = self.timing_point_at(timedelta(milliseconds=time), timing)
-        before_tp = before_tp if before_tp.parent is None else before_tp.parent
-        before_time = round(before_tp.offset.total_seconds() * 1000)
+        current_tp = self.timing_point_at(timedelta(milliseconds=time), timing)
+        current_tp = current_tp if current_tp.parent is None else current_tp.parent
+        current_tp_time = round(current_tp.offset.total_seconds() * 1000)
+        before_tp = self.timing_point_at(timedelta(milliseconds=current_tp_time - 1), timing)
         after_tp = self.uninherited_timing_point_after(timedelta(milliseconds=time), timing)
-        after_time = round(after_tp.offset.total_seconds() * 1000) if after_tp is not None else None
+        after_tp_time = round(after_tp.offset.total_seconds() * 1000) if after_tp is not None else np.inf
 
-        # If the new time is too close to the next timing point, snap to the next timing point
-        if after_time is not None and time > before_time + 10 and time >= after_time - 10:
-            return after_time
+        current_interval = (current_tp_time, after_tp_time)
 
-        def local_ticks(divisor: int) -> set[int]:
-            ms_per_tick = before_tp.ms_per_beat / divisor
-            remainder = (time - before_time) % ms_per_tick
+        def local_ticks(tp: TimingPoint, divisor: int) -> set[int]:
+            tp_time = round(tp.offset.total_seconds() * 1000)
+            ms_per_tick = tp.ms_per_beat / divisor
+            remainder = (time - tp_time) % ms_per_tick
             return {
                 int(time - remainder - ms_per_tick),
                 int(time - remainder),
@@ -657,12 +657,29 @@ class Postprocessor(object):
                 int(time - remainder + 2 * ms_per_tick)
             }
 
-        ticks = local_ticks(snap_divisor)
+        def local_ticks_minus_ignored(tp: TimingPoint, divisor: int) -> set[int]:
+            ticks = local_ticks(tp, divisor)
 
-        # Remove ticks that are from bigger snap divisors because we specifically want to snap to the snap_divisor
-        ignore_divisors = ignore_ticks.get(snap_divisor, [1])
-        for ignore_divisor in ignore_divisors:
-            ticks -= local_ticks(ignore_divisor)
+            # Remove ticks that are from bigger snap divisors because we specifically want to snap to the snap_divisor
+            ignore_divisors = ignore_ticks.get(divisor, [1])
+            for ignore_divisor in ignore_divisors:
+                ticks -= local_ticks(tp, ignore_divisor)
+            return ticks
+
+        ticks = local_ticks_minus_ignored(current_tp, snap_divisor)
+        # Trim to ticks inside current interval with margin
+        m = 20
+        ticks = {tick for tick in ticks if current_interval[0] - m <= tick <= current_interval[1] + m}
+
+        if before_tp is not None:
+            before_ticks = local_ticks_minus_ignored(before_tp, snap_divisor)
+            before_ticks = {tick for tick in before_ticks if tick <= current_interval[0] + m}
+            ticks.update(before_ticks)
+
+        if after_tp is not None:
+            after_ticks = local_ticks_minus_ignored(after_tp, snap_divisor)
+            after_ticks = {tick for tick in after_ticks if tick >= current_interval[1] - m}
+            ticks.update(after_ticks)
 
         if len(ticks) == 0:
             # If we don't have any ticks, just return the original time
