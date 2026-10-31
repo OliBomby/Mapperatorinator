@@ -744,10 +744,12 @@ class Postprocessor(object):
             tp_change = TimingPointsChange(tp, uninherited=True)
             timing = tp_change.add_change(timing, True)
 
-        if len(timing) == 0:
-            timing = [
-                TimingPoint(timedelta(milliseconds=markers[0].time), 1000, 4, 2, -1, 100, None, False)
-            ]
+        # Beats may precede the first predicted BPM change. Seed that initial
+        # section too, otherwise its beats are fitted against a future redline
+        # and disappear when the timing is parsed for map generation.
+        first_marker_offset = timedelta(milliseconds=markers[0].time)
+        if len(timing) == 0 or timing[0].offset > first_marker_offset:
+            timing.insert(0, TimingPoint(first_marker_offset, 1000, 4, 2, -1, 100, None, False))
 
         counter = 0
         last_measure_time = markers[0].time
