@@ -14,7 +14,7 @@ from slider import TimingPoint, Beatmap
 from config import InferenceConfig
 from .slider_path import SliderPath
 from .timing_points_change import TimingPointsChange, sort_timing_points
-from ..dataset.data_utils import get_groups, Group, get_median_mpb, BEAT_TYPES
+from ..dataset.data_utils import get_groups, Group, get_median_mpb, BEAT_TYPES, TIMED_EVENTS
 from ..tokenizer import Event, EventType
 
 OSU_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "template.osu")
@@ -172,7 +172,17 @@ class Postprocessor(object):
                 timedelta(milliseconds=self.offset), self.beat_length, 4, 2, -1, 100, None, False
             )]
 
-        groups, _ = get_groups(events, types_first=self.types_first)
+        groups, group_indices = get_groups(events, types_first=self.types_first)
+        valid_groups = []
+        for group, indices in zip(groups, group_indices):
+            # An absent timestamp must not become an object at Group's default
+            # time of zero. LAST_ANCHOR can be untimed geometry in V2 sliders.
+            requires_time = group.event_type in TIMED_EVENTS and group.event_type != EventType.LAST_ANCHOR
+            if requires_time and not any(events[i].type == EventType.TIME_SHIFT for i in indices):
+                self.logger.warning(f"Warning: Skipping {group.event_type.value} group without a timestamp")
+                continue
+            valid_groups.append(group)
+        groups = valid_groups
         last_x, last_y = 256, 192
 
         if self.snap_near_perfect_overlaps_enabled:

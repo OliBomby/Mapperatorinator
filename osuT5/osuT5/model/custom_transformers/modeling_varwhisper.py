@@ -362,6 +362,9 @@ def sdpa_attention_forward(
             value,
             dropout_p=module.attention_dropout if module.training else 0.0,
             attn_mask=attention_mask,
+            # The decoder may omit its mask expecting SDPA to supply causality.
+            # A single cached query must still attend to every previous key.
+            is_causal=module.is_causal and attention_mask is None and query.shape[-2] > 1,
         )
         .transpose(1, 2)
         .contiguous()

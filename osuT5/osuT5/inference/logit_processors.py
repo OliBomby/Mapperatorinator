@@ -83,14 +83,17 @@ class ConditionalTemperatureLogitsWarper(LogitsProcessor):
 
 
 class LookbackBiasLogitsWarper(LogitsProcessor):
-    """This logit processor adjusts for bias in the frequency of generated events in case there is a lookback window,
-    and it is not full of generated tokens. In this case, the lookback window will be considered multiple times for
-    generating the next token, so we nill the scores of the lookback tokens and increase the chance of eos.
+    """Suppress repeated lookback events without inflating unrelated token categories.
+
+    For time-first streams, redistribute past-timestamp mass among allowed timestamps.
+    Type-first streams correct the preceding event/EOS decision when its time is sampled.
     """
     def __init__(self, lookback_max_time: float, tokenizer: Tokenizer, types_first: bool, device):
         self.types_first = types_first
         self.lookback_start = tokenizer.event_start[EventType.TIME_SHIFT]
         self.lookback_end = tokenizer.encode(Event(EventType.TIME_SHIFT, int(lookback_max_time / MILISECONDS_PER_STEP)))
+        self.time_shift_end = tokenizer.event_end[EventType.TIME_SHIFT]
+        self.eos_id = tokenizer.eos_id
         self.lookback_range = torch.full((tokenizer.vocab_size_out,), False, dtype=torch.bool, device=device)
         self.lookback_range[self.lookback_start:self.lookback_end] = True
         self.other_range = ~self.lookback_range
@@ -106,7 +109,21 @@ class LookbackBiasLogitsWarper(LogitsProcessor):
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.Tensor:
         if not self.types_first:
             scores_processed = scores.clone()
+            time_mass = torch.logsumexp(scores[:, self.lookback_start:self.time_shift_end], dim=-1)
+            allowed_scores = scores[:, self.lookback_end:self.time_shift_end]
+            allowed_mass = torch.logsumexp(allowed_scores, dim=-1)
+            has_allowed_time = torch.isfinite(allowed_mass)
+            # Preserve the total timestamp mass and the relative scores of the
+            # allowed timestamps. Other categories retain their original logits.
+            shift = torch.where(has_allowed_time, time_mass - allowed_mass, 0)
+            scores_processed[:, self.lookback_end:self.time_shift_end] = allowed_scores + shift.unsqueeze(-1)
             scores_processed[:, self.lookback_range] = -torch.inf
+            # If all timestamps are masked, terminate rather than boosting
+            # positions/hitsounds or producing NaNs from an empty category.
+            scores_processed[:, self.eos_id] = torch.where(
+                has_allowed_time, scores[:, self.eos_id],
+                torch.logaddexp(scores[:, self.eos_id], time_mass),
+            )
             return scores_processed
 
         scores_processed = scores
