@@ -163,7 +163,7 @@ class Postprocessor(object):
         slider_head = None
         anchor_info = []
         last_anchor = None
-        hold_note_start = None
+        hold_note_starts: dict[int, Group] = {}
         drumroll_start = None
         denden_start = None
 
@@ -229,12 +229,21 @@ class Postprocessor(object):
                     timing = self.set_sv(timedelta(milliseconds=int(round(group.time))), group.scroll_speed, timing)
 
             elif hit_type == EventType.HOLD_NOTE:
+                column = min(max(int(group.x * beatmap_config.circle_size / 512), 0),
+                             int(beatmap_config.circle_size) - 1)
+                hold_note_start = hold_note_starts.get(column)
                 if hold_note_start is not None:
-                    self.logger.warning(f"Warning: Incomplete hold note at {int(round(hold_note_start.time))}")
+                    self.logger.warning(
+                        f"Warning: Incomplete hold note at {int(round(hold_note_start.time))} in column {column}")
 
-                hold_note_start = group
+                hold_note_starts[column] = group
 
-            elif hit_type == EventType.HOLD_NOTE_END and hold_note_start is not None:
+            elif hit_type == EventType.HOLD_NOTE_END:
+                column = min(max(int(group.x * beatmap_config.circle_size / 512), 0),
+                             int(beatmap_config.circle_size) - 1)
+                hold_note_start = hold_note_starts.pop(column, None)
+                if hold_note_start is None:
+                    continue
                 hitsound = hold_note_start.hitsounds[0] if len(hold_note_start.hitsounds) > 0 else 0
                 sampleset = hold_note_start.samplesets[0] if len(hold_note_start.samplesets) > 0 else 0
                 addition = hold_note_start.additions[0] if len(hold_note_start.additions) > 0 else 0
@@ -246,7 +255,6 @@ class Postprocessor(object):
                 if len(hold_note_start.volumes) > 0 and beatmap_config.mode != 3:
                     timing = self.set_volume(timedelta(milliseconds=int(round(hold_note_start.time))),
                                              hold_note_start.volumes[0], timing)
-                hold_note_start = None
 
             elif hit_type == EventType.DRUMROLL:
                 if drumroll_start is not None:
@@ -447,10 +455,18 @@ class Postprocessor(object):
                 else:
                     timing = self.set_sv(timedelta(milliseconds=group.time), group.scroll_speed, timing)
 
+        for column, hold_note_start in hold_note_starts.items():
+            self.logger.warning(
+                f"Warning: Incomplete hold note at {int(round(hold_note_start.time))} in column {column}")
+
         # Remove any greenlines before the first timingpoint where parent is None
         if len(timing) > 0:
             first_timing_point = next(tp for tp in timing if tp.parent is None)
             timing = [tp for tp in timing if tp.offset >= first_timing_point.offset]
+
+        # Holds are completed in end-time order, which may differ from their
+        # start-time order when different columns overlap.
+        hit_object_strings.sort(key=lambda hit_object: int(hit_object.split(",", 3)[2]))
 
         # Write .osu file
         with open(OSU_TEMPLATE_PATH, "r", encoding="utf-8") as tf:
