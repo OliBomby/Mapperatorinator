@@ -275,6 +275,38 @@ def _configure_generation_log_worker(queue: multiprocessing.Queue) -> logging.Lo
     return gen_logger
 
 
+def _wait_for_generation_workers(processes, chunks, mode_name: str):
+    failed = []
+    for idx, process in enumerate(processes):
+        process.join()
+        if process.exitcode != 0:
+            failed.append(idx)
+            logger.error(
+                "Generation worker %d (%s) exited with code %s; assigned %d maps, starting with %s",
+                idx, process.name, process.exitcode, len(chunks[idx]),
+                chunks[idx][0] if chunks[idx] else "<empty chunk>",
+            )
+    if failed:
+        raise RuntimeError(
+            f"{mode_name} generation workers {failed} failed. See their console tracebacks; "
+            "rerun generation to finish missing maps before calculating metrics."
+        )
+
+
+def _require_generated_beatmaps(beatmap_paths, generated_root: Path = Path("generated")):
+    missing = [path for path in beatmap_paths if not any(
+        output.is_file() and output.stat().st_size > 0
+        for output in (generated_root / path.stem).glob("*.osu")
+    )]
+    if missing:
+        for path in missing[:10]:
+            logger.error("Missing generated beatmap for %s", path)
+        raise RuntimeError(
+            f"Missing generated beatmaps for {len(missing)} of {len(beatmap_paths)} maps. "
+            "Run generation to completion before calculating metrics."
+        )
+
+
 def _read_gamemode_from_osu(path: Path) -> int:
     """Read the Mode field from an .osu file without fully parsing it."""
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
@@ -499,24 +531,29 @@ def generate_beatmaps(beatmap_paths, args: InferenceConfig, dataset_type, idx, l
 
     gen_logger = _configure_generation_log_worker(log_queue)
 
-    model, tokenizer, diff_model, diff_tokenizer, refine_model = None, None, None, None, None
-    model, tokenizer = load_model_with_server(args.model_path, args.train, args.device,
-                                              max_batch_size=args.max_batch_size, use_server=args.use_server,
-                                              precision=args.precision, attn_implementation=args.attn_implementation,
-                                              gamemode=args.gamemode,
-                                              auto_select_gamemode_model=args.auto_select_gamemode_model)
-
-    if args.compile:
-        model.transformer.forward = torch.compile(model.transformer.forward, mode="reduce-overhead", fullgraph=True)
-
-    if args.generate_positions:
-        diff_model, diff_tokenizer = load_diff_model(args.diff_ckpt, args.diffusion, args.device)
-
-        if os.path.exists(args.diff_refine_ckpt):
-            refine_model = load_diff_model(args.diff_refine_ckpt, args.diffusion, args.device)[0]
+    try:
+        diff_model, diff_tokenizer, refine_model = None, None, None
+        model, tokenizer = load_model_with_server(args.model_path, args.train, args.device,
+                                                  max_batch_size=args.max_batch_size, use_server=args.use_server,
+                                                  precision=args.precision, attn_implementation=args.attn_implementation,
+                                                  gamemode=args.gamemode,
+                                                  auto_select_gamemode_model=args.auto_select_gamemode_model,
+                                                  fast_decoder_loop=args.fast_decoder_loop)
 
         if args.compile:
-            diff_model.forward = torch.compile(diff_model.forward, mode="reduce-overhead", fullgraph=False)
+            model.transformer.forward = torch.compile(model.transformer.forward, mode="reduce-overhead", fullgraph=True)
+
+        if args.generate_positions:
+            diff_model, diff_tokenizer = load_diff_model(args.diff_ckpt, args.diffusion, args.device)
+
+            if os.path.exists(args.diff_refine_ckpt):
+                refine_model = load_diff_model(args.diff_refine_ckpt, args.diffusion, args.device)[0]
+
+            if args.compile:
+                diff_model.forward = torch.compile(diff_model.forward, mode="reduce-overhead", fullgraph=False)
+    except Exception:
+        gen_logger.exception("Generation worker %d failed during model initialization", idx)
+        raise
 
     for beatmap_path in tqdm(beatmap_paths, desc=f"Process {idx}"):
         try:
@@ -830,11 +867,12 @@ def main(args: FidConfig):
                         processes.append(p)
                         p.start()
 
-                    for p in processes:
-                        p.join()
+                    _wait_for_generation_workers(processes, chunks, gm_name)
 
+                _require_generated_beatmaps(gm_beatmap_paths)
                 logger.info("=== Finished generating %s beatmaps ===", gm_name)
 
+        _require_generated_beatmaps(all_beatmap_paths)
         calculate_metrics(args, all_beatmap_paths)
     finally:
         if listener is not None:
