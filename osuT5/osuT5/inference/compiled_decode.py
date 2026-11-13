@@ -209,6 +209,13 @@ class CUDAGraphDecoder:
 # so one graph is captured per cache-length bucket and reused across windows.
 _decoder_cache = {}
 
+
+def clear_decoder_cache(model):
+    """Release captured graphs and their model references when a server stops."""
+    for key in list(_decoder_cache):
+        if key[0] == id(model):
+            del _decoder_cache[key]
+
 # Decoder self-attention cache-length buckets. A static cache attends over its
 # full allocated length every decode step, so we pick the smallest bucket that
 # holds this window's prompt + generation headroom (a bigger cache = slower step).

@@ -1,4 +1,5 @@
 import _pickle
+import gc
 import os
 import time
 import threading
@@ -14,6 +15,7 @@ from .logit_processors import ConditionalTemperatureLogitsWarper, get_beat_type_
     get_mania_type_tokens, get_scroll_speed_tokens, TimeshiftBias, LookbackBiasLogitsWarper, \
     MonotonicTimeShiftLogitsProcessor
 from .cache_utils import get_cache
+from .compiled_decode import clear_decoder_cache
 from ..model import Mapperatorinator
 from ..tokenizer import Tokenizer
 
@@ -382,6 +384,7 @@ class InferenceServer:
         self.listener = None
         self.connections = 0
         self.request_event = threading.Event()  # set when a request is enqueued
+        self.batch_thread = None
 
     def start(self):
         # Remove stale socket
@@ -394,12 +397,14 @@ class InferenceServer:
         self.listener = Listener(self.socket_path)
         threading.Thread(target=self._listener_thread, daemon=True).start()
         # Start batcher thread
-        threading.Thread(target=self._batch_thread, daemon=True).start()
+        self.batch_thread = threading.Thread(target=self._batch_thread, daemon=True)
+        self.batch_thread.start()
         # Start idle monitor
         threading.Thread(target=self._idle_monitor, daemon=True).start()
 
     def stop(self):
         self.shutdown_flag.set()
+        self.request_event.set()
         try:
             if self.listener is not None:
                 self.listener.close()
@@ -409,6 +414,16 @@ class InferenceServer:
             os.unlink(self.socket_path)
         except Exception:
             pass
+
+    def release_model(self):
+        """Wait for inference to finish before releasing weights and CUDA graphs."""
+        if self.batch_thread is not None:
+            self.batch_thread.join()
+        if self.fast_decoder_loop:
+            clear_decoder_cache(self.model)
+        self.model = None
+        self.tokenizer = None
+        self.grouped_requests.clear()
 
     def _listener_thread(self):
         while not self.shutdown_flag.is_set():
@@ -484,6 +499,8 @@ class InferenceServer:
             # sleep (which taxed every request of a sequential client with up to
             # batch_timeout of latency).
             self.request_event.wait(timeout=self.batch_timeout)
+            if self.shutdown_flag.is_set():
+                break
             with self.lock:
                 if not self.grouped_requests:
                     # Enqueue + set happen under this lock, so clearing here
@@ -602,18 +619,14 @@ class InferenceServer:
     def _idle_monitor(self):
         last_activity = time.time()
         while not self.shutdown_flag.is_set():
-            time.sleep(self.idle_timeout / 2)
+            if self.shutdown_flag.wait(self.idle_timeout / 2):
+                return
             with self.lock:
                 if self.connections > 0:
                     last_activity = time.time()
             if time.time() - last_activity > self.idle_timeout:
                 # No requests for a while: shutdown
-                self.shutdown_flag.set()
-                try:
-                    self.listener.close()
-                    os.unlink(self.socket_path)
-                except Exception:
-                    pass
+                self.stop()
 
 
 class InferenceClient:
@@ -651,6 +664,8 @@ class InferenceClient:
         self.last_generation_stats = None
         self._server = None
         self._server_thread = None
+        self._server_ready = threading.Event()
+        self._server_error = None
 
     def __enter__(self):
         self._reconnect()
@@ -663,15 +678,20 @@ class InferenceClient:
             except FileNotFoundError:
                 # No server: start one
                 self._start_server_thread()
-                # Wait for server socket to appear
-                while not os.path.exists(self.socket_path):
-                    time.sleep(0.1)
+                self._wait_for_server_start()
                 self.conn = Client(self.socket_path)
 
     def _start_server_thread(self):
         if self._server_thread is not None and self._server_thread.is_alive():
-            return
+            if not self._server_ready.is_set():
+                return
+            if self._server is not None and not self._server.shutdown_flag.is_set():
+                return
+            # An idle server may still be releasing its model after closing IPC.
+            self._server_thread.join()
 
+        self._server_ready.clear()
+        self._server_error = None
         self._server_thread = threading.Thread(
             target=self._start_server,
             args=(self.model_loader, self.tokenizer_loader),
@@ -684,24 +704,44 @@ class InferenceClient:
             self.conn.close()
 
     def _start_server(self, model_loader, tokenizer_loader):
-        # Load model inside server process
-        model = model_loader()
-        tokenizer = tokenizer_loader()
-        server = InferenceServer(
-            model,
-            tokenizer,
-            max_batch_size=self.max_batch_size,
-            batch_timeout=self.batch_timeout,
-            idle_timeout=self.idle_timeout,
-            socket_path=self.socket_path,
-            fast_decoder_loop=self.fast_decoder_loop,
-        )
-        self._server = server
-        server.start()
-        # Block until shutdown
-        while not server.shutdown_flag.is_set():
-            time.sleep(1)
-        self._server = None
+        server = None
+        model = tokenizer = None
+        try:
+            model = model_loader()
+            tokenizer = tokenizer_loader()
+            server = InferenceServer(
+                model,
+                tokenizer,
+                max_batch_size=self.max_batch_size,
+                batch_timeout=self.batch_timeout,
+                idle_timeout=self.idle_timeout,
+                socket_path=self.socket_path,
+                fast_decoder_loop=self.fast_decoder_loop,
+            )
+            self._server = server
+            server.start()
+            self._server_ready.set()
+            server.shutdown_flag.wait()
+        except Exception as exc:
+            # Do not retain a traceback containing the model or failed allocations.
+            self._server_error = f"{type(exc).__name__}: {exc}"
+        finally:
+            try:
+                if server is not None:
+                    server.stop()
+                    server.release_model()
+            finally:
+                self._server = None
+                model = tokenizer = server = None
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                self._server_ready.set()
+
+    def _wait_for_server_start(self):
+        self._server_ready.wait()
+        if self._server_error is not None:
+            raise RuntimeError(f"Failed to start inference server: {self._server_error}")
 
     def generate(self, model_kwargs, generate_kwargs, max_retries=3):
         attempts = 0
@@ -749,10 +789,8 @@ class InferenceClient:
         with Locker():
             if not os.path.exists(self.socket_path):
                 self._start_server_thread()
-
-        # Wait for server socket to appear.
-        while not os.path.exists(self.socket_path):
-            time.sleep(0.1)
+                # Keep startup serialized until the listener is ready.
+                self._wait_for_server_start()
 
     def shutdown_server(self, join_timeout=5.0):
         if self.conn:
@@ -763,12 +801,15 @@ class InferenceClient:
             finally:
                 self.conn = None
 
+        server_thread = self._server_thread
+        if server_thread is not None and server_thread.is_alive() and self._server is None:
+            self._server_ready.wait()
         if self._server is not None:
             self._server.stop()
-
-        server_thread = self._server_thread
         if server_thread is not None and server_thread.is_alive():
             server_thread.join(timeout=join_timeout)
+            if server_thread.is_alive():
+                raise RuntimeError("Inference server is still shutting down")
 
 
 if __name__ == "__main__":

@@ -290,11 +290,12 @@ cancelled_jobs = set()
 process_lock = threading.Lock()
 owned_server_clients = {}
 owned_server_clients_lock = threading.Lock()
+inference_start_lock = threading.Lock()
 shutdown_lock = threading.Lock()
 shutdown_started = False
 
 
-def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: str | None):
+def _model_server_key(args, *, auto_select_gamemode_model: bool, lora_path: str | None):
     socket_path = get_server_address(
         args.model_path,
         lora_path=lora_path,
@@ -302,9 +303,14 @@ def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: s
         auto_select_gamemode_model=auto_select_gamemode_model,
     )
 
-    with owned_server_clients_lock:
-        existing_client = owned_server_clients.get(socket_path)
+    return (socket_path, str(args.device), args.precision, args.attn_implementation,
+            args.fast_decoder_loop, args.max_batch_size)
 
+
+def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: str | None):
+    # Caller holds owned_server_clients_lock through lookup, startup and insertion.
+    key = _model_server_key(args, auto_select_gamemode_model=auto_select_gamemode_model, lora_path=lora_path)
+    existing_client = owned_server_clients.get(key)
     if existing_client is not None:
         existing_client.ensure_server()
         return
@@ -327,26 +333,36 @@ def _ensure_model_server(args, *, auto_select_gamemode_model: bool, lora_path: s
         max_batch_size=args.max_batch_size,
         idle_timeout=3600,
         server_thread_daemon=True,
-        socket_path=socket_path,
+        socket_path=key[0],
         fast_decoder_loop=args.fast_decoder_loop,
     )
 
     # Start the server in a dedicated thread that outlives per-job workers.
     _server_owner_client.ensure_server()
 
-    with owned_server_clients_lock:
-        owned_server_clients.setdefault(socket_path, _server_owner_client)
+    owned_server_clients[key] = _server_owner_client
 
 
 def _ensure_inference_server(args):
-    _ensure_model_server(
-        args,
-        auto_select_gamemode_model=args.auto_select_gamemode_model,
-        lora_path=args.lora_path
-    )
-
+    specs = [(args.auto_select_gamemode_model, args.lora_path)]
     if should_load_separate_timing_model(args):
-        _ensure_model_server(args, auto_select_gamemode_model=False, lora_path=None)
+        specs.append((False, None))
+    required_keys = {
+        _model_server_key(args, auto_select_gamemode_model=auto_select, lora_path=lora)
+        for auto_select, lora in specs
+    }
+    with owned_server_clients_lock:
+        obsolete_keys = owned_server_clients.keys() - required_keys
+        if obsolete_keys:
+            with process_lock:
+                if any(rec["process"].is_alive() for rec in processes.values()):
+                    raise ValueError("Wait for the current generation to finish before changing models or precision.")
+        for key in obsolete_keys:
+            # Finish releasing the previous weights before loading replacements.
+            owned_server_clients[key].shutdown_server()
+            del owned_server_clients[key]
+        for auto_select, lora in specs:
+            _ensure_model_server(args, auto_select_gamemode_model=auto_select, lora_path=lora)
 
 
 def _shutdown_inference_processes():
@@ -631,9 +647,18 @@ def start_inference():
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(ve)}), 400
 
+    # Serialize model selection through worker registration so a concurrent
+    # request cannot unload a server before its first worker starts.
+    with inference_start_lock:
+        return _start_inference_job(cfg, job_id)
+
+
+def _start_inference_job(cfg, job_id):
     # Ensure a shared server is running, owned by web UI.
     try:
         _ensure_inference_server(cfg)
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 409
     except Exception as e:
         traceback.print_exc()
         return jsonify({"status": "error", "message": f"Failed to ensure inference server: {e}"}), 500
