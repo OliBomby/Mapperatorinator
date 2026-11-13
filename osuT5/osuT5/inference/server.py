@@ -15,7 +15,6 @@ from .logit_processors import ConditionalTemperatureLogitsWarper, get_beat_type_
     get_mania_type_tokens, get_scroll_speed_tokens, TimeshiftBias, LookbackBiasLogitsWarper, \
     MonotonicTimeShiftLogitsProcessor
 from .cache_utils import get_cache
-from .compiled_decode import clear_decoder_cache
 from ..model import Mapperatorinator
 from ..tokenizer import Tokenizer
 
@@ -420,6 +419,7 @@ class InferenceServer:
         if self.batch_thread is not None:
             self.batch_thread.join()
         if self.fast_decoder_loop:
+            from .compiled_decode import clear_decoder_cache
             clear_decoder_cache(self.model)
         self.model = None
         self.tokenizer = None
