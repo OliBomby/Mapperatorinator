@@ -68,8 +68,12 @@ class Mapperatorinator(PreTrainedModel, GenerationMixin):
     _supports_cache_class = True
     _supports_static_cache = True
 
-    def __init__(self, config: MapperatorinatorConfig):
-        super().__init__(config)
+    def __init__(self, config: MapperatorinatorConfig, **kwargs):
+        super().__init__(config, **kwargs)
+
+        # get_backbone_model reads dtype from config, but from_pretrained passes it as a kwarg
+        if not hasattr(config, 'dtype'):
+            config.dtype = kwargs.get('dtype', None)
 
         if not config.input_raw_wave:
             self.spectrogram = MelSpectrogram(
